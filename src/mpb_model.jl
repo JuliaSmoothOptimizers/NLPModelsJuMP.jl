@@ -1,6 +1,7 @@
 using MathProgBase
 
 importall NLPModels
+import NLPModels.increment!
 
 export MathProgNLPModel,
        reset!,
