@@ -1,0 +1,45 @@
+language: julia
+
+os:
+  - linux
+  - osx
+
+julia:
+  - 0.6
+  - 0.7
+  - 1.0
+  - nightly
+
+matrix:
+  allow_failures:
+    - julia: 0.7
+    - julia: 1.0
+    - julia: nightly
+
+sudo: required
+
+git:
+  depth: 9999
+
+notifications:
+  email: false
+
+addons:
+  apt_packages:
+    - gfortran
+
+branches:
+  only:
+    - master
+
+before_install:
+  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
+
+script:
+  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("NLPJuMPModels"); Pkg.test("NLPJuMPModels"; coverage=true)'
+
+after_success:
+  - julia -e 'Pkg.add("Documenter")'
+  - julia -e 'Pkg.clone("https://github.com/JuliaSmoothOptimizers/OptimizationProblems.jl")'
+  - julia -e 'cd(Pkg.dir("NLPJuMPModels")); include(joinpath("docs", "make.jl"))'
+  - julia -e 'cd(Pkg.dir("NLPJuMPModels")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
