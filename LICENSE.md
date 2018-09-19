@@ -1,4 +1,4 @@
-The NLPJuMPModels.jl package is licensed under the MIT "Expat" License.
+The JuMPNLPModels.jl package is licensed under the MIT "Expat" License.
 This package was part of the NLPModels.jl package.
 
 > Copyright (c) 2018: Abel Soares Siqueira & Dominique Orban.
