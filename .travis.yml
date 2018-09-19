@@ -36,10 +36,10 @@ before_install:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
 
 script:
-  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("NLPJuMPModels"); Pkg.test("NLPJuMPModels"; coverage=true)'
+  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("JuMPNLPModels"); Pkg.test("JuMPNLPModels"; coverage=true)'
 
 after_success:
   - julia -e 'Pkg.add("Documenter")'
   - julia -e 'Pkg.clone("https://github.com/JuliaSmoothOptimizers/OptimizationProblems.jl")'
-  - julia -e 'cd(Pkg.dir("NLPJuMPModels")); include(joinpath("docs", "make.jl"))'
-  - julia -e 'cd(Pkg.dir("NLPJuMPModels")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
+  - julia -e 'cd(Pkg.dir("JuMPNLPModels")); include(joinpath("docs", "make.jl"))'
+  - julia -e 'cd(Pkg.dir("JuMPNLPModels")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
