@@ -16,7 +16,8 @@ end
 MathProgBase.initialize(::NLPModelEvaluator, requested_features) = nothing
 
 # SAutodetect?
-MathProgBase.features_available(::NLPModelEvaluator) = [:Grad, :Jac, :Hess]
+MathProgBase.features_available(::NLPModelEvaluator) = [:Grad, :Jac, :JacVec, :HessVec, :Hess]
+MathProgBase.features_available(::NLPModelEvaluator{NLPModels.ADNLPModel}) = [:Grad, :Jac, :Hess]
 
 MathProgBase.eval_f(d::NLPModelEvaluator, x) = obj(d.nlp, x)
 
