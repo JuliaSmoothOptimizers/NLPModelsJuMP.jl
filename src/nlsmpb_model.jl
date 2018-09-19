@@ -98,7 +98,7 @@ function residual!(nls :: MathProgNLSModel, x :: AbstractVector, Fx :: AbstractV
   return Fx
 end
 
-function jac_residual(nls :: MathProgNLSModel, x :: Vector)
+function jac_residual(nls :: MathProgNLSModel, x :: AbstractVector)
   increment!(nls, :neval_jac_residual)
   m, n = nls.nls_meta.nequ, nls.meta.nvar
   MathProgBase.eval_jac_g(nls.Fmodel.eval, nls.Fjvals, x)
@@ -134,105 +134,105 @@ function hprod_residual!(nls :: MathProgNLSModel, x :: AbstractVector, i :: Int,
   return Hiv
 end
 
-function obj(nls :: MathProgNLSModel, x :: Array{Float64})
+function obj(nls :: MathProgNLSModel, x :: AbstractVector)
   increment!(nls, :neval_obj)
   return MathProgBase.eval_f(nls.cmodel.eval, x)
 end
 
-function grad(nls :: MathProgNLSModel, x :: Array{Float64})
+function grad(nls :: MathProgNLSModel, x :: AbstractVector)
   g = zeros(nls.meta.nvar)
   return grad!(nls, x, g)
 end
 
-function grad!(nls :: MathProgNLSModel, x :: Array{Float64}, g :: Array{Float64})
+function grad!(nls :: MathProgNLSModel, x :: AbstractVector, g :: AbstractVector)
   increment!(nls, :neval_grad)
   MathProgBase.eval_grad_f(nls.cmodel.eval, g, x)
   return g
 end
 
-function cons(nls :: MathProgNLSModel, x :: Array{Float64})
+function cons(nls :: MathProgNLSModel, x :: AbstractVector)
   c = zeros(nls.meta.ncon)
   return cons!(nls, x, c)
 end
 
-function cons!(nls :: MathProgNLSModel, x :: Array{Float64}, c :: Array{Float64})
+function cons!(nls :: MathProgNLSModel, x :: AbstractVector, c :: AbstractVector)
   increment!(nls, :neval_cons)
   MathProgBase.eval_g(nls.cmodel.eval, c, x)
   return c
 end
 
-function jac_coord(nls :: MathProgNLSModel, x :: Array{Float64})
+function jac_coord(nls :: MathProgNLSModel, x :: AbstractVector)
   increment!(nls, :neval_jac)
   MathProgBase.eval_jac_g(nls.cmodel.eval, nls.cjvals, x)
   return (nls.cjrows, nls.cjcols, nls.cjvals)
 end
 
-function jac(nls :: MathProgNLSModel, x :: Array{Float64})
+function jac(nls :: MathProgNLSModel, x :: AbstractVector)
   return sparse(jac_coord(nls, x)..., nls.meta.ncon, nls.meta.nvar)
 end
 
-function jprod(nls :: MathProgNLSModel, x :: Array{Float64}, v :: Array{Float64})
+function jprod(nls :: MathProgNLSModel, x :: AbstractVector, v :: AbstractVector)
   Jv = zeros(nls.meta.ncon)
   return jprod!(nls, x, v, Jv)
 end
 
 function jprod!(nls :: MathProgNLSModel,
-                x :: Array{Float64},
-                v :: Array{Float64},
-                Jv :: Array{Float64})
+                x :: AbstractVector,
+                v :: AbstractVector,
+                Jv :: AbstractVector)
   nls.counters.counters.neval_jac -= 1
   increment!(nls, :neval_jprod)
   Jv[:] = jac(nls, x) * v
   return Jv
 end
 
-function jtprod(nls :: MathProgNLSModel, x :: Array{Float64}, v :: Array{Float64})
+function jtprod(nls :: MathProgNLSModel, x :: AbstractVector, v :: AbstractVector)
   Jtv = zeros(nls.meta.nvar)
   return jtprod!(nls, x, v, Jtv)
 end
 
 function jtprod!(nls :: MathProgNLSModel,
-                x :: Array{Float64},
-                v :: Array{Float64},
-                Jtv :: Array{Float64})
+                x :: AbstractVector,
+                v :: AbstractVector,
+                Jtv :: AbstractVector)
   nls.counters.counters.neval_jac -= 1
   increment!(nls, :neval_jtprod)
   Jtv[1:nls.meta.nvar] = jac(nls, x)' * v
   return Jtv
 end
 
-function hess_coord(nls :: MathProgNLSModel, x :: Array{Float64};
-    obj_weight :: Float64=1.0, y :: Array{Float64}=zeros(nls.meta.ncon))
+function hess_coord(nls :: MathProgNLSModel, x :: AbstractVector;
+    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nls.meta.ncon))
   increment!(nls, :neval_hess)
   MathProgBase.eval_hesslag(nls.cmodel.eval, nls.chvals, x, obj_weight, y)
   return (nls.chrows, nls.chcols, nls.chvals)
 end
 
-function hess(nls :: MathProgNLSModel, x :: Array{Float64};
-    obj_weight :: Float64=1.0, y :: Array{Float64}=zeros(nls.meta.ncon))
+function hess(nls :: MathProgNLSModel, x :: AbstractVector;
+    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nls.meta.ncon))
   return sparse(hess_coord(nls, x, y=y, obj_weight=obj_weight)...,
                 nls.meta.nvar, nls.meta.nvar)
 end
 
-function hprod(nls :: MathProgNLSModel, x :: Array{Float64}, v :: Array{Float64};
-    obj_weight :: Float64=1.0, y :: Array{Float64}=zeros(nls.meta.ncon))
+function hprod(nls :: MathProgNLSModel, x :: AbstractVector, v :: AbstractVector;
+    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nls.meta.ncon))
   hv = zeros(nls.meta.nvar)
   return hprod!(nls, x, v, hv, obj_weight=obj_weight, y=y)
 end
 
 #=
 # Removed due to bug https://github.com/JuliaOpt/JuMP.jl/issues/1204
-function hprod!(nls :: MathProgNLSModel, x :: Array{Float64}, v :: Array{Float64},
-    hv :: Array{Float64};
-    obj_weight :: Float64=1.0, y :: Array{Float64}=zeros(nls.meta.ncon))
+function hprod!(nls :: MathProgNLSModel, x :: AbstractVector, v :: AbstractVector,
+    hv :: AbstractVector;
+    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nls.meta.ncon))
   MathProgBase.eval_hesslag_prod(nls.cmodel.eval, hv, x, v, obj_weight, y)
   return hv
 end
 =#
 
-function hprod!(nls :: MathProgNLSModel, x :: Array{Float64}, v :: Array{Float64},
-    hv :: Array{Float64};
-    obj_weight :: Float64=1.0, y :: Array{Float64}=zeros(nls.meta.ncon))
+function hprod!(nls :: MathProgNLSModel, x :: AbstractVector, v :: AbstractVector,
+    hv :: AbstractVector;
+    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nls.meta.ncon))
   increment!(nls, :neval_hprod)
   # See bug https://github.com/JuliaOpt/JuMP.jl/issues/1204
   MathProgBase.eval_hesslag_prod(nls.cmodel.eval, hv, x, v, 0.0, y)
