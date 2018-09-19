@@ -129,67 +129,67 @@ end
 import Base.show
 show(nlp :: MathProgNLPModel) = show(nlp.mpmodel)
 
-function obj(nlp :: MathProgNLPModel, x :: Array{Float64})
+function obj(nlp :: MathProgNLPModel, x :: AbstractVector)
   increment!(nlp, :neval_obj)
   return MathProgBase.eval_f(nlp.mpmodel.eval, x)
 end
 
-function grad(nlp :: MathProgNLPModel, x :: Array{Float64})
+function grad(nlp :: MathProgNLPModel, x :: AbstractVector)
   g = zeros(nlp.meta.nvar)
   return grad!(nlp, x, g)
 end
 
-function grad!(nlp :: MathProgNLPModel, x :: Array{Float64}, g :: Array{Float64})
+function grad!(nlp :: MathProgNLPModel, x :: AbstractVector, g :: AbstractVector)
   increment!(nlp, :neval_grad)
   MathProgBase.eval_grad_f(nlp.mpmodel.eval, g, x)
   return g
 end
 
-function cons(nlp :: MathProgNLPModel, x :: Array{Float64})
+function cons(nlp :: MathProgNLPModel, x :: AbstractVector)
   c = zeros(nlp.meta.ncon)
   return cons!(nlp, x, c)
 end
 
-function cons!(nlp :: MathProgNLPModel, x :: Array{Float64}, c :: Array{Float64})
+function cons!(nlp :: MathProgNLPModel, x :: AbstractVector, c :: AbstractVector)
   increment!(nlp, :neval_cons)
   MathProgBase.eval_g(nlp.mpmodel.eval, c, x)
   return c
 end
 
-function jac_coord(nlp :: MathProgNLPModel, x :: Array{Float64})
+function jac_coord(nlp :: MathProgNLPModel, x :: AbstractVector)
   increment!(nlp, :neval_jac)
   MathProgBase.eval_jac_g(nlp.mpmodel.eval, nlp.jvals, x)
   return (nlp.jrows, nlp.jcols, nlp.jvals)
 end
 
-function jac(nlp :: MathProgNLPModel, x :: Array{Float64})
+function jac(nlp :: MathProgNLPModel, x :: AbstractVector)
   return sparse(jac_coord(nlp, x)..., nlp.meta.ncon, nlp.meta.nvar)
 end
 
-function jprod(nlp :: MathProgNLPModel, x :: Array{Float64}, v :: Array{Float64})
+function jprod(nlp :: MathProgNLPModel, x :: AbstractVector, v :: AbstractVector)
   Jv = zeros(nlp.meta.ncon)
   return jprod!(nlp, x, v, Jv)
 end
 
 function jprod!(nlp :: MathProgNLPModel,
-                x :: Array{Float64},
-                v :: Array{Float64},
-                Jv :: Array{Float64})
+                x :: AbstractVector,
+                v :: AbstractVector,
+                Jv :: AbstractVector)
   nlp.counters.neval_jac -= 1
   increment!(nlp, :neval_jprod)
   Jv[:] = jac(nlp, x) * v
   return Jv
 end
 
-function jtprod(nlp :: MathProgNLPModel, x :: Array{Float64}, v :: Array{Float64})
+function jtprod(nlp :: MathProgNLPModel, x :: AbstractVector, v :: AbstractVector)
   Jtv = zeros(nlp.meta.nvar)
   return jtprod!(nlp, x, v, Jtv)
 end
 
 function jtprod!(nlp :: MathProgNLPModel,
-                x :: Array{Float64},
-                v :: Array{Float64},
-                Jtv :: Array{Float64})
+                x :: AbstractVector,
+                v :: AbstractVector,
+                Jtv :: AbstractVector)
   nlp.counters.neval_jac -= 1
   increment!(nlp, :neval_jtprod)
   Jtv[1:nlp.meta.nvar] = jac(nlp, x)' * v
@@ -198,52 +198,54 @@ end
 
 # Uncomment if/when :JacVec becomes available in MPB.
 # "Evaluate the Jacobian-vector product at `x`."
-# function jprod(nlp :: MathProgNLPModel, x :: Array{Float64}, v :: Array{Float64})
+# function jprod(nlp :: MathProgNLPModel, x :: AbstractVector, v :: AbstractVector)
 #   jv = zeros(nlp.meta.ncon)
 #   return jprod!(nlp, x, v, jv)
 # end
 #
 # "Evaluate the Jacobian-vector product at `x` in place."
-# function jprod!(nlp :: MathProgNLPModel, x :: Array{Float64}, v :: Array{Float64}, jv :: Array{Float64})
+# function jprod!(nlp :: MathProgNLPModel, x :: AbstractVector, v :: AbstractVector, jv
+# :: AbstractVector)
 #   increment!(nlp, :neval_jprod)
 #   MathProgBase.eval_jac_prod(nlp.mpmodel.eval, jv, x, v)
 #   return jv
 # end
 #
 # "Evaluate the transposed-Jacobian-vector product at `x`."
-# function jtprod(nlp :: MathProgNLPModel, x :: Array{Float64}, v :: Array{Float64})
+# function jtprod(nlp :: MathProgNLPModel, x :: AbstractVector, v :: AbstractVector)
 #   jtv = zeros(nlp.meta.nvar)
 #   return jtprod!(nlp, x, v, jtv)
 # end
 #
 # "Evaluate the transposed-Jacobian-vector product at `x` in place."
-# function jtprod!(nlp :: MathProgNLPModel, x :: Array{Float64}, v :: Array{Float64}, jtv :: Array{Float64})
+# function jtprod!(nlp :: MathProgNLPModel, x :: AbstractVector, v :: AbstractVector,
+# jtv :: AbstractVector)
 #   increment!(nlp, :neval_jtprod)
 #   MathProgBase.eval_jac_prod_t(nlp.mpmodel.eval, jtv, x, v)
 #   return jtv
 # end
 
-function hess_coord(nlp :: MathProgNLPModel, x :: Array{Float64};
-    obj_weight :: Float64=1.0, y :: Array{Float64}=zeros(nlp.meta.ncon))
+function hess_coord(nlp :: MathProgNLPModel, x :: AbstractVector;
+    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nlp.meta.ncon))
   increment!(nlp, :neval_hess)
   MathProgBase.eval_hesslag(nlp.mpmodel.eval, nlp.hvals, x, obj_weight, y)
   return (nlp.hrows, nlp.hcols, nlp.hvals)
 end
 
-function hess(nlp :: MathProgNLPModel, x :: Array{Float64};
-    obj_weight :: Float64=1.0, y :: Array{Float64}=zeros(nlp.meta.ncon))
+function hess(nlp :: MathProgNLPModel, x :: AbstractVector;
+    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nlp.meta.ncon))
   return sparse(hess_coord(nlp, x, y=y, obj_weight=obj_weight)..., nlp.meta.nvar, nlp.meta.nvar)
 end
 
-function hprod(nlp :: MathProgNLPModel, x :: Array{Float64}, v :: Array{Float64};
-    obj_weight :: Float64=1.0, y :: Array{Float64}=zeros(nlp.meta.ncon))
+function hprod(nlp :: MathProgNLPModel, x :: AbstractVector, v :: AbstractVector;
+    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nlp.meta.ncon))
   hv = zeros(nlp.meta.nvar)
   return hprod!(nlp, x, v, hv, obj_weight=obj_weight, y=y)
 end
 
-function hprod!(nlp :: MathProgNLPModel, x :: Array{Float64}, v :: Array{Float64},
-    hv :: Array{Float64};
-    obj_weight :: Float64=1.0, y :: Array{Float64}=zeros(nlp.meta.ncon))
+function hprod!(nlp :: MathProgNLPModel, x :: AbstractVector, v :: AbstractVector,
+    hv :: AbstractVector;
+    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nlp.meta.ncon))
   increment!(nlp, :neval_hprod)
   MathProgBase.eval_hesslag_prod(nlp.mpmodel.eval, hv, x, v, obj_weight, y)
   return hv
