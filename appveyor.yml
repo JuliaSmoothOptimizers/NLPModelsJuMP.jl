@@ -40,7 +40,7 @@ install:
 build_script:
 # Need to convert from shallow to complete for Pkg.clone to work
   - IF EXIST .git\shallow (git fetch --unshallow)
-  - C:\projects\julia\bin\julia -e "versioninfo(); VERSION < v\"0.7.0-beta2.0\" && Pkg.init(); Pkg.clone(pwd(), \"JuMPNLPModels\"); Pkg.build(\"JuMPNLPModels\");"
+  - C:\projects\julia\bin\julia -e "versioninfo(); VERSION < v\"0.7.0-beta2.0\" && Pkg.init(); Pkg.clone(pwd(), \"NLPModelsJuMP\"); Pkg.build(\"NLPModelsJuMP\");"
 
 test_script:
-  - C:\projects\julia\bin\julia -e "Pkg.test(\"JuMPNLPModels\")"
+  - C:\projects\julia\bin\julia -e "Pkg.test(\"NLPModelsJuMP\")"

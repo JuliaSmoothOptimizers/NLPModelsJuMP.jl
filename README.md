@@ -1,17 +1,17 @@
-# JuMPNLPModels
+# NLPModelsJuMP
 
 This package provides nonlinear programming models as implemented by
 [NLPModels](https://github.com/JuliaSmoothOptimizers/NLPModels.jl), through the use of
 [JuMP](https://github.com/JuliaOpt/JuMP.jl).
 
-**Disclaimer**: JuMPNLPModels is *not* developed or maintained by the JuMP developers.
+**Disclaimer**: NLPModelsJuMP is *not* developed or maintained by the JuMP developers.
 
 See the documentation on NLPModels for the general description of NLPModels. Here, we
 focus on the use of JuMP to create these.
 
 ## NLPModels from a JuMP
 
-JuMPNLPModels provides conversion between MathProgBase models and NLPModels.
+NLPModelsJuMP provides conversion between MathProgBase models and NLPModels.
 
 ## LICENSE
 
