@@ -1,6 +1,6 @@
 #__precompile__()
 
-module JuMPNLPModels
+module NLPModelsJuMP
 
 include("nlsmpb_model.jl")
 include("nlp_to_mpb.jl")
