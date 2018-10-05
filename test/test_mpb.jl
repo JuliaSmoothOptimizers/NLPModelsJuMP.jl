@@ -1,4 +1,4 @@
-using Ipopt, JuMP, NLPModels
+using Ipopt, JuMP, NLPModels, MathProgBase
 
 # pass an ADNLPModel to IPOPT
 nlp = ADNLPModel(x->dot(x,x), ones(2), lvar=-ones(2), uvar=ones(2),
