@@ -22,9 +22,9 @@ MathProgBase.features_available(::NLPModelEvaluator{NLPModels.ADNLPModel}) = [:G
 MathProgBase.eval_f(d::NLPModelEvaluator, x) = obj(d.nlp, x)
 
 # use grad! ?
-MathProgBase.eval_grad_f(d::NLPModelEvaluator, g, x) = copy!(g, grad(d.nlp, x))
+MathProgBase.eval_grad_f(d::NLPModelEvaluator, g, x) = copyto!(g, grad(d.nlp, x))
 
-MathProgBase.eval_g(d::NLPModelEvaluator, g, x) = copy!(g, cons(d.nlp, x))
+MathProgBase.eval_g(d::NLPModelEvaluator, g, x) = copyto!(g, cons(d.nlp, x))
 
 function MathProgBase.jac_structure(d::NLPModelEvaluator)
   rows, cols, _ = jac_coord(d.nlp, [0.317i for i = 1:d.nlp.meta.nvar])
@@ -33,7 +33,7 @@ end
 
 function MathProgBase.eval_jac_g(d::NLPModelEvaluator, J, x)
   _, _, vals = jac_coord(d.nlp, x)
-  copy!(J, vals)
+  copyto!(J, vals)
 end
 
 # use jprod! ?
@@ -54,7 +54,7 @@ end
 
 function MathProgBase.eval_hesslag(d::NLPModelEvaluator, H, x, σ, μ)
   rows, cols, vals = hess_coord(d.nlp, x, y=μ, obj_weight=σ)
-  copy!(H, vals)
+  copyto!(H, vals)
 end
 
 function MathProgBase.eval_hesslag_prod(d::NLPModelEvaluator, h, x, v, σ, μ)
@@ -67,7 +67,7 @@ MathProgBase.isobjquadratic(d::NLPModelEvaluator) = false
 
 MathProgBase.isconstrlinear(d::NLPModelEvaluator, i::Integer) = i in d.nlp.meta.lin
 
-function loadNLPModel!{T <: AbstractNLPModel}(m::MathProgBase.AbstractMathProgModel, nlp::T)
+function loadNLPModel!(m::MathProgBase.AbstractMathProgModel, nlp::T) where T <: AbstractNLPModel
   MathProgBase.loadproblem!(m, nlp.meta.nvar, nlp.meta.ncon,
                             nlp.meta.lvar, nlp.meta.uvar,
                             nlp.meta.lcon, nlp.meta.ucon,
@@ -140,7 +140,7 @@ be possible to call
 
     MathProgBase.optimize!(mpbmodel)
 """
-function NLPtoMPB{T <: AbstractNLPModel}(nlp :: T, solver :: MathProgBase.AbstractMathProgSolver)
+function NLPtoMPB(nlp :: T, solver :: MathProgBase.AbstractMathProgSolver) where T <: AbstractNLPModel
   model = MathProgBase.NonlinearModel(solver)
   return loadNLPModel!(model, nlp)
 end
