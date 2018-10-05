@@ -7,6 +7,8 @@
 #
 # A. Montoison, Montreal, 05/2018.
 
+using Compat
+
 export mgh35
 
 "Chebyquad function"
@@ -30,8 +32,8 @@ function mgh35(m :: Int = 10, n :: Int = 10)
     end
   end
 
-  Ts = Vector{Function}(undef, n)
-  Tnames = Vector{Symbol}(undef, n)
+  @compat Ts = Vector{Function}(undef, n)
+  @compat Tnames = Vector{Symbol}(undef, n)
   for i = 1:n
     Ts[i] = x -> Tsim(2*x-1, i)
     Tnames[i] = gensym()
