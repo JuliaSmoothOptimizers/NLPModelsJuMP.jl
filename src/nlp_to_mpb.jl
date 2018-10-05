@@ -2,11 +2,9 @@
 # to a MathProgBase standard solver.
 # Modeled after Miles Lubin's AmplMathProgInterface
 
-import MathProgBase
-import MathProgBase.SolverInterface
+using MathProgBase
 
 export NLPModelEvaluator, NLPtoMPB
-
 
 mutable struct NLPModelEvaluator{T <: AbstractNLPModel} <: SolverInterface.AbstractNLPEvaluator
   nlp :: T

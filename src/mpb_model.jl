@@ -1,7 +1,8 @@
 using MathProgBase
 
-using NLPModels, SparseArrays
+using NLPModels, Compat.SparseArrays
 import NLPModels.increment!
+import MathProgBase.SolverInterface
 
 export MathProgNLPModel
 
