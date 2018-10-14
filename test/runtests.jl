@@ -17,3 +17,4 @@ end
 include("test_mpb.jl")
 include("consistency.jl")
 include("test_mathprognlsmodel.jl")
+include("test_view_subarray.jl")
