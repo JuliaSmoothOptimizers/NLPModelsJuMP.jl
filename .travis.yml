@@ -27,6 +27,7 @@ notifications:
 branches:
   only:
     - master
+    - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
 
 jobs:
   include:
