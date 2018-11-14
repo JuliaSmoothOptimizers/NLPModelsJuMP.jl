@@ -75,7 +75,11 @@ mutable struct MathProgNLPModel <: AbstractNLPModel
   hvals :: Vector{Float64}  # Room for the Lagrangian Hessian.
 end
 
-"Construct a `MathProgNLPModel` from a `MathProgModel`."
+"""
+    MathProgNLPModel(model, name="Generic")
+
+Construct a `MathProgNLPModel` from a `MathProgModel`.
+"""
 function MathProgNLPModel(mpmodel :: MathProgModel; name :: String="Generic")
 
   nvar = mpmodel.numVar

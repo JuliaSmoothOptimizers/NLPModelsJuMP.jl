@@ -1,15 +1,21 @@
 using JuMP
 
-"Construct a `MathProgNLPModel` from a JuMP `Model`."
+"""
+    MathProgNLPModel(model; kwargs...)
+
+Construct a `MathProgNLPModel` from a JuMP `Model`.
+"""
 function MathProgNLPModel(jmodel :: JuMP.Model; kwargs...)
   JuMP.setsolver(jmodel, ModelReader())
   jmodel.internalModelLoaded || JuMP.build(jmodel)
   return MathProgNLPModel(jmodel.internalModel; kwargs...)
 end
 
-"Construct a `MathProgNLSModel` from a JuMP `Model` and a vector of
-NLexpression.
-"
+"""
+    MathProgNLSModel(cmodel, F)
+
+Construct a `MathProgNLSModel` from a JuMP `Model` and a vector of NLexpression.
+"""
 function MathProgNLSModel(cmodel :: JuMP.Model,
                           F :: Vector{JuMP.NonlinearExpression}; kwargs...)
   # Hessian-Vector products don't work:

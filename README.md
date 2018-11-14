@@ -1,5 +1,9 @@
 # NLPModelsJuMP
 
+[![Build
+Status](https://travis-ci.org/JuliaSmoothOptimizers/NLPModelsJuMP.jl.svg?branch=master)](https://travis-ci.org/JuliaSmoothOptimizers/NLPModelsJuMP.jl)
+[![](https://img.shields.io/badge/docs-stable-3f51b5.svg)](https://JuliaSmoothOptimizers.github.io/NLPModelsJuMP.jl/stable)
+
 This package provides nonlinear programming models as implemented by
 [NLPModels](https://github.com/JuliaSmoothOptimizers/NLPModels.jl), through the use of
 [JuMP](https://github.com/JuliaOpt/JuMP.jl).
