@@ -1,8 +1,8 @@
 # Tutorial
 
-NLPModelsJuMP is a combination of NLPModels and JuMP, as the name imply.
+NLPModelsJuMP is a combination of NLPModels and JuMP, as the name implies.
 Sometimes it may be required to refer to the specific documentation, as we'll present
-here the result of combining both.
+here only the documention specific to NLPModelsJuMP.
 
 ```@contents
 Pages = ["tutorial.md"]
@@ -15,9 +15,9 @@ MathProgNLPModel
 ```
 
 `MathProgNLPModel` is a simple yet efficient model. It uses JuMP to define the problem,
-which can then be accessed through the NLPModels API.
-Using `ADNLPModel` is simpler, as it comes by default, but `ADNLPModel` doesn't handle
-sparse derivatives and `MathProgNLPModel` does.
+and can be accessed through the NLPModels API.
+An advantage of `MathProgNLPModel` over simpler models such as `ADNLPModel`s is that
+they provide sparse derivates.
 
 Let's define the famous Rosenbrock function
 ```math
@@ -36,7 +36,6 @@ model = Model() # No solver is required
 nlp = MathProgNLPModel(model)
 ```
 
-This defines the model.
 Let's get the objective function value at ``x^0``, using only `nlp`.
 
 ```@example jumpnlp
@@ -44,7 +43,6 @@ fx = obj(nlp, nlp.meta.x0)
 println("fx = $fx")
 ```
 
-Done.
 Let's try the gradient and Hessian.
 
 ```@example jumpnlp
@@ -140,7 +138,7 @@ x, fx, ngx, optimal, iter = steepest(adnlp)
 
 The package
 [OptimizationProblems](https://github.com/JuliaSmoothOptimizers/OptimizationProblems.jl)
-provides a reasonable amount of problems defined in JuMP format, which can be converted
+provides a collection of problems defined in JuMP format, which can be converted
 to `MathProgNLPModel`.
 
 ```@example jumpnlp
@@ -154,7 +152,7 @@ println("optimal = $optimal")
 println("iter = $iter")
 ```
 
-Constrained problem can also be converted.
+Constrained problems can also be converted.
 
 ```@example jumpnlp2
 using NLPModels, NLPModelsJuMP, JuMP
@@ -178,14 +176,19 @@ println("Jx = $(jac(nlp, nlp.meta.x0))")
 MathProgNLSModel
 ```
 
-`MathProgNLSModel` is a model for nonlinear least squares using JuMP.
-To use it, we define a JuMP model without the objective, and use `NLexpression`s to
-define the residual function.
-For instance, the Rosenbrock function in nonlinear least squares format is
+`MathProgNLSModel` is a model for nonlinear least squares using JuMP, The objective
+function of NLS problems has the form ``f(x) = \tfrac{1}{2}\|F(x)\|^2``, but specialized
+methods handle ``F`` directly, instead of ``f``.
+To use `MathProgNLSModel`, we define a JuMP model without the objective, and use `NLexpression`s to
+define the residual function ``F``.
+For instance, the Rosenbrock function can be expressed in nonlinear least squares format by
+defining
 ```math
 F(x) = \begin{bmatrix} x_1 - 1\\ 10(x_2 - x_1^2) \end{bmatrix},
 ```
-which we can implement as
+and noting that ``f(x) = \|F(x)\|^2`` (the constant ``\frac{1}{2}`` is ignored as it
+doesn't change the solution).
+We implement this function as
 
 ```@example nls
 using NLPModels, NLPModelsJuMP, JuMP
