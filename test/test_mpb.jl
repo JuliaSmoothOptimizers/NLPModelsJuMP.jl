@@ -24,4 +24,10 @@ MathProgBase.isconstrlinear(d, 1)
 
 # Testing NLPtoMPB of a MathProgNLPModel
 nlp = MathProgNLPModel(hs6())
-NLPtoMPB(nlp, IpoptSolver())
+model = NLPtoMPB(nlp, IpoptSolver())
+MathProgBase.optimize!(model)
+
+# Testing NLPtoMPB of a MathProgNLSModel
+nls = mgh35()
+model = NLPtoMPB(nls, IpoptSolver())
+MathProgBase.optimize!(model)

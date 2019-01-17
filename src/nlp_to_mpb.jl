@@ -145,7 +145,8 @@ end
 
 # MathProgNLPModels are straightforward
 # Note that this method doesn't appear to be shadowed by the parametric NLPtoMPB
-function NLPtoMPB(model :: MathProgNLPModel, solver :: MathProgBase.AbstractMathProgSolver)
+function NLPtoMPB(model :: Union{MathProgNLPModel, MathProgNLSModel},
+                  solver :: MathProgBase.AbstractMathProgSolver)
   mpbmodel = MathProgBase.NonlinearModel(solver)
   MathProgBase.loadproblem!(mpbmodel,
                             model.meta.nvar, model.meta.ncon,
