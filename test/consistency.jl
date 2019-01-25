@@ -1,6 +1,6 @@
 using NLPModels
 
-include(joinpath(path, "consistency.jl"))
+include(joinpath(nlpmodels_path, "consistency.jl"))
 
 function test_consistency()
   for problem in [:brownden, :hs5, :hs6, :hs10, :hs11, :hs14]
