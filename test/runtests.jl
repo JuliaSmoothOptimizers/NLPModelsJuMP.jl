@@ -1,5 +1,5 @@
-using Compat.Test, JuMP, NLPModels, NLPModelsJuMP, Compat.LinearAlgebra,
-      Compat.SparseArrays, Compat.Printf
+using Test, JuMP, NLPModels, NLPModelsJuMP, LinearAlgebra,
+      SparseArrays, Printf
 
 @static if VERSION < v"0.7"
   path = joinpath(Pkg.dir("NLPModels"), "test")
