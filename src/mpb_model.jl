@@ -178,7 +178,7 @@ function NLPModels.jprod!(nlp :: MathProgNLPModel,
                 Jv :: AbstractVector)
   nlp.counters.neval_jac -= 1
   increment!(nlp, :neval_jprod)
-  Jv[:] = jac(nlp, x) * v
+  Jv .= jac(nlp, x) * v
   return Jv
 end
 

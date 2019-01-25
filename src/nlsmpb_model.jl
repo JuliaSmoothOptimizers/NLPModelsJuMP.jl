@@ -108,14 +108,14 @@ end
 function NLPModels.jprod_residual!(nls :: MathProgNLSModel, x :: AbstractVector, v :: AbstractVector, Jv :: AbstractVector)
   nls.counters.neval_jac_residual -= 1
   increment!(nls, :neval_jprod_residual)
-  Jv[:] = jac_residual(nls, x) * v
+  Jv .= jac_residual(nls, x) * v
   return Jv
 end
 
 function NLPModels.jtprod_residual!(nls :: MathProgNLSModel, x :: AbstractVector, v :: AbstractVector, Jtv :: AbstractVector)
   nls.counters.neval_jac_residual -= 1
   increment!(nls, :neval_jtprod_residual)
-  Jtv[:] = jac_residual(nls, x)' * v
+  Jtv .= jac_residual(nls, x)' * v
   return Jtv
 end
 
@@ -196,7 +196,7 @@ function NLPModels.jprod!(nls :: MathProgNLSModel,
                 Jv :: AbstractVector)
   nls.counters.counters.neval_jac -= 1
   increment!(nls, :neval_jprod)
-  Jv[:] = jac(nls, x) * v
+  Jv .= jac(nls, x) * v
   return Jv
 end
 
@@ -211,7 +211,7 @@ function NLPModels.jtprod!(nls :: MathProgNLSModel,
                 Jtv :: AbstractVector)
   nls.counters.counters.neval_jac -= 1
   increment!(nls, :neval_jtprod)
-  Jtv[1:nls.meta.nvar] = jac(nls, x)' * v
+  Jtv[1:nls.meta.nvar] .= jac(nls, x)' * v
   return Jtv
 end
 
