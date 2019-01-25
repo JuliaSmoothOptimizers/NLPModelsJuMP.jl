@@ -66,7 +66,7 @@ function MathProgNLSModel(Fmodel :: MathProgModel,
                       )
 
   return MathProgNLSModel(meta,
-                          NLSMeta(nequ, nvar),
+                          NLSMeta(nequ, nvar, nnzj=length(Fjrows), nnzh=length(Fhrows)),
                           Fmodel,
                           cmodel,
                           NLSCounters(),
@@ -98,6 +98,13 @@ function NLPModels.jac_residual(nls :: MathProgNLSModel, x :: AbstractVector)
   return sparse(nls.Fjrows, nls.Fjcols, nls.Fjvals, m, n)
 end
 
+function NLPModels.jac_coord_residual(nls :: MathProgNLSModel, x :: AbstractVector)
+  increment!(nls, :neval_jac_residual)
+  m, n = nls.nls_meta.nequ, nls.meta.nvar
+  MathProgBase.eval_jac_g(nls.Fmodel.eval, nls.Fjvals, x)
+  return nls.Fjrows, nls.Fjcols, nls.Fjvals
+end
+
 function NLPModels.jprod_residual!(nls :: MathProgNLSModel, x :: AbstractVector, v :: AbstractVector, Jv :: AbstractVector)
   nls.counters.neval_jac_residual -= 1
   increment!(nls, :neval_jprod_residual)
@@ -112,8 +119,22 @@ function NLPModels.jtprod_residual!(nls :: MathProgNLSModel, x :: AbstractVector
   return Jtv
 end
 
-function NLPModels.hess_residual(nls :: MathProgNLSModel, x :: AbstractVector, i :: Int)
+function NLPModels.hess_residual(nls :: MathProgNLSModel, x :: AbstractVector, v :: AbstractVector)
   increment!(nls, :neval_hess_residual)
+  n = nls.meta.nvar
+  MathProgBase.eval_hesslag(nls.Fmodel.eval, nls.Fhvals, x, 0.0, v)
+  return sparse(nls.Fhrows, nls.Fhcols, nls.Fhvals, n, n)
+end
+
+function NLPModels.hess_coord_residual(nls :: MathProgNLSModel, x :: AbstractVector, v :: AbstractVector)
+  increment!(nls, :neval_hess_residual)
+  n = nls.meta.nvar
+  MathProgBase.eval_hesslag(nls.Fmodel.eval, nls.Fhvals, x, 0.0, v)
+  return nls.Fhrows, nls.Fhcols, nls.Fhvals
+end
+
+function NLPModels.jth_hess_residual(nls :: MathProgNLSModel, x :: AbstractVector, i :: Int)
+  increment!(nls, :neval_jhess_residual)
   y = [j == i ? 1.0 : 0.0 for j = 1:nls.nls_meta.nequ]
   n = nls.meta.nvar
   MathProgBase.eval_hesslag(nls.Fmodel.eval, nls.Fhvals, x, 0.0, y)
