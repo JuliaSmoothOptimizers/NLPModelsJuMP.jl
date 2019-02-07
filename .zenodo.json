@@ -1,0 +1,24 @@
+{
+  "description": "A package for converting nonlinear optimization models between MathProgBase and NLPModels",
+  "title": "NLPModelsJuMP.jl",
+  "upload_type": "software",
+  "publication_date": "2019-02-06",
+  "creators": [
+    {
+      "affiliation": "Federal University of Paran\u00e1 - UFPR",
+      "name": "Abel Soares Siqueira"
+    },
+    {
+      "affiliation": "\u00c9cole Polytechnique/GERAD - Montr\u00e9al",
+      "name": "Dominique Orban"
+    }
+  ],
+  "access_right": "open",
+  "related_identifiers": [
+    {
+      "scheme": "url",
+      "identifier": "https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl/releases/latest",
+      "relation": "isSupplementTo"
+    }
+  ]
+}
