@@ -5,12 +5,18 @@
   "publication_date": "2019-02-06",
   "creators": [
     {
-      "affiliation": "Federal University of Paran\u00e1 - UFPR",
+      "affiliation": "Federal University of Paraná - UFPR",
       "name": "Abel Soares Siqueira"
     },
     {
-      "affiliation": "\u00c9cole Polytechnique/GERAD - Montr\u00e9al",
+      "affiliation": "École Polytechnique/GERAD - Montréal",
       "name": "Dominique Orban"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "Miles Lubin",
+      "type": "Researcher"
     }
   ],
   "access_right": "open",
@@ -20,5 +26,6 @@
       "identifier": "https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl/releases/latest",
       "relation": "isSupplementTo"
     }
-  ]
+  ],
+  "license": "MPL-2.0"
 }
