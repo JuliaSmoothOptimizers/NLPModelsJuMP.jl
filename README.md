@@ -1,5 +1,12 @@
 # NLPModelsJuMP
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.2574164.svg)](https://doi.org/10.5281/zenodo.2574164)
+
+Cite as
+
+    Abel Soares Siqueira & Dominique Orban. NLPModelsJuMP.jl. Zenodo.
+    http://doi.org/10.5281/zenodo.2574164
+
 [![Build
 Status](https://travis-ci.org/JuliaSmoothOptimizers/NLPModelsJuMP.jl.svg?branch=master)](https://travis-ci.org/JuliaSmoothOptimizers/NLPModelsJuMP.jl)
 [![](https://img.shields.io/badge/docs-stable-3f51b5.svg)](https://JuliaSmoothOptimizers.github.io/NLPModelsJuMP.jl/stable)
