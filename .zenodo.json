@@ -2,7 +2,6 @@
   "description": "A package for converting nonlinear optimization models between MathProgBase and NLPModels",
   "title": "NLPModelsJuMP.jl",
   "upload_type": "software",
-  "publication_date": "2019-02-06",
   "creators": [
     {
       "affiliation": "Federal University of Paraná - UFPR",
