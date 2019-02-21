@@ -8,8 +8,15 @@ export NLPModelEvaluator, NLPtoMPB
 
 mutable struct NLPModelEvaluator{T <: AbstractNLPModel} <: SolverInterface.AbstractNLPEvaluator
   nlp :: T
+  jrows :: Vector{Int}
+  jcols :: Vector{Int}
+  hrows :: Vector{Int}
+  hcols :: Vector{Int}
 end
 
+function NLPModelEvaluator(nlp :: T) where T <: AbstractNLPModel
+  return NLPModelEvaluator(nlp, Int[], Int[], Int[], Int[])
+end
 
 MathProgBase.initialize(::NLPModelEvaluator, requested_features) = nothing
 
@@ -25,13 +32,12 @@ MathProgBase.eval_grad_f(d::NLPModelEvaluator, g, x) = copyto!(g, grad(d.nlp, x)
 MathProgBase.eval_g(d::NLPModelEvaluator, g, x) = copyto!(g, cons(d.nlp, x))
 
 function MathProgBase.jac_structure(d::NLPModelEvaluator)
-  rows, cols, _ = jac_coord(d.nlp, [0.317i for i = 1:d.nlp.meta.nvar])
-  return rows, cols
+  d.jrows, d.jcols = jac_structure(d.nlp)
+  return d.jrows, d.jcols
 end
 
 function MathProgBase.eval_jac_g(d::NLPModelEvaluator, J, x)
-  _, _, vals = jac_coord(d.nlp, x)
-  copyto!(J, vals)
+  jac_coord!(d.nlp, x, d.jrows, d.jcols, J)
 end
 
 # use jprod! ?
@@ -45,14 +51,12 @@ function MathProgBase.eval_jac_prod_t(d::NLPModelEvaluator, y, x, w)
 end
 
 function MathProgBase.hesslag_structure(d::NLPModelEvaluator)
-  rows, cols, _ = hess_coord(d.nlp, [0.317i for i = 1:d.nlp.meta.nvar],
-                             y=[0.618i for i = 1:d.nlp.meta.ncon])
-  return rows, cols
+  d.hrows, d.hcols = hess_structure(d.nlp)
+  return d.hrows, d.hcols
 end
 
 function MathProgBase.eval_hesslag(d::NLPModelEvaluator, H, x, σ, μ)
-  rows, cols, vals = hess_coord(d.nlp, x, y=μ, obj_weight=σ)
-  copyto!(H, vals)
+  hess_coord!(d.nlp, x, y=μ, obj_weight=σ, d.hrows, d.hcols, H)
 end
 
 function MathProgBase.eval_hesslag_prod(d::NLPModelEvaluator, h, x, v, σ, μ)

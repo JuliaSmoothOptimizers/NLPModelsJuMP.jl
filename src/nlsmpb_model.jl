@@ -98,9 +98,18 @@ function NLPModels.jac_residual(nls :: MathProgNLSModel, x :: AbstractVector)
   return sparse(nls.Fjrows, nls.Fjcols, nls.Fjvals, m, n)
 end
 
+function NLPModels.jac_structure_residual(nls :: MathProgNLSModel)
+  return nls.Fjrows, nls.Fjcols
+end
+
+function NLPModels.jac_coord_residual!(nls :: MathProgNLSModel, x :: AbstractVector, rows :: AbstractVector{Int}, cols :: AbstractVector{Int}, vals :: AbstractVector)
+  increment!(nls, :neval_jac_residual)
+  MathProgBase.eval_jac_g(nls.Fmodel.eval, vals, x)
+  return (rows, cols, vals)
+end
+
 function NLPModels.jac_coord_residual(nls :: MathProgNLSModel, x :: AbstractVector)
   increment!(nls, :neval_jac_residual)
-  m, n = nls.nls_meta.nequ, nls.meta.nvar
   MathProgBase.eval_jac_g(nls.Fmodel.eval, nls.Fjvals, x)
   return nls.Fjrows, nls.Fjcols, nls.Fjvals
 end
@@ -126,9 +135,18 @@ function NLPModels.hess_residual(nls :: MathProgNLSModel, x :: AbstractVector, v
   return sparse(nls.Fhrows, nls.Fhcols, nls.Fhvals, n, n)
 end
 
+function NLPModels.hess_structure_residual(nls :: MathProgNLSModel)
+  return nls.Fhrows, nls.Fhcols
+end
+
+function NLPModels.hess_coord_residual!(nls :: MathProgNLSModel, x :: AbstractVector, v :: AbstractVector, rows :: AbstractVector{Int}, cols :: AbstractVector{Int}, vals :: AbstractVector)
+  increment!(nls, :neval_hess_residual)
+  MathProgBase.eval_hesslag(nls.Fmodel.eval, vals, x, 0.0, v)
+  return (rows, cols, vals)
+end
+
 function NLPModels.hess_coord_residual(nls :: MathProgNLSModel, x :: AbstractVector, v :: AbstractVector)
   increment!(nls, :neval_hess_residual)
-  n = nls.meta.nvar
   MathProgBase.eval_hesslag(nls.Fmodel.eval, nls.Fhvals, x, 0.0, v)
   return nls.Fhrows, nls.Fhcols, nls.Fhvals
 end
@@ -175,6 +193,16 @@ function NLPModels.cons!(nls :: MathProgNLSModel, x :: AbstractVector, c :: Abst
   return c
 end
 
+function NLPModels.jac_structure(nls :: MathProgNLSModel)
+  return (nls.cjrows, nls.cjcols)
+end
+
+function NLPModels.jac_coord!(nls :: MathProgNLSModel, x :: AbstractVector, rows :: AbstractVector{Int}, cols :: AbstractVector{Int}, vals :: AbstractVector)
+  increment!(nls, :neval_jac)
+  MathProgBase.eval_jac_g(nls.cmodel.eval, vals, x)
+  return (rows, cols, vals)
+end
+
 function NLPModels.jac_coord(nls :: MathProgNLSModel, x :: AbstractVector)
   increment!(nls, :neval_jac)
   MathProgBase.eval_jac_g(nls.cmodel.eval, nls.cjvals, x)
@@ -213,6 +241,17 @@ function NLPModels.jtprod!(nls :: MathProgNLSModel,
   increment!(nls, :neval_jtprod)
   Jtv[1:nls.meta.nvar] .= jac(nls, x)' * v
   return Jtv
+end
+
+function NLPModels.hess_structure(nls :: MathProgNLSModel)
+  return (nls.chrows, nls.chcols)
+end
+
+function NLPModels.hess_coord!(nls :: MathProgNLSModel, x :: AbstractVector, rows :: AbstractVector{Int}, cols :: AbstractVector{Int}, vals :: AbstractVector;
+    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nls.meta.ncon))
+  increment!(nls, :neval_hess)
+  MathProgBase.eval_hesslag(nls.cmodel.eval, vals, x, obj_weight, y)
+  return (rows, cols, vals)
 end
 
 function NLPModels.hess_coord(nls :: MathProgNLSModel, x :: AbstractVector;

@@ -9,8 +9,7 @@ function test_consistency()
     problem_f = eval(problem)
     nlp_autodiff = eval(Meta.parse("$(problem)_autodiff"))()
     nlp_mpb = MathProgNLPModel(problem_f())
-    nlp_simple = eval(Meta.parse("$(problem)_simple"))()
-    nlps = [nlp_autodiff; nlp_mpb; nlp_simple]
+    nlps = [nlp_autodiff; nlp_mpb]
 
     consistent_nlps(nlps)
   end
