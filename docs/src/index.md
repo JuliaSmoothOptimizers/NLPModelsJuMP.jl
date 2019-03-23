@@ -15,11 +15,6 @@ Install NLPModelsJuMP.jl with the following commands.
 pkg> add NLPModelsJuMP
 ```
 
-## License
-
-This content is released under the [MIT](http://opensource.org/licenses/MIT) License.
-[![](http://upload.wikimedia.org/wikipedia/commons/8/83/License_icon-mit.png) ](http://opensource.org/licenses/MIT)
-
 ## Contents
 
 ```@contents
