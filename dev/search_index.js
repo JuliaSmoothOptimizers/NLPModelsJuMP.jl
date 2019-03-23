@@ -25,14 +25,6 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "#License-1",
-    "page": "Home",
-    "title": "License",
-    "category": "section",
-    "text": "This content is released under the MIT License. (Image: ) "
-},
-
-{
     "location": "#Contents-1",
     "page": "Home",
     "title": "Contents",
