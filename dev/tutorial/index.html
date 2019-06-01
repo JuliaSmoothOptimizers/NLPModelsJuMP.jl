@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Tutorial · NLPModelsJuMP.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link href="../assets/documenter.css" rel="stylesheet" type="text/css"/><link href="../assets/style.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><a href="../index.html"><img class="logo" src="../assets/logo.png" alt="NLPModelsJuMP.jl logo"/></a><h1>NLPModelsJuMP.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../">Home</a></li><li class="current"><a class="toctext" href>Tutorial</a><ul class="internal"><li><a class="toctext" href="#MathProgNLPModel-1">MathProgNLPModel</a></li><li><a class="toctext" href="#MathProgNLSModel-Tutorial-1">MathProgNLSModel Tutorial</a></li><li><a class="toctext" href="#NLPtoMPB-Convert-NLP-to-MathProgBase-1">NLPtoMPB - Convert NLP to MathProgBase</a></li></ul></li><li><a class="toctext" href="../reference/">Reference</a></li></ul></nav><article id="docs"><header><nav><ul><li><a href>Tutorial</a></li></ul><a class="edit-page" href="https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl/blob/master/docs/src/tutorial.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Tutorial</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Tutorial-1" href="#Tutorial-1">Tutorial</a></h1><p>NLPModelsJuMP is a combination of NLPModels and JuMP, as the name implies. Sometimes it may be required to refer to the specific documentation, as we&#39;ll present here only the documention specific to NLPModelsJuMP.</p><ul><li><a href="#Tutorial-1">Tutorial</a></li><ul><li><a href="#MathProgNLPModel-1">MathProgNLPModel</a></li><li><a href="#MathProgNLSModel-Tutorial-1">MathProgNLSModel Tutorial</a></li><li><a href="#NLPtoMPB-Convert-NLP-to-MathProgBase-1">NLPtoMPB - Convert NLP to MathProgBase</a></li></ul></ul><h2><a class="nav-anchor" id="MathProgNLPModel-1" href="#MathProgNLPModel-1">MathProgNLPModel</a></h2><section class="docstring"><div class="docstring-header"><a class="docstring-binding" id="NLPModelsJuMP.MathProgNLPModel" href="#NLPModelsJuMP.MathProgNLPModel"><code>NLPModelsJuMP.MathProgNLPModel</code></a> — <span class="docstring-category">Type</span>.</div><div><div><pre><code class="language-none">MathProgNLPModel(model, name=&quot;Generic&quot;)</code></pre><p>Construct a <code>MathProgNLPModel</code> from a <code>MathProgModel</code>.</p></div></div><div><div><pre><code class="language-none">MathProgNLPModel(model; kwargs...)</code></pre><p>Construct a <code>MathProgNLPModel</code> from a JuMP <code>Model</code>.</p></div></div></section><p><code>MathProgNLPModel</code> is a simple yet efficient model. It uses JuMP to define the problem, and can be accessed through the NLPModels API. An advantage of <code>MathProgNLPModel</code> over simpler models such as <code>ADNLPModel</code>s is that they provide sparse derivates.</p><p>Let&#39;s define the famous Rosenbrock function</p><div>\[f(x) = (x_1 - 1)^2 + 100(x_2 - x_1^2)^2,\]</div><p>with starting point <span>$x^0 = (-1.2,1.0)$</span>.</p><div><pre><code class="language-julia">using NLPModels, NLPModelsJuMP, JuMP
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Tutorial · NLPModelsJuMP.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link href="../assets/documenter.css" rel="stylesheet" type="text/css"/><link href="../assets/style.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><a href="../index.html"><img class="logo" src="../assets/logo.png" alt="NLPModelsJuMP.jl logo"/></a><h1>NLPModelsJuMP.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../">Home</a></li><li class="current"><a class="toctext" href>Tutorial</a><ul class="internal"><li><a class="toctext" href="#MathProgNLPModel-1">MathProgNLPModel</a></li><li><a class="toctext" href="#MathProgNLSModel-Tutorial-1">MathProgNLSModel Tutorial</a></li><li><a class="toctext" href="#NLPtoMPB-Convert-NLP-to-MathProgBase-1">NLPtoMPB - Convert NLP to MathProgBase</a></li></ul></li><li><a class="toctext" href="../reference/">Reference</a></li></ul></nav><article id="docs"><header><nav><ul><li><a href>Tutorial</a></li></ul><a class="edit-page" href="https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl/blob/master/docs/src/tutorial.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Tutorial</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Tutorial-1" href="#Tutorial-1">Tutorial</a></h1><p>NLPModelsJuMP is a combination of NLPModels and JuMP, as the name implies. Sometimes it may be required to refer to the specific documentation, as we&#39;ll present here only the documention specific to NLPModelsJuMP.</p><ul><li><a href="#Tutorial-1">Tutorial</a></li><ul><li><a href="#MathProgNLPModel-1">MathProgNLPModel</a></li><li><a href="#MathProgNLSModel-Tutorial-1">MathProgNLSModel Tutorial</a></li><li><a href="#NLPtoMPB-Convert-NLP-to-MathProgBase-1">NLPtoMPB - Convert NLP to MathProgBase</a></li></ul></ul><h2><a class="nav-anchor" id="MathProgNLPModel-1" href="#MathProgNLPModel-1">MathProgNLPModel</a></h2><section class="docstring"><div class="docstring-header"><a class="docstring-binding" id="NLPModelsJuMP.MathProgNLPModel" href="#NLPModelsJuMP.MathProgNLPModel"><code>NLPModelsJuMP.MathProgNLPModel</code></a> — <span class="docstring-category">Type</span>.</div><div><div><pre><code class="language-julia">MathProgNLPModel(model, name=&quot;Generic&quot;)</code></pre><p>Construct a <code>MathProgNLPModel</code> from a <code>MathProgModel</code>.</p></div></div><div><div><pre><code class="language-none">MathProgNLPModel(model; kwargs...)</code></pre><p>Construct a <code>MathProgNLPModel</code> from a JuMP <code>Model</code>.</p></div></div></section><p><code>MathProgNLPModel</code> is a simple yet efficient model. It uses JuMP to define the problem, and can be accessed through the NLPModels API. An advantage of <code>MathProgNLPModel</code> over simpler models such as <code>ADNLPModel</code>s is that they provide sparse derivates.</p><p>Let&#39;s define the famous Rosenbrock function</p><div>\[f(x) = (x_1 - 1)^2 + 100(x_2 - x_1^2)^2,\]</div><p>with starting point <span>$x^0 = (-1.2,1.0)$</span>.</p><pre><code class="language-julia">using NLPModels, NLPModelsJuMP, JuMP
 
 x0 = [-1.2; 1.0]
 model = Model() # No solver is required
@@ -11,7 +11,7 @@ nvar = 2, ncon = 0 (0 linear)
 , NLPModelsJuMP.MathProgModel(JuMP.NLPEvaluator(Minimization problem with:
  * 0 linear constraints
  * 2 variables
-Solver is NLPModelsJuMP.ModelReader(), 0×2 SparseArrays.SparseMatrixCSC{Float64,Int64} with 0 stored entries, Float64[], true, [0.0, 0.0], JuMP.FunctionStorage(ReverseDiffSparse.NodeData[NodeData(CALL, 1, -1), NodeData(CALL, 4, 1), NodeData(CALL, 2, 2), NodeData(VARIABLE, 1, 3), NodeData(VALUE, 1, 3), NodeData(VALUE, 2, 2), NodeData(CALL, 3, 1), NodeData(VALUE, 3, 7), NodeData(CALL, 4, 7), NodeData(CALL, 2, 9), NodeData(VARIABLE, 2, 10), NodeData(CALL, 4, 10), NodeData(VARIABLE, 1, 12), NodeData(VALUE, 4, 12), NodeData(VALUE, 5, 9)],
+Solver is NLPModelsJuMP.ModelReader(), 0×2 SparseArrays.SparseMatrixCSC{Float64,Int64} with 0 stored entries, Float64[], true, [0.0, 0.0], JuMP.FunctionStorage(ReverseDiffSparse.NodeData[NodeData(CALL, 1, -1), NodeData(CALL, 4, 1), NodeData(CALL, 2, 2), NodeData(VARIABLE, 1, 3), NodeData(VALUE, 1, 3), NodeData(VALUE, 2, 2), NodeData(CALL, 3, 1), NodeData(VALUE, 3, 7), NodeData(CALL, 4, 7), NodeData(CALL, 2, 9), NodeData(VARIABLE, 2, 10), NodeData(CALL, 4, 10), NodeData(VARIABLE, 1, 12), NodeData(VALUE, 4, 12), NodeData(VALUE, 5, 9)], 
   [2 ,  1]  =  true
   [7 ,  1]  =  true
   [3 ,  2]  =  true
@@ -25,15 +25,15 @@ Solver is NLPModelsJuMP.ModelReader(), 0×2 SparseArrays.SparseMatrixCSC{Float64
   [11, 10]  =  true
   [12, 10]  =  true
   [13, 12]  =  true
-  [14, 12]  =  true, [1.0, 2.0, 100.0, 2.0, 2.0], [24.2, 4.84, -2.2, -1.2, 1.0, 2.0, 19.36, 100.0, 0.1936, -0.44, 1.0, 1.44, -1.2, 2.0, 2.0], [0.0, 1.0, -4.4, 1.0, -1.0, NaN, 1.0, 0.1936, 100.0, -0.88, 1.0, -1.0, -2.4, NaN, NaN], [1.0, 1.0, -4.4, -4.4, 0.0, 0.0, 1.0, 0.0, 100.0, -88.0, -88.0, 88.0, -211.2, 0.0, 0.0], [1, 2], [1, 2, 2], [1, 2, 1], ReverseDiffSparse.Coloring.RecoveryInfo(Array{Int64,1}[[2, 1]], Array{Int64,1}[[2, 1]], Array{Int64,1}[[0, 1]], [1, 2], 2, 1, [1, 2]), [1330.0 480.0; 480.0 200.0], NONLINEAR::Linearity = 3, Int64[]), JuMP.FunctionStorage[], JuMP.SubexpressionStorage[], Int64[], Float64[], Float64[], ReverseDiffSparse.Linearity[], Any[], [-1.2, 1.0], [6.90939e-310, 0.0], Float64[], false, true, [-215.6, -88.0, -4.4, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0  …  0.0, 1.0, -2.4, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0  …  0.0, 0.0, 0.0, 0.0, 2.0, 0.0, NaN, NaN, NaN, NaN], [0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 2.0, 0.0, 6.90937e-310, 6.90937e-310  …  480.0, 200.0, -480.0, -200.0, 1328.0, 480.0, 6.90937e-310, 6.90937e-310, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [480.0, 0.0, 480.0, 200.0], Float64[], Float64[], [1, 2, 2], [1, 2, 1], 2, false, false, false, false, false), 2, 0, [-1.2, 1.0], Float64[], [-Inf, -Inf], [Inf, Inf], Float64[], Float64[], :Min, :Uninitialized), NLPModels.Counters(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), Int64[], Int64[], Float64[], [1, 2, 2], [1, 2, 1], [0.0, 0.0, 0.0])</code></pre></div><p>Let&#39;s get the objective function value at <span>$x^0$</span>, using only <code>nlp</code>.</p><div><pre><code class="language-julia">fx = obj(nlp, nlp.meta.x0)
-println(&quot;fx = $fx&quot;)</code></pre><pre><code class="language-none">fx = 24.199999999999996</code></pre></div><p>Let&#39;s try the gradient and Hessian.</p><div><pre><code class="language-julia">gx = grad(nlp, nlp.meta.x0)
+  [14, 12]  =  true, [1.0, 2.0, 100.0, 2.0, 2.0], [24.2, 4.84, -2.2, -1.2, 1.0, 2.0, 19.36, 100.0, 0.1936, -0.44, 1.0, 1.44, -1.2, 2.0, 2.0], [0.0, 1.0, -4.4, 1.0, -1.0, NaN, 1.0, 0.1936, 100.0, -0.88, 1.0, -1.0, -2.4, NaN, NaN], [1.0, 1.0, -4.4, -4.4, 0.0, 0.0, 1.0, 0.0, 100.0, -88.0, -88.0, 88.0, -211.2, 0.0, 0.0], [1, 2], [1, 2, 2], [1, 2, 1], ReverseDiffSparse.Coloring.RecoveryInfo(Array{Int64,1}[[2, 1]], Array{Int64,1}[[2, 1]], Array{Int64,1}[[0, 1]], [1, 2], 2, 1, [1, 2]), [1330.0 480.0; 480.0 200.0], NONLINEAR::Linearity = 3, Int64[]), JuMP.FunctionStorage[], JuMP.SubexpressionStorage[], Int64[], Float64[], Float64[], ReverseDiffSparse.Linearity[], Any[], [-1.2, 1.0], [6.93178e-310, 0.0], Float64[], false, true, [-215.6, -88.0, -4.4, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0  …  0.0, 1.0, -2.4, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0  …  0.0, 0.0, 0.0, 0.0, 2.0, 0.0, NaN, NaN, NaN, NaN], [0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 2.0, 0.0, 6.36599e-313, 4.94066e-323  …  480.0, 200.0, -480.0, -200.0, 1328.0, 480.0, 3.90312e-322, 4.00193e-322, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [480.0, 0.0, 480.0, 200.0], Float64[], Float64[], [1, 2, 2], [1, 2, 1], 2, false, false, false, false, false), 2, 0, [-1.2, 1.0], Float64[], [-Inf, -Inf], [Inf, Inf], Float64[], Float64[], :Min, :Uninitialized), NLPModels.Counters(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), Int64[], Int64[], Float64[], [1, 2, 2], [1, 2, 1], [0.0, 0.0, 0.0])</code></pre><p>Let&#39;s get the objective function value at <span>$x^0$</span>, using only <code>nlp</code>.</p><pre><code class="language-julia">fx = obj(nlp, nlp.meta.x0)
+println(&quot;fx = $fx&quot;)</code></pre><pre><code class="language-none">fx = 24.199999999999996</code></pre><p>Let&#39;s try the gradient and Hessian.</p><pre><code class="language-julia">gx = grad(nlp, nlp.meta.x0)
 Hx = hess(nlp, nlp.meta.x0)
 println(&quot;gx = $gx&quot;)
 println(&quot;Hx = $Hx&quot;)</code></pre><pre><code class="language-none">gx = [-215.6, -88.0]
 Hx =
   [1, 1]  =  1330.0
   [2, 1]  =  480.0
-  [2, 2]  =  200.0</code></pre></div><p>Notice how only the lower triangle of the Hessian is stored, which is the default for NLPModels.</p><p>Let&#39;s do something a little more complex here, defining a function to try to solve this problem through steepest descent method with Armijo search. Namely, the method</p><ol><li>Given <span>$x^0$</span>, <span>$\varepsilon &gt; 0$</span>, and <span>$\eta \in (0,1)$</span>. Set <span>$k = 0$</span>;</li><li>If <span>$\Vert \nabla f(x^k) \Vert &lt; \varepsilon$</span> STOP with <span>$x^* = x^k$</span>;</li><li>Compute <span>$d^k = -\nabla f(x^k)$</span>;</li><li>Compute <span>$\alpha_k \in (0,1]$</span> such that <span>$f(x^k + \alpha_kd^k) &lt; f(x^k) + \alpha_k\eta \nabla f(x^k)^Td^k$</span></li><li>Define <span>$x^{k+1} = x^k + \alpha_kx^k$</span></li><li>Update <span>$k = k + 1$</span> and go to step 2.</li></ol><div><pre><code class="language-julia">using LinearAlgebra
+  [2, 2]  =  200.0</code></pre><p>Notice how only the lower triangle of the Hessian is stored, which is the default for NLPModels.</p><p>Let&#39;s do something a little more complex here, defining a function to try to solve this problem through steepest descent method with Armijo search. Namely, the method</p><ol><li>Given <span>$x^0$</span>, <span>$\varepsilon &gt; 0$</span>, and <span>$\eta \in (0,1)$</span>. Set <span>$k = 0$</span>;</li><li>If <span>$\Vert \nabla f(x^k) \Vert &lt; \varepsilon$</span> STOP with <span>$x^* = x^k$</span>;</li><li>Compute <span>$d^k = -\nabla f(x^k)$</span>;</li><li>Compute <span>$\alpha_k \in (0,1]$</span> such that <span>$f(x^k + \alpha_kd^k) &lt; f(x^k) + \alpha_k\eta \nabla f(x^k)^Td^k$</span></li><li>Define <span>$x^{k+1} = x^k + \alpha_kx^k$</span></li><li>Update <span>$k = k + 1$</span> and go to step 2.</li></ol><pre><code class="language-julia">using LinearAlgebra
 
 function steepest(nlp; itmax=100000, eta=1e-4, eps=1e-6, sigma=0.66)
   x = nlp.meta.x0
@@ -71,13 +71,13 @@ println(&quot;iter = $iter&quot;)</code></pre><pre><code class="language-none">x
 fx = 4.2438440239813445e-13
 ngx = 9.984661274466946e-7
 optimal = true
-iter = 17962</code></pre></div><p>Maybe this code is too complicated? If you&#39;re in a class you just want to show a Newton step.</p><div><pre><code class="language-julia">f(x) = obj(nlp, x)
+iter = 17962</code></pre><p>Maybe this code is too complicated? If you&#39;re in a class you just want to show a Newton step.</p><pre><code class="language-julia">f(x) = obj(nlp, x)
 g(x) = grad(nlp, x)
 H(x) = Symmetric(hess(nlp, x), :L)
 x = nlp.meta.x0
 d = -H(x)\g(x)</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
  0.02471910112359557
- 0.3806741573033706</code></pre></div><p>or a few</p><div><pre><code class="language-julia">for i = 1:5
+ 0.3806741573033706 </code></pre><p>or a few</p><pre><code class="language-julia">for i = 1:5
   global x
   x = x - H(x)\g(x)
   println(&quot;x = $x&quot;)
@@ -85,10 +85,10 @@ end</code></pre><pre><code class="language-none">x = [-1.17528, 1.38067]
 x = [0.763115, -3.17503]
 x = [0.76343, 0.582825]
 x = [0.999995, 0.944027]
-x = [0.999996, 0.999991]</code></pre></div><p>Notice how we can use the method with different NLPModels:</p><div><pre><code class="language-julia">f(x) = (x[1] - 1.0)^2 + 100 * (x[2] - 1.0)^2
+x = [0.999996, 0.999991]</code></pre><p>Notice how we can use the method with different NLPModels:</p><pre><code class="language-julia">f(x) = (x[1] - 1.0)^2 + 100 * (x[2] - 1.0)^2
 
 adnlp = ADNLPModel(f, x0)
-x, fx, ngx, optimal, iter = steepest(adnlp)</code></pre><pre><code class="language-none">([1.0, 1.0], 6.745975419202182e-14, 5.194603129865527e-7, true, 14)</code></pre></div><h3><a class="nav-anchor" id="OptimizationProblems-1" href="#OptimizationProblems-1">OptimizationProblems</a></h3><p>The package <a href="https://github.com/JuliaSmoothOptimizers/OptimizationProblems.jl">OptimizationProblems</a> provides a collection of problems defined in JuMP format, which can be converted to <code>MathProgNLPModel</code>.</p><div><pre><code class="language-julia">using OptimizationProblems # Defines a lot of JuMP models
+x, fx, ngx, optimal, iter = steepest(adnlp)</code></pre><pre><code class="language-none">([1.0, 1.0], 6.745975419202182e-14, 5.194603129865527e-7, true, 14)</code></pre><h3><a class="nav-anchor" id="OptimizationProblems-1" href="#OptimizationProblems-1">OptimizationProblems</a></h3><p>The package <a href="https://github.com/JuliaSmoothOptimizers/OptimizationProblems.jl">OptimizationProblems</a> provides a collection of problems defined in JuMP format, which can be converted to <code>MathProgNLPModel</code>.</p><pre><code class="language-julia">using OptimizationProblems # Defines a lot of JuMP models
 
 nlp = MathProgNLPModel(woods())
 x, fx, ngx, optimal, iter = steepest(nlp)
@@ -98,7 +98,7 @@ println(&quot;optimal = $optimal&quot;)
 println(&quot;iter = $iter&quot;)</code></pre><pre><code class="language-none">fx = 1.0000000000002167
 ngx = 9.893253859340887e-7
 optimal = true
-iter = 12016</code></pre></div><p>Constrained problems can also be converted.</p><div><pre><code class="language-julia">using NLPModels, NLPModelsJuMP, JuMP
+iter = 12016</code></pre><p>Constrained problems can also be converted.</p><pre><code class="language-julia">using NLPModels, NLPModelsJuMP, JuMP
 
 model = Model()
 x0 = [-1.2; 1.0]
@@ -115,7 +115,7 @@ Jx =
   [1, 1]  =  1.0
   [2, 1]  =  1.0
   [1, 2]  =  1.0
-  [2, 2]  =  -1.2</code></pre></div><h2><a class="nav-anchor" id="MathProgNLSModel-Tutorial-1" href="#MathProgNLSModel-Tutorial-1">MathProgNLSModel Tutorial</a></h2><section class="docstring"><div class="docstring-header"><a class="docstring-binding" id="NLPModelsJuMP.MathProgNLSModel" href="#NLPModelsJuMP.MathProgNLSModel"><code>NLPModelsJuMP.MathProgNLSModel</code></a> — <span class="docstring-category">Type</span>.</div><div><div><p>Construct a <code>MathProgNLSModel</code> from two <code>MathProgModel</code>s.</p></div></div><div><div><pre><code class="language-none">MathProgNLSModel(cmodel, F)</code></pre><p>Construct a <code>MathProgNLSModel</code> from a JuMP <code>Model</code> and a vector of NLexpression.</p></div></div></section><p><code>MathProgNLSModel</code> is a model for nonlinear least squares using JuMP, The objective function of NLS problems has the form <span>$f(x) = \tfrac{1}{2}\|F(x)\|^2$</span>, but specialized methods handle <span>$F$</span> directly, instead of <span>$f$</span>. To use <code>MathProgNLSModel</code>, we define a JuMP model without the objective, and use <code>NLexpression</code>s to define the residual function <span>$F$</span>. For instance, the Rosenbrock function can be expressed in nonlinear least squares format by defining</p><div>\[F(x) = \begin{bmatrix} x_1 - 1\\ 10(x_2 - x_1^2) \end{bmatrix},\]</div><p>and noting that <span>$f(x) = \|F(x)\|^2$</span> (the constant <span>$\frac{1}{2}$</span> is ignored as it doesn&#39;t change the solution). We implement this function as</p><div><pre><code class="language-julia">using NLPModels, NLPModelsJuMP, JuMP
+  [2, 2]  =  -1.2</code></pre><h2><a class="nav-anchor" id="MathProgNLSModel-Tutorial-1" href="#MathProgNLSModel-Tutorial-1">MathProgNLSModel Tutorial</a></h2><section class="docstring"><div class="docstring-header"><a class="docstring-binding" id="NLPModelsJuMP.MathProgNLSModel" href="#NLPModelsJuMP.MathProgNLSModel"><code>NLPModelsJuMP.MathProgNLSModel</code></a> — <span class="docstring-category">Type</span>.</div><div><div><p>Construct a <code>MathProgNLSModel</code> from two <code>MathProgModel</code>s.</p></div></div><div><div><pre><code class="language-none">MathProgNLSModel(cmodel, F)</code></pre><p>Construct a <code>MathProgNLSModel</code> from a JuMP <code>Model</code> and a vector of NLexpression.</p></div></div></section><p><code>MathProgNLSModel</code> is a model for nonlinear least squares using JuMP, The objective function of NLS problems has the form <span>$f(x) = \tfrac{1}{2}\|F(x)\|^2$</span>, but specialized methods handle <span>$F$</span> directly, instead of <span>$f$</span>. To use <code>MathProgNLSModel</code>, we define a JuMP model without the objective, and use <code>NLexpression</code>s to define the residual function <span>$F$</span>. For instance, the Rosenbrock function can be expressed in nonlinear least squares format by defining</p><div>\[F(x) = \begin{bmatrix} x_1 - 1\\ 10(x_2 - x_1^2) \end{bmatrix},\]</div><p>and noting that <span>$f(x) = \|F(x)\|^2$</span> (the constant <span>$\frac{1}{2}$</span> is ignored as it doesn&#39;t change the solution). We implement this function as</p><pre><code class="language-julia">using NLPModels, NLPModelsJuMP, JuMP
 
 model = Model()
 x0 = [-1.2; 1.0]
@@ -126,63 +126,14 @@ x0 = [-1.2; 1.0]
 nls = MathProgNLSModel(model, [F1, F2], name=&quot;rosen-nls&quot;)
 
 residual(nls, nls.meta.x0)</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
- -2.2
- -4.3999999999999995</code></pre></div><div><pre><code class="language-julia">jac_residual(nls, nls.meta.x0)</code></pre><pre><code class="language-none">2×2 SparseArrays.SparseMatrixCSC{Float64,Int64} with 3 stored entries:
+ -2.2               
+ -4.3999999999999995</code></pre><pre><code class="language-julia">jac_residual(nls, nls.meta.x0)</code></pre><pre><code class="language-none">2×2 SparseArrays.SparseMatrixCSC{Float64,Int64} with 3 stored entries:
   [1, 1]  =  1.0
   [2, 1]  =  24.0
-  [2, 2]  =  10.0</code></pre></div><h2><a class="nav-anchor" id="NLPtoMPB-Convert-NLP-to-MathProgBase-1" href="#NLPtoMPB-Convert-NLP-to-MathProgBase-1">NLPtoMPB - Convert NLP to MathProgBase</a></h2><section class="docstring"><div class="docstring-header"><a class="docstring-binding" id="NLPModelsJuMP.NLPtoMPB" href="#NLPModelsJuMP.NLPtoMPB"><code>NLPModelsJuMP.NLPtoMPB</code></a> — <span class="docstring-category">Function</span>.</div><div><div><pre><code class="language-none">mp = NLPtoMPB(nlp, solver)</code></pre><p>Return a <code>MathProgBase</code> model corresponding to an <code>AbstractNLPModel</code>.</p><p><strong>Arguments</strong></p><ul><li><code>nlp::AbstractNLPModel</code></li><li><code>solver::AbstractMathProgSolver</code> a solver instance, e.g., <code>IpoptSolver()</code></li></ul><p>Currently, all models are treated as nonlinear models.</p><p><strong>Return values</strong></p><p>The function returns a <code>MathProgBase</code> model <code>mpbmodel</code> such that it should be possible to call</p><pre><code class="language-none">MathProgBase.optimize!(mpbmodel)</code></pre></div></div></section><p>In addition to creating NLPModels using JuMP, we might want to convert an NLPModel to a MathProgBase model to use the solvers available. For instance</p><div><pre><code class="language-julia">using Ipopt, NLPModels, NLPModelsJuMP, LinearAlgebra, JuMP, MathProgBase
+  [2, 2]  =  10.0</code></pre><h2><a class="nav-anchor" id="NLPtoMPB-Convert-NLP-to-MathProgBase-1" href="#NLPtoMPB-Convert-NLP-to-MathProgBase-1">NLPtoMPB - Convert NLP to MathProgBase</a></h2><section class="docstring"><div class="docstring-header"><a class="docstring-binding" id="NLPModelsJuMP.NLPtoMPB" href="#NLPModelsJuMP.NLPtoMPB"><code>NLPModelsJuMP.NLPtoMPB</code></a> — <span class="docstring-category">Function</span>.</div><div><div><pre><code class="language-julia">mp = NLPtoMPB(nlp, solver)</code></pre><p>Return a <code>MathProgBase</code> model corresponding to an <code>AbstractNLPModel</code>.</p><p><strong>Arguments</strong></p><ul><li><code>nlp::AbstractNLPModel</code></li><li><code>solver::AbstractMathProgSolver</code> a solver instance, e.g., <code>IpoptSolver()</code></li></ul><p>Currently, all models are treated as nonlinear models.</p><p><strong>Return values</strong></p><p>The function returns a <code>MathProgBase</code> model <code>mpbmodel</code> such that it should be possible to call</p><pre><code class="language-none">MathProgBase.optimize!(mpbmodel)</code></pre></div></div></section><p>In addition to creating NLPModels using JuMP, we might want to convert an NLPModel to a MathProgBase model to use the solvers available. For instance</p><pre><code class="language-julia">using Ipopt, NLPModels, NLPModelsJuMP, LinearAlgebra, JuMP, MathProgBase
 
 nlp = ADNLPModel(x -&gt; dot(x, x), ones(2),
                  c=x-&gt;[x[1] + 2 * x[2] - 1.0], lcon=[0.0], ucon=[0.0])
 model = NLPtoMPB(nlp, IpoptSolver())
 
-MathProgBase.optimize!(model)</code></pre><pre><code class="language-none">
-******************************************************************************
-This program contains Ipopt, a library for large-scale nonlinear optimization.
- Ipopt is released as open source code under the Eclipse Public License (EPL).
-         For more information visit http://projects.coin-or.org/Ipopt
-******************************************************************************
-
-This is Ipopt version 3.12.10, running with linear solver mumps.
-NOTE: Other linear solvers might be more efficient (see Ipopt documentation).
-
-Number of nonzeros in equality constraint Jacobian...:        2
-Number of nonzeros in inequality constraint Jacobian.:        0
-Number of nonzeros in Lagrangian Hessian.............:        3
-
-Total number of variables............................:        2
-                     variables with only lower bounds:        0
-                variables with lower and upper bounds:        0
-                     variables with only upper bounds:        0
-Total number of equality constraints.................:        1
-Total number of inequality constraints...............:        0
-        inequality constraints with only lower bounds:        0
-   inequality constraints with lower and upper bounds:        0
-        inequality constraints with only upper bounds:        0
-
-iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-   0  2.0000000e+00 2.00e+00 8.00e-01  -1.0 0.00e+00    -  0.00e+00 0.00e+00   0
-   1  2.0000000e-01 0.00e+00 1.11e-16  -1.0 8.00e-01    -  1.00e+00 1.00e+00f  1
-
-Number of Iterations....: 1
-
-                                   (scaled)                 (unscaled)
-Objective...............:   2.0000000000000001e-01    2.0000000000000001e-01
-Dual infeasibility......:   1.1102230246251565e-16    1.1102230246251565e-16
-Constraint violation....:   0.0000000000000000e+00    0.0000000000000000e+00
-Complementarity.........:   0.0000000000000000e+00    0.0000000000000000e+00
-Overall NLP error.......:   1.1102230246251565e-16    1.1102230246251565e-16
-
-
-Number of objective function evaluations             = 2
-Number of objective gradient evaluations             = 2
-Number of equality constraint evaluations            = 2
-Number of inequality constraint evaluations          = 0
-Number of equality constraint Jacobian evaluations   = 2
-Number of inequality constraint Jacobian evaluations = 0
-Number of Lagrangian Hessian evaluations             = 1
-Total CPU secs in IPOPT (w/o function evaluations)   =      0.496
-Total CPU secs in NLP function evaluations           =      0.616
-
-EXIT: Optimal Solution Found.
-0</code></pre></div><footer><hr/><a class="previous" href="../"><span class="direction">Previous</span><span class="title">Home</span></a><a class="next" href="../reference/"><span class="direction">Next</span><span class="title">Reference</span></a></footer></article></body></html>
+MathProgBase.optimize!(model)</code></pre><pre><code class="language-none">0</code></pre><footer><hr/><a class="previous" href="../"><span class="direction">Previous</span><span class="title">Home</span></a><a class="next" href="../reference/"><span class="direction">Next</span><span class="title">Reference</span></a></footer></article></body></html>
