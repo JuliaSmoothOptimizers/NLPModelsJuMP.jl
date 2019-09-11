@@ -1,5 +1,6 @@
 name = "NLPModelsJuMP"
 uuid = "792afdf1-32c1-5681-94e0-d7bf7a5df49e"
+version = "0.4.0"
 
 [deps]
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
@@ -14,7 +15,7 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Ipopt = "≥ 0.4.1"
 JuMP = "~0.18.5"
 MathProgBase = "≥ 0.7.6"
-NLPModels = "= 0.8.0"
+NLPModels = "0.8.1"
 julia = "^1.0.0"
 
 [extras]

@@ -98,6 +98,14 @@ function NLPModels.jac_residual(nls :: MathProgNLSModel, x :: AbstractVector)
   return sparse(nls.Fjrows, nls.Fjcols, nls.Fjvals, m, n)
 end
 
+#= NLPModels 0.9.0
+function NLPModels.jac_structure_residual!(nls :: MathProgNLSModel, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer})
+  rows[1:nls.nls_meta.nnzj] .= nls.Fjrows
+  cols[1:nls.nls_meta.nnzj] .= nls.Fjcols
+  return nls.Fjrows, nls.Fjcols
+end
+=#
+
 function NLPModels.jac_structure_residual(nls :: MathProgNLSModel)
   return nls.Fjrows, nls.Fjcols
 end
@@ -133,6 +141,12 @@ function NLPModels.hess_residual(nls :: MathProgNLSModel, x :: AbstractVector, v
   n = nls.meta.nvar
   MathProgBase.eval_hesslag(nls.Fmodel.eval, nls.Fhvals, x, 0.0, v)
   return sparse(nls.Fhrows, nls.Fhcols, nls.Fhvals, n, n)
+end
+
+function NLPModels.hess_structure_residual!(nls :: MathProgNLSModel, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer})
+  rows[1:nls.nls_meta.nnzh] .= nls.Fhrows
+  cols[1:nls.nls_meta.nnzh] .= nls.Fhcols
+  return nls.Fhrows, nls.Fhcols
 end
 
 function NLPModels.hess_structure_residual(nls :: MathProgNLSModel)
@@ -243,11 +257,17 @@ function NLPModels.jtprod!(nls :: MathProgNLSModel,
   return Jtv
 end
 
+function NLPModels.hess_structure!(nls :: MathProgNLSModel, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer})
+  rows[1:nls.meta.nnzh] .= nls.chrows
+  cols[1:nls.meta.nnzh] .= nls.chcols
+  return (nls.chrows, nls.chcols)
+end
+
 function NLPModels.hess_structure(nls :: MathProgNLSModel)
   return (nls.chrows, nls.chcols)
 end
 
-function NLPModels.hess_coord!(nls :: MathProgNLSModel, x :: AbstractVector, rows :: AbstractVector{Int}, cols :: AbstractVector{Int}, vals :: AbstractVector;
+function NLPModels.hess_coord!(nls :: MathProgNLSModel, x :: AbstractVector, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer}, vals :: AbstractVector;
     obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nls.meta.ncon))
   increment!(nls, :neval_hess)
   MathProgBase.eval_hesslag(nls.cmodel.eval, vals, x, obj_weight, y)
