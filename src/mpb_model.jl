@@ -157,6 +157,12 @@ function NLPModels.cons!(nlp :: MathProgNLPModel, x :: AbstractVector, c :: Abst
   return c
 end
 
+function NLPModels.jac_structure!(nlp :: MathProgNLPModel, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer})
+  rows[1:nlp.meta.nnzj] .= nlp.jrows
+  cols[1:nlp.meta.nnzj] .= nlp.jcols
+  return (nlp.jrows, nlp.jcols)
+end
+
 function NLPModels.jac_structure(nlp :: MathProgNLPModel)
   return (nlp.jrows, nlp.jcols)
 end
@@ -235,6 +241,12 @@ end
 #   MathProgBase.eval_jac_prod_t(nlp.mpmodel.eval, jtv, x, v)
 #   return jtv
 # end
+
+function NLPModels.hess_structure!(nlp :: MathProgNLPModel, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer})
+  rows[1:nlp.meta.nnzh] .= nlp.hrows
+  cols[1:nlp.meta.nnzh] .= nlp.hcols
+  return (nlp.hrows, nlp.hcols)
+end
 
 function NLPModels.hess_structure(nlp :: MathProgNLPModel)
   return (nlp.hrows, nlp.hcols)
