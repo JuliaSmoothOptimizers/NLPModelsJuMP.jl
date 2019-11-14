@@ -167,7 +167,7 @@ function NLPModels.jac_structure(nlp :: MathProgNLPModel)
   return (nlp.jrows, nlp.jcols)
 end
 
-function NLPModels.jac_coord!(nlp :: MathProgNLPModel, x :: AbstractVector, rows :: AbstractVector{Int}, cols :: AbstractVector{Int}, vals :: AbstractVector)
+function NLPModels.jac_coord!(nlp :: MathProgNLPModel, x :: AbstractVector, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer}, vals :: AbstractVector)
   increment!(nlp, :neval_jac)
   MathProgBase.eval_jac_g(nlp.mpmodel.eval, vals, x)
   return (rows, cols, vals)
@@ -252,7 +252,7 @@ function NLPModels.hess_structure(nlp :: MathProgNLPModel)
   return (nlp.hrows, nlp.hcols)
 end
 
-function NLPModels.hess_coord!(nlp :: MathProgNLPModel, x :: AbstractVector, rows :: AbstractVector{Int}, cols :: AbstractVector{Int}, vals :: AbstractVector;
+function NLPModels.hess_coord!(nlp :: MathProgNLPModel, x :: AbstractVector, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer}, vals :: AbstractVector;
     obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nlp.meta.ncon))
   increment!(nlp, :neval_hess)
   MathProgBase.eval_hesslag(nlp.mpmodel.eval, vals, x, obj_weight, y)
