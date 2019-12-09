@@ -135,20 +135,10 @@ function NLPModels.obj(nlp :: MathProgNLPModel, x :: AbstractVector)
   return MathProgBase.eval_f(nlp.mpmodel.eval, x)
 end
 
-function NLPModels.grad(nlp :: MathProgNLPModel, x :: AbstractVector)
-  g = zeros(nlp.meta.nvar)
-  return grad!(nlp, x, g)
-end
-
 function NLPModels.grad!(nlp :: MathProgNLPModel, x :: AbstractVector, g :: AbstractVector)
   increment!(nlp, :neval_grad)
   MathProgBase.eval_grad_f(nlp.mpmodel.eval, g, x)
   return g
-end
-
-function NLPModels.cons(nlp :: MathProgNLPModel, x :: AbstractVector)
-  c = zeros(nlp.meta.ncon)
-  return cons!(nlp, x, c)
 end
 
 function NLPModels.cons!(nlp :: MathProgNLPModel, x :: AbstractVector, c :: AbstractVector)
@@ -167,25 +157,22 @@ function NLPModels.jac_structure(nlp :: MathProgNLPModel)
   return (nlp.jrows, nlp.jcols)
 end
 
-function NLPModels.jac_coord!(nlp :: MathProgNLPModel, x :: AbstractVector, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer}, vals :: AbstractVector)
+function NLPModels.jac_coord!(nlp :: MathProgNLPModel, x :: AbstractVector, vals :: AbstractVector)
   increment!(nlp, :neval_jac)
-  MathProgBase.eval_jac_g(nlp.mpmodel.eval, vals, x)
-  return (rows, cols, vals)
+  MathProgBase.eval_jac_g(nlp.mpmodel.eval, nlp.jvals, x)
+  vals[1:nlp.meta.nnzj] .= nlp.jvals
+  return vals
 end
 
 function NLPModels.jac_coord(nlp :: MathProgNLPModel, x :: AbstractVector)
   increment!(nlp, :neval_jac)
   MathProgBase.eval_jac_g(nlp.mpmodel.eval, nlp.jvals, x)
-  return (nlp.jrows, nlp.jcols, nlp.jvals)
+  return nlp.jvals
 end
 
 function NLPModels.jac(nlp :: MathProgNLPModel, x :: AbstractVector)
-  return sparse(jac_coord(nlp, x)..., nlp.meta.ncon, nlp.meta.nvar)
-end
-
-function NLPModels.jprod(nlp :: MathProgNLPModel, x :: AbstractVector, v :: AbstractVector)
-  Jv = zeros(nlp.meta.ncon)
-  return jprod!(nlp, x, v, Jv)
+  jac_coord!(nlp, x, nlp.jvals)
+  return sparse(nlp.jrows, nlp.jcols, nlp.jvals, nlp.meta.ncon, nlp.meta.nvar)
 end
 
 function NLPModels.jprod!(nlp :: MathProgNLPModel,
@@ -252,35 +239,30 @@ function NLPModels.hess_structure(nlp :: MathProgNLPModel)
   return (nlp.hrows, nlp.hcols)
 end
 
-function NLPModels.hess_coord!(nlp :: MathProgNLPModel, x :: AbstractVector, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer}, vals :: AbstractVector;
-    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nlp.meta.ncon))
-  increment!(nlp, :neval_hess)
-  MathProgBase.eval_hesslag(nlp.mpmodel.eval, vals, x, obj_weight, y)
-  return (rows, cols, vals)
-end
-
-function NLPModels.hess_coord(nlp :: MathProgNLPModel, x :: AbstractVector;
-    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nlp.meta.ncon))
+function NLPModels.hess_coord!(nlp :: MathProgNLPModel, x :: AbstractVector, y :: AbstractVector, vals :: AbstractVector; obj_weight :: Float64=1.0)
   increment!(nlp, :neval_hess)
   MathProgBase.eval_hesslag(nlp.mpmodel.eval, nlp.hvals, x, obj_weight, y)
-  return (nlp.hrows, nlp.hcols, nlp.hvals)
+  vals[1:nlp.meta.nnzh] .= nlp.hvals
+  return vals
 end
 
-function NLPModels.hess(nlp :: MathProgNLPModel, x :: AbstractVector;
-    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nlp.meta.ncon))
-  return sparse(hess_coord(nlp, x, y=y, obj_weight=obj_weight)..., nlp.meta.nvar, nlp.meta.nvar)
+function NLPModels.hess_coord!(nlp :: MathProgNLPModel, x :: AbstractVector, vals :: AbstractVector; obj_weight :: Float64=1.0)
+  increment!(nlp, :neval_hess)
+  MathProgBase.eval_hesslag(nlp.mpmodel.eval, nlp.hvals, x, obj_weight, zeros(nlp.meta.ncon))
+  vals[1:nlp.meta.nnzh] .= nlp.hvals
+  return vals
 end
 
-function NLPModels.hprod(nlp :: MathProgNLPModel, x :: AbstractVector, v :: AbstractVector;
-    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nlp.meta.ncon))
-  hv = zeros(nlp.meta.nvar)
-  return hprod!(nlp, x, v, hv, obj_weight=obj_weight, y=y)
+function NLPModels.hprod!(nlp :: MathProgNLPModel, x :: AbstractVector, y :: AbstractVector, v :: AbstractVector, hv :: AbstractVector; obj_weight :: Float64=1.0)
+  increment!(nlp, :neval_hprod)
+  MathProgBase.eval_hesslag_prod(nlp.mpmodel.eval, hv, x, v, obj_weight, y)
+  return hv
 end
 
 function NLPModels.hprod!(nlp :: MathProgNLPModel, x :: AbstractVector, v :: AbstractVector,
     hv :: AbstractVector;
-    obj_weight :: Float64=1.0, y :: AbstractVector=zeros(nlp.meta.ncon))
+    obj_weight :: Float64=1.0)
   increment!(nlp, :neval_hprod)
-  MathProgBase.eval_hesslag_prod(nlp.mpmodel.eval, hv, x, v, obj_weight, y)
+  MathProgBase.eval_hesslag_prod(nlp.mpmodel.eval, hv, x, v, obj_weight, zeros(nlp.meta.ncon))
   return hv
 end
