@@ -37,7 +37,7 @@ function MathProgBase.jac_structure(d::NLPModelEvaluator)
 end
 
 function MathProgBase.eval_jac_g(d::NLPModelEvaluator, J, x)
-  jac_coord!(d.nlp, x, d.jrows, d.jcols, J)
+  jac_coord!(d.nlp, x, J)
 end
 
 # use jprod! ?
@@ -56,11 +56,11 @@ function MathProgBase.hesslag_structure(d::NLPModelEvaluator)
 end
 
 function MathProgBase.eval_hesslag(d::NLPModelEvaluator, H, x, σ, μ)
-  hess_coord!(d.nlp, x, y=μ, obj_weight=σ, d.hrows, d.hcols, H)
+  hess_coord!(d.nlp, x, μ, H, obj_weight=σ)
 end
 
 function MathProgBase.eval_hesslag_prod(d::NLPModelEvaluator, h, x, v, σ, μ)
-  hprod!(d.nlp, x, v, h, y=μ, obj_weight=σ)
+  hprod!(d.nlp, x, μ, v, h, obj_weight=σ)
 end
 
 MathProgBase.isobjlinear(d::NLPModelEvaluator) = d.nlp.meta.nlo == 0
