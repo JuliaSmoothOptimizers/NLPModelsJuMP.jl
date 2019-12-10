@@ -1,6 +1,6 @@
 name = "NLPModelsJuMP"
 uuid = "792afdf1-32c1-5681-94e0-d7bf7a5df49e"
-version = "0.4.1"
+version = "0.5.0"
 
 [deps]
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
