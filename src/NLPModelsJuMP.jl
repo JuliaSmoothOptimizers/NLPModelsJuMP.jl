@@ -1,9 +1,5 @@
-__precompile__()
-
 module NLPModelsJuMP
 
-include("nlsmpb_model.jl")
-include("nlp_to_mpb.jl")
-include("jump_model.jl")
+include("moi_nlp_model.jl")
 
 end

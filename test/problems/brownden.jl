@@ -12,7 +12,7 @@ function brownden()
   nlp = Model()
 
   @variable(nlp, x[1:4])
-  setvalue(x, [25.0; 5.0; -5.0; -1.0])
+  set_start_value.(x, [25.0; 5.0; -5.0; -1.0])
 
   @NLobjective(
     nlp,
