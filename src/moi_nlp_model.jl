@@ -31,38 +31,20 @@ function MathOptNLPModel(jmodel :: JuMP.Model; name :: String="Generic")
   MOI.initialize(eval, [:Grad, :Jac, :Hess, :HessVec, :ExprGraph])  # Add :JacVec when available
 
   nvar = num_variables(jmodel)
-  x0 = zeros(nvar)
-  lvar = []
-  uvar = []
   vars = all_variables(jmodel)
-  for i = 1 : nvar
-    var = vars[i]
-
-    if has_lower_bound(var)
-      push!(lvar, lower_bound(var))
-    else
-      push!(lvar, -Inf)
-    end
-
-    if has_upper_bound(var)
-      push!(uvar, upper_bound(var))
-    else
-      push!(uvar, Inf)
-    end
-
-    init_value = start_value(var)
-    if init_value !== nothing
-      x0[i] = init_value
+  lvar = map(var -> has_lower_bound(var) ? lower_bound(var) : -Inf, vars)
+  uvar = map(var -> has_upper_bound(var) ? upper_bound(var) :  Inf, vars)
+  x0   = zeros(nvar)
+  for (i, val) ∈ enumerate(start_value.(vars))
+    if val !== nothing
+      x0[i] = val
     end
   end
 
   ncon = num_nl_constraints(jmodel)
-  lcon = []
-  ucon = []
-  for con ∈ jmodel.nlp_data.nlconstr
-    push!(lcon, con.lb)
-    push!(ucon, con.ub)
-  end
+  cons = jmodel.nlp_data.nlconstr
+  lcon = map(con -> con.lb, cons)
+  ucon = map(con -> con.ub, cons)
 
   jac_struct = MOI.jacobian_structure(eval)
   jrows = map(t -> t[1], jac_struct)
@@ -159,22 +141,12 @@ end
 
 # Uncomment when :JacVec becomes available in MOI.
 #
-# function NLPModels.jprod(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector)
-#   jv = zeros(nlp.meta.ncon)
-#   return jprod!(nlp, x, v, jv)
-# end
-
 # function NLPModels.jprod!(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector, jv :: AbstractVector)
 #   increment!(nlp, :neval_jprod)
 #   MOI.eval_constraint_jacobian_product(nlp.eval, jv, x, v)
 #   return jv
 # end
-
-# function NLPModels.jtprod(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector)
-#   jtv = zeros(nlp.meta.nvar)
-#   return jtprod!(nlp, x, v, jtv)
-# end
-
+#
 # function NLPModels.jtprod!(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector, jtv :: AbstractVector)
 #   increment!(nlp, :neval_jtprod)
 #   MOI.eval_constraint_jacobian_transpose_product(nlp.eval, jtv, x, v)
