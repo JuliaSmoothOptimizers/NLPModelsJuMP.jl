@@ -141,7 +141,7 @@ The package
 provides a collection of problems defined in JuMP format, which can be converted
 to `MathOptNLPModel`.
 
-```julia
+```@example jumpnlp
 using OptimizationProblems # Defines a lot of JuMP models
 
 nlp = MathOptNLPModel(woods())

@@ -2,8 +2,10 @@
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 NLPModels = "a4795742-8479-5a88-8948-cc11e1c8c1a6"
+OptimizationProblems = "5049e819-d29b-5fba-b941-0eee7e64c1c6"
 
 [compat]
 Documenter = "~0.24"
 JuMP = "~0.20, ~0.21"
 NLPModels = "0.10"
+OptimizationProblems = "~0.3"
