@@ -5,5 +5,5 @@ NLPModels = "a4795742-8479-5a88-8948-cc11e1c8c1a6"
 
 [compat]
 Documenter = "~0.24"
-JuMP = "~0.20"
+JuMP = "~0.20, ~0.21"
 NLPModels = "0.10"
