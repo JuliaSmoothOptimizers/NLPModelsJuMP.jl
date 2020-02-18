@@ -8,15 +8,15 @@ here only the documention specific to NLPModelsJuMP.
 Pages = ["tutorial.md"]
 ```
 
-## MathProgNLPModel
+## MathOptNLPModel
 
 ```@docs
-MathProgNLPModel
+MathOptNLPModel
 ```
 
-`MathProgNLPModel` is a simple yet efficient model. It uses JuMP to define the problem,
+`MathOptNLPModel` is a simple yet efficient model. It uses JuMP to define the problem, 
 and can be accessed through the NLPModels API.
-An advantage of `MathProgNLPModel` over simpler models such as `ADNLPModel`s is that
+An advantage of `MathOptNLPModel` over simpler models such as `ADNLPModel`s is that
 they provide sparse derivates.
 
 Let's define the famous Rosenbrock function
@@ -33,7 +33,7 @@ model = Model() # No solver is required
 @variable(model, x[i=1:2], start=x0[i])
 @NLobjective(model, Min, (x[1] - 1)^2 + 100 * (x[2] - x[1]^2)^2)
 
-nlp = MathProgNLPModel(model)
+nlp = MathOptNLPModel(model)
 ```
 
 Let's get the objective function value at ``x^0``, using only `nlp`.
@@ -112,7 +112,7 @@ f(x) = obj(nlp, x)
 g(x) = grad(nlp, x)
 H(x) = Symmetric(hess(nlp, x), :L)
 x = nlp.meta.x0
-d = -H(x)\g(x)
+d = -H(x) \ g(x)
 ```
 
 or a few
@@ -120,7 +120,7 @@ or a few
 ```@example jumpnlp
 for i = 1:5
   global x
-  x = x - H(x)\g(x)
+  x = x - H(x) \ g(x)
   println("x = $x")
 end
 ```
@@ -139,12 +139,12 @@ x, fx, ngx, optimal, iter = steepest(adnlp)
 The package
 [OptimizationProblems](https://github.com/JuliaSmoothOptimizers/OptimizationProblems.jl)
 provides a collection of problems defined in JuMP format, which can be converted
-to `MathProgNLPModel`.
+to `MathOptNLPModel`.
 
 ```@example jumpnlp
 using OptimizationProblems # Defines a lot of JuMP models
 
-nlp = MathProgNLPModel(woods())
+nlp = MathOptNLPModel(woods())
 x, fx, ngx, optimal, iter = steepest(nlp)
 println("fx = $fx")
 println("ngx = $ngx")
@@ -161,25 +161,25 @@ model = Model()
 x0 = [-1.2; 1.0]
 @variable(model, x[i=1:2] >= 0.0, start=x0[i])
 @NLobjective(model, Min, (x[1] - 1)^2 + 100 * (x[2] - x[1]^2)^2)
-@constraint(model, x[1] + x[2] == 3.0)
+@NLconstraint(model, exp(x[1]) + x[2] == 3.0)
 @NLconstraint(model, x[1] * x[2] >= 1.0)
 
-nlp = MathProgNLPModel(model)
+nlp = MathOptNLPModel(model)
 
 println("cx = $(cons(nlp, nlp.meta.x0))")
 println("Jx = $(jac(nlp, nlp.meta.x0))")
 ```
 
-## MathProgNLSModel Tutorial
+## MathOptNLSModel
 
 ```@docs
-MathProgNLSModel
+MathOptNLSModel
 ```
 
-`MathProgNLSModel` is a model for nonlinear least squares using JuMP, The objective
+`MathOptNLSModel` is a model for nonlinear least squares using JuMP, The objective
 function of NLS problems has the form ``f(x) = \tfrac{1}{2}\|F(x)\|^2``, but specialized
 methods handle ``F`` directly, instead of ``f``.
-To use `MathProgNLSModel`, we define a JuMP model without the objective, and use `NLexpression`s to
+To use `MathOptNLSModel`, we define a JuMP model without the objective, and use `NLexpression`s to
 define the residual function ``F``.
 For instance, the Rosenbrock function can be expressed in nonlinear least squares format by
 defining
@@ -199,30 +199,11 @@ x0 = [-1.2; 1.0]
 @NLexpression(model, F1, x[1] - 1)
 @NLexpression(model, F2, 10 * (x[2] - x[1]^2))
 
-nls = MathProgNLSModel(model, [F1, F2], name="rosen-nls")
+nls = MathOptNLSModel(model, [F1, F2], name="rosen-nls")
 
 residual(nls, nls.meta.x0)
 ```
 
 ```@example nls
 jac_residual(nls, nls.meta.x0)
-```
-
-## NLPtoMPB - Convert NLP to MathProgBase
-
-```@docs
-NLPtoMPB
-```
-
-In addition to creating NLPModels using JuMP, we might want to convert an NLPModel to a
-MathProgBase model to use the solvers available. For instance
-
-```@example nlptompb
-using Ipopt, NLPModels, NLPModelsJuMP, LinearAlgebra, JuMP, MathProgBase
-
-nlp = ADNLPModel(x -> dot(x, x), ones(2),
-                 c=x->[x[1] + 2 * x[2] - 1.0], lcon=[0.0], ucon=[0.0])
-model = NLPtoMPB(nlp, IpoptSolver())
-
-MathProgBase.optimize!(model)
 ```

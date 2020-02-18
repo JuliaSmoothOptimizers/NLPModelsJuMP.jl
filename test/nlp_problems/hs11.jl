@@ -4,8 +4,8 @@ function hs11()
   nlp = Model()
 
   @variable(nlp, x[i=1:2])
-  setvalue(x[1], 4.9)
-  setvalue(x[2], 0.1)
+  set_start_value(x[1], 4.9)
+  set_start_value(x[2], 0.1)
 
   @NLobjective(
     nlp,

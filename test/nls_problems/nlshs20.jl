@@ -23,5 +23,5 @@ function nlshs20()
   @NLexpression(model, F1, 10 * (x[2] - x[1]^2))
   @NLexpression(model, F2, 1 - x[1])
 
-  return MathProgNLSModel(model, [F1, F2])
+  return MathOptNLSModel(model, [F1, F2], name="nlshs20")
 end

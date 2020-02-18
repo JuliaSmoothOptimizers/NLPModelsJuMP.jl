@@ -2,7 +2,7 @@
 
 This package defines a
 [`NLPModels`](https://github.com/JuliaSmoothOptimizers/NLPModels.jl) model using
-[`MathProgBase`](https://github.com/JuliaOpt/MathProgBase.jl) and
+[`MathOptInterface`](https://github.com/JuliaOpt/MathOptInterface.jl) and
 [`JuMP.jl`](https://github.com/JuliaOpt/JuMP.jl).
 This documentation is specific for this model. Please refer to the
 [NLPModels documentation](http://juliasmoothoptimizers.github.io/NLPModels.jl/stable/)

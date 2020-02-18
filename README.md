@@ -24,4 +24,4 @@ focus on the use of JuMP to create these.
 
 ## NLPModels from a JuMP
 
-NLPModelsJuMP provides conversion between MathProgBase models and NLPModels.
+NLPModelsJuMP provides conversion between MathOptInterface models and NLPModels.
