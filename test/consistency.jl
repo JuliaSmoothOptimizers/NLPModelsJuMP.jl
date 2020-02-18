@@ -8,8 +8,9 @@ function test_consistency()
     @printf("Checking problem %-20s", problem_s)
     problem_f = eval(problem)
     nlp_autodiff = eval(Meta.parse("$(problem)_autodiff"))()
+    nlp_manual = eval(Meta.parse(uppercase(string(problem))))()
     nlp_mpb = MathProgNLPModel(problem_f())
-    nlps = [nlp_autodiff; nlp_mpb]
+    nlps = [nlp_autodiff; nlp_manual; nlp_mpb]
 
     consistent_nlps(nlps)
   end
