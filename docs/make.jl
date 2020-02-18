@@ -2,6 +2,7 @@ using Documenter, NLPModelsJuMP
 
 makedocs(
   modules = [NLPModelsJuMP],
+  checkdocs = :exports,
   doctest = true,
   strict = true,
   format = Documenter.HTML(

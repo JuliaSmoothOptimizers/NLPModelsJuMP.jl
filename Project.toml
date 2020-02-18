@@ -1,21 +1,19 @@
 name = "NLPModelsJuMP"
 uuid = "792afdf1-32c1-5681-94e0-d7bf7a5df49e"
-version = "0.5.0"
+version = "0.6.0"
 
 [deps]
-ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-MathProgBase = "fdba3010-5040-5b88-9595-932c9decdf73"
+MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 NLPModels = "a4795742-8479-5a88-8948-cc11e1c8c1a6"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-ForwardDiff = "0.9, 0.10"
-JuMP = "~0.18.5"
-MathProgBase = "0.7.6"
-NLPModels = "0.11"
+JuMP = "~0.20, ~0.21"
+MathOptInterface = "^0.9"
+NLPModels = "^0.11"
 julia = "^1.0.0"
 
 [extras]
