@@ -11,6 +11,11 @@ for problem in [:brownden, :hs5, :hs6, :hs10, :hs11, :hs14, :hs30, :hs43, :mgh07
   end
 end
 
+for problem in [:lls, :mgh01, :nlshs20]
+  include(joinpath("nls_problems", "$problem.jl"))
+  include(joinpath(nlpmodels_path, "nls_problems", "$problem.jl"))
+end
+
 include("consistency.jl")
 include("nls_consistency.jl")
 include("test_mathprognlsmodel.jl")
