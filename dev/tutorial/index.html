@@ -11,7 +11,7 @@ nvar = 2, ncon = 0 (0 linear)
 , NLPModelsJuMP.MathProgModel(JuMP.NLPEvaluator(Minimization problem with:
  * 0 linear constraints
  * 2 variables
-Solver is NLPModelsJuMP.ModelReader(), 0×2 SparseArrays.SparseMatrixCSC{Float64,Int64} with 0 stored entries, Float64[], true, [0.0, 0.0], JuMP.FunctionStorage(ReverseDiffSparse.NodeData[NodeData(CALL, 1, -1), NodeData(CALL, 4, 1), NodeData(CALL, 2, 2), NodeData(VARIABLE, 1, 3), NodeData(VALUE, 1, 3), NodeData(VALUE, 2, 2), NodeData(CALL, 3, 1), NodeData(VALUE, 3, 7), NodeData(CALL, 4, 7), NodeData(CALL, 2, 9), NodeData(VARIABLE, 2, 10), NodeData(CALL, 4, 10), NodeData(VARIABLE, 1, 12), NodeData(VALUE, 4, 12), NodeData(VALUE, 5, 9)], 
+Solver is NLPModelsJuMP.ModelReader(), 0×2 SparseArrays.SparseMatrixCSC{Float64,Int64} with 0 stored entries, Float64[], true, [0.0, 0.0], JuMP.FunctionStorage(ReverseDiffSparse.NodeData[ReverseDiffSparse.NodeData(ReverseDiffSparse.CALL, 1, -1), ReverseDiffSparse.NodeData(ReverseDiffSparse.CALL, 4, 1), ReverseDiffSparse.NodeData(ReverseDiffSparse.CALL, 2, 2), ReverseDiffSparse.NodeData(ReverseDiffSparse.VARIABLE, 1, 3), ReverseDiffSparse.NodeData(ReverseDiffSparse.VALUE, 1, 3), ReverseDiffSparse.NodeData(ReverseDiffSparse.VALUE, 2, 2), ReverseDiffSparse.NodeData(ReverseDiffSparse.CALL, 3, 1), ReverseDiffSparse.NodeData(ReverseDiffSparse.VALUE, 3, 7), ReverseDiffSparse.NodeData(ReverseDiffSparse.CALL, 4, 7), ReverseDiffSparse.NodeData(ReverseDiffSparse.CALL, 2, 9), ReverseDiffSparse.NodeData(ReverseDiffSparse.VARIABLE, 2, 10), ReverseDiffSparse.NodeData(ReverseDiffSparse.CALL, 4, 10), ReverseDiffSparse.NodeData(ReverseDiffSparse.VARIABLE, 1, 12), ReverseDiffSparse.NodeData(ReverseDiffSparse.VALUE, 4, 12), ReverseDiffSparse.NodeData(ReverseDiffSparse.VALUE, 5, 9)], 
   [2 ,  1]  =  true
   [7 ,  1]  =  true
   [3 ,  2]  =  true
@@ -25,11 +25,11 @@ Solver is NLPModelsJuMP.ModelReader(), 0×2 SparseArrays.SparseMatrixCSC{Float64
   [11, 10]  =  true
   [12, 10]  =  true
   [13, 12]  =  true
-  [14, 12]  =  true, [1.0, 2.0, 100.0, 2.0, 2.0], [24.2, 4.84, -2.2, -1.2, 1.0, 2.0, 19.36, 100.0, 0.1936, -0.44, 1.0, 1.44, -1.2, 2.0, 2.0], [0.0, 1.0, -4.4, 1.0, -1.0, NaN, 1.0, 0.1936, 100.0, -0.88, 1.0, -1.0, -2.4, NaN, NaN], [1.0, 1.0, -4.4, -4.4, 0.0, 0.0, 1.0, 0.0, 100.0, -88.0, -88.0, 88.0, -211.2, 0.0, 0.0], [1, 2], [1, 2, 2], [1, 2, 1], ReverseDiffSparse.Coloring.RecoveryInfo(Array{Int64,1}[[2, 1]], Array{Int64,1}[[2, 1]], Array{Int64,1}[[0, 1]], [1, 2], 2, 1, [1, 2]), [1330.0 480.0; 480.0 200.0], NONLINEAR::Linearity = 3, Int64[]), JuMP.FunctionStorage[], JuMP.SubexpressionStorage[], Int64[], Float64[], Float64[], ReverseDiffSparse.Linearity[], Any[], [-1.2, 1.0], [6.91627e-310, 4.94066e-324], Float64[], false, true, [-215.6, -88.0, -4.4, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0  …  0.0, 1.0, -2.4, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0  …  0.0, 0.0, 0.0, 0.0, 2.0, 0.0, NaN, NaN, NaN, NaN], [0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 2.0, 0.0, 4.94066e-324, 8.69556e-322  …  480.0, 200.0, -480.0, -200.0, 1328.0, 480.0, 4.94066e-324, 1.44267e-321, 2.51973e-322, 4.94066e-324], [0.0, 0.0, 0.0, 0.0], [480.0, 0.0, 480.0, 200.0], Float64[], Float64[], [1, 2, 2], [1, 2, 1], 2, false, false, false, false, false), 2, 0, [-1.2, 1.0], Float64[], [-Inf, -Inf], [Inf, Inf], Float64[], Float64[], :Min, :Uninitialized), NLPModels.Counters(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), Int64[], Int64[], Float64[], [1, 2, 2], [1, 2, 1], [0.0, 0.0, 0.0])</code></pre><p>Let&#39;s get the objective function value at <span>$x^0$</span>, using only <code>nlp</code>.</p><pre><code class="language-julia">fx = obj(nlp, nlp.meta.x0)
+  [14, 12]  =  true, [1.0, 2.0, 100.0, 2.0, 2.0], [24.199999999999996, 4.840000000000001, -2.2, -1.2, 1.0, 2.0, 19.359999999999996, 100.0, 0.19359999999999997, -0.43999999999999995, 1.0, 1.44, -1.2, 2.0, 2.0], [0.0, 1.0, -4.4, 1.0, -1.0, NaN, 1.0, 0.19359999999999997, 100.0, -0.8799999999999999, 1.0, -1.0, -2.4, NaN, NaN], [1.0, 1.0, -4.4, -4.4, 0.0, 0.0, 1.0, 0.0, 100.0, -87.99999999999999, -87.99999999999999, 87.99999999999999, -211.19999999999996, 0.0, 0.0], [1, 2], [1, 2, 2], [1, 2, 1], ReverseDiffSparse.Coloring.RecoveryInfo(Array{Int64,1}[[2, 1]], Array{Int64,1}[[2, 1]], Array{Int64,1}[[0, 1]], [1, 2], 2, 1, [1, 2]), [1330.0 480.0; 480.0 200.0], ReverseDiffSparse.NONLINEAR, Int64[]), JuMP.FunctionStorage[], JuMP.SubexpressionStorage[], Int64[], Float64[], Float64[], ReverseDiffSparse.Linearity[], Any[], [-1.2, 1.0], [6.4e-323, 7.0e-323], Float64[], false, true, [-215.59999999999997, -87.99999999999999, -4.4, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0  …  0.0, 1.0, -2.4, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0  …  0.0, 0.0, 0.0, 0.0, 2.0, 0.0, NaN, NaN, NaN, NaN], [0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 2.0, 0.0, 0.0, 0.0  …  480.0, 200.0, -480.0, -200.0, 1328.0, 480.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [480.0, 0.0, 480.0, 200.0], Float64[], Float64[], [1, 2, 2], [1, 2, 1], 2, false, false, false, false, false), 2, 0, [-1.2, 1.0], Float64[], [-Inf, -Inf], [Inf, Inf], Float64[], Float64[], :Min, :Uninitialized), NLPModels.Counters(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), Int64[], Int64[], Float64[], [1, 2, 2], [1, 2, 1], [0.0, 0.0, 0.0])</code></pre><p>Let&#39;s get the objective function value at <span>$x^0$</span>, using only <code>nlp</code>.</p><pre><code class="language-julia">fx = obj(nlp, nlp.meta.x0)
 println(&quot;fx = $fx&quot;)</code></pre><pre><code class="language-none">fx = 24.199999999999996</code></pre><p>Let&#39;s try the gradient and Hessian.</p><pre><code class="language-julia">gx = grad(nlp, nlp.meta.x0)
 Hx = hess(nlp, nlp.meta.x0)
 println(&quot;gx = $gx&quot;)
-println(&quot;Hx = $Hx&quot;)</code></pre><pre><code class="language-none">gx = [-215.6, -88.0]
+println(&quot;Hx = $Hx&quot;)</code></pre><pre><code class="language-none">gx = [-215.59999999999997, -87.99999999999999]
 Hx =
   [1, 1]  =  1330.0
   [2, 1]  =  480.0
@@ -67,7 +67,7 @@ println(&quot;x = $x&quot;)
 println(&quot;fx = $fx&quot;)
 println(&quot;ngx = $ngx&quot;)
 println(&quot;optimal = $optimal&quot;)
-println(&quot;iter = $iter&quot;)</code></pre><pre><code class="language-none">x = [1.0, 1.0]
+println(&quot;iter = $iter&quot;)</code></pre><pre><code class="language-none">x = [1.0000006499501406, 1.0000013043156974]
 fx = 4.2438440239813445e-13
 ngx = 9.984661274466946e-7
 optimal = true
@@ -81,14 +81,14 @@ d = -H(x)\g(x)</code></pre><pre><code class="language-none">2-element Array{Floa
   global x
   x = x - H(x)\g(x)
   println(&quot;x = $x&quot;)
-end</code></pre><pre><code class="language-none">x = [-1.17528, 1.38067]
-x = [0.763115, -3.17503]
-x = [0.76343, 0.582825]
-x = [0.999995, 0.944027]
-x = [0.999996, 0.999991]</code></pre><p>Notice how we can use the method with different NLPModels:</p><pre><code class="language-julia">f(x) = (x[1] - 1.0)^2 + 100 * (x[2] - 1.0)^2
+end</code></pre><pre><code class="language-none">x = [-1.1752808988764043, 1.3806741573033703]
+x = [0.7631148711766087, -3.1750338547485217]
+x = [0.7634296788842126, 0.5828247754973592]
+x = [0.9999953110849883, 0.9440273238534098]
+x = [0.9999956956536664, 0.9999913913257125]</code></pre><p>Notice how we can use the method with different NLPModels:</p><pre><code class="language-julia">f(x) = (x[1] - 1.0)^2 + 100 * (x[2] - 1.0)^2
 
 adnlp = ADNLPModel(f, x0)
-x, fx, ngx, optimal, iter = steepest(adnlp)</code></pre><pre><code class="language-none">([1.0, 1.0], 6.745975419202182e-14, 5.194603129865527e-7, true, 14)</code></pre><h3 id="OptimizationProblems-1"><a class="docs-heading-anchor" href="#OptimizationProblems-1">OptimizationProblems</a><a class="docs-heading-anchor-permalink" href="#OptimizationProblems-1" title="Permalink"></a></h3><p>The package <a href="https://github.com/JuliaSmoothOptimizers/OptimizationProblems.jl">OptimizationProblems</a> provides a collection of problems defined in JuMP format, which can be converted to <code>MathProgNLPModel</code>.</p><pre><code class="language-julia">using OptimizationProblems # Defines a lot of JuMP models
+x, fx, ngx, optimal, iter = steepest(adnlp)</code></pre><pre><code class="language-none">([0.9999997402698435, 1.0], 6.745975419202182e-14, 5.194603129865527e-7, true, 14)</code></pre><h3 id="OptimizationProblems-1"><a class="docs-heading-anchor" href="#OptimizationProblems-1">OptimizationProblems</a><a class="docs-heading-anchor-permalink" href="#OptimizationProblems-1" title="Permalink"></a></h3><p>The package <a href="https://github.com/JuliaSmoothOptimizers/OptimizationProblems.jl">OptimizationProblems</a> provides a collection of problems defined in JuMP format, which can be converted to <code>MathProgNLPModel</code>.</p><pre><code class="language-julia">using OptimizationProblems # Defines a lot of JuMP models
 
 nlp = MathProgNLPModel(woods())
 x, fx, ngx, optimal, iter = steepest(nlp)
@@ -110,7 +110,7 @@ x0 = [-1.2; 1.0]
 nlp = MathProgNLPModel(model)
 
 println(&quot;cx = $(cons(nlp, nlp.meta.x0))&quot;)
-println(&quot;Jx = $(jac(nlp, nlp.meta.x0))&quot;)</code></pre><pre><code class="language-none">cx = [-0.2, -2.2]
+println(&quot;Jx = $(jac(nlp, nlp.meta.x0))&quot;)</code></pre><pre><code class="language-none">cx = [-0.19999999999999996, -2.2]
 Jx =
   [1, 1]  =  1.0
   [2, 1]  =  1.0
@@ -136,4 +136,4 @@ nlp = ADNLPModel(x -&gt; dot(x, x), ones(2),
                  c=x-&gt;[x[1] + 2 * x[2] - 1.0], lcon=[0.0], ucon=[0.0])
 model = NLPtoMPB(nlp, IpoptSolver())
 
-MathProgBase.optimize!(model)</code></pre><pre><code class="language-none">0</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../reference/">Reference »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 10 December 2019 02:42">Tuesday 10 December 2019</span>. Using Julia version 1.0.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+MathProgBase.optimize!(model)</code></pre><pre><code class="language-none">0</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../reference/">Reference »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 20 February 2020 05:17">Thursday 20 February 2020</span>. Using Julia version 1.3.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
