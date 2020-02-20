@@ -207,3 +207,9 @@ residual(nls, nls.meta.x0)
 ```@example nls
 jac_residual(nls, nls.meta.x0)
 ```
+
+### NLSProblems
+
+The package
+[NLSProblems](https://github.com/JuliaSmoothOptimizers/NLSProblems.jl)
+provides a collection of problems defined as `MathOptNLSModel`.
