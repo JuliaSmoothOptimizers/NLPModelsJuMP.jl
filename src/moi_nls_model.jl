@@ -37,7 +37,7 @@ Construct a `MathOptNLSModel` from a `JuMP` model and a vector of `NonlinearExpr
 """
 function MathOptNLSModel(cmodel :: JuMP.Model, F :: Vector{JuMP.NonlinearExpression}; name :: String="Generic")
 
-  nvar = num_variables(cmodel)
+  nvar = Int(num_variables(cmodel))
   vars = all_variables(cmodel)
   lvar = map(var -> has_lower_bound(var) ? lower_bound(var) : -Inf, vars)
   uvar = map(var -> has_upper_bound(var) ? upper_bound(var) :  Inf, vars)
@@ -69,7 +69,7 @@ function MathOptNLSModel(cmodel :: JuMP.Model, F :: Vector{JuMP.NonlinearExpress
     JuMP.add_NL_constraint(Fmodel, expr)
   end
 
-  nequ = num_nl_constraints(Fmodel)
+  nequ = Int(num_nl_constraints(Fmodel))
   Feval = NLPEvaluator(Fmodel)
   MOI.initialize(Feval, [:Grad, :Jac, :Hess, :HessVec, :ExprGraph])  # Add :JacVec when available
 
