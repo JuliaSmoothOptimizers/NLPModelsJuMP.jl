@@ -1,5 +1,5 @@
-using NLPModels, SparseArrays
-import NLPModels.increment!
+using NLPModels
+import NLPModels.increment!, NLPModels.decrement!
 
 using JuMP, MathOptInterface
 const MOI = MathOptInterface
@@ -9,15 +9,7 @@ export MathOptNLPModel
 mutable struct MathOptNLPModel <: AbstractNLPModel
   meta     :: NLPModelMeta
   eval     :: Union{MOI.AbstractNLPEvaluator, Nothing}
-  counters :: Counters      # Evaluation counters.
-
-  jrows :: Vector{Int}      # Jacobian sparsity pattern.
-  jcols :: Vector{Int}
-  jvals :: Vector{Float64}  # Room for the constraints Jacobian.
-
-  hrows :: Vector{Int}      # Hessian sparsity pattern.
-  hcols :: Vector{Int} 
-  hvals :: Vector{Float64}  # Room for the Lagrangian Hessian.
+  counters :: Counters
 end
 
 """
@@ -28,13 +20,14 @@ Construct a `MathOptNLPModel` from a `JuMP` model.
 function MathOptNLPModel(jmodel :: JuMP.Model; name :: String="Generic")
 
   eval = NLPEvaluator(jmodel)
-  MOI.initialize(eval, [:Grad, :Jac, :Hess, :HessVec, :ExprGraph])  # Add :JacVec when available
+  MOI.initialize(eval, [:Grad, :Jac, :Hess, :HessVec])  # Add :JacVec when available
 
   nvar = num_variables(jmodel)
   vars = all_variables(jmodel)
   lvar = map(var -> has_lower_bound(var) ? lower_bound(var) : -Inf, vars)
   uvar = map(var -> has_upper_bound(var) ? upper_bound(var) :  Inf, vars)
-  x0   = zeros(nvar)
+
+  x0 = zeros(nvar)
   for (i, val) ∈ enumerate(start_value.(vars))
     if val !== nothing
       x0[i] = val
@@ -46,16 +39,8 @@ function MathOptNLPModel(jmodel :: JuMP.Model; name :: String="Generic")
   lcon = map(con -> con.lb, cons)
   ucon = map(con -> con.ub, cons)
 
-  jac_struct = MOI.jacobian_structure(eval)
-  jrows = map(t -> t[1], jac_struct)
-  jcols = map(t -> t[2], jac_struct)
-
-  hesslag_struct = MOI.hessian_lagrangian_structure(eval)
-  hrows = map(t -> t[1], hesslag_struct)
-  hcols = map(t -> t[2], hesslag_struct)
-
-  nnzj = length(jrows)
-  nnzh = length(hrows)
+  nnzj = ncon == 0 ? 0 : sum(length(con.grad_sparsity) for con in eval.constraints)
+  nnzh = length(eval.objective.hess_I) + (ncon == 0 ? 0 : sum(length(ex.hess_I) for ex in eval.constraints))
 
   meta = NLPModelMeta(nvar,
                       x0=x0,
@@ -70,20 +55,11 @@ function MathOptNLPModel(jmodel :: JuMP.Model; name :: String="Generic")
                       lin=[],
                       nln=collect(1:ncon),
                       minimize=objective_sense(jmodel) == MOI.MIN_SENSE,
-                      islp=false,
+                      islp=!eval.has_nlobj,
                       name=name,
                       )
 
-  return MathOptNLPModel(meta,
-                         eval,
-                         Counters(),
-                         jrows,
-                         jcols,
-                         zeros(nnzj),  # jvals
-                         hrows,
-                         hcols,
-                         zeros(nnzh),  # hvals
-                        )
+  return MathOptNLPModel(meta, eval, Counters())
 end
 
 function NLPModels.obj(nlp :: MathOptNLPModel, x :: AbstractVector)
@@ -104,9 +80,12 @@ function NLPModels.cons!(nlp :: MathOptNLPModel, x :: AbstractVector, c :: Abstr
 end
 
 function NLPModels.jac_structure!(nlp :: MathOptNLPModel, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer})
-  rows[1:nlp.meta.nnzj] .= nlp.jrows
-  cols[1:nlp.meta.nnzj] .= nlp.jcols
-  return (rows, cols)
+  jac_struct = MOI.jacobian_structure(nlp.eval)
+  for index = 1 : nlp.meta.nnzj
+    rows[index] = jac_struct[index][1]
+    cols[index] = jac_struct[index][2]
+  end
+  return rows, cols
 end
 
 function NLPModels.jac_coord!(nlp :: MathOptNLPModel, x :: AbstractVector, vals :: AbstractVector)
@@ -115,53 +94,53 @@ function NLPModels.jac_coord!(nlp :: MathOptNLPModel, x :: AbstractVector, vals 
   return vals
 end
 
-function NLPModels.jac(nlp :: MathOptNLPModel, x :: AbstractVector)
-  jac_coord!(nlp, x, nlp.jvals)
-  return sparse(nlp.jrows, nlp.jcols, nlp.jvals, nlp.meta.ncon, nlp.meta.nvar)
-end
-
-function NLPModels.jprod!(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector, Jv :: AbstractVector)
-  increment!(nlp, :neval_jprod)
-  Jv .= 0.0
-  MOI.eval_constraint_jacobian(nlp.eval, nlp.jvals, x)
-  for k = 1 : nlp.meta.nnzj
-    i = nlp.jrows[k]
-    j = nlp.jcols[k]
-    Jv[i] += nlp.jvals[k] * v[j]
-  end
+function NLPModels.jprod!(nlp :: MathOptNLPModel, x :: AbstractVector, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer}, v :: AbstractVector, Jv :: AbstractVector)
+  vals = jac_coord(nlp, x)
+  decrement!(nlp, :neval_jac)
+  jprod!(nlp, rows, cols, vals, v, Jv)
   return Jv
 end
 
+function NLPModels.jprod!(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector, Jv :: AbstractVector)
+  rows, cols = jac_structure(nlp)
+  jprod!(nlp, x, rows, cols, v, Jv)
+  return Jv
+end
+
+function NLPModels.jtprod!(nlp :: MathOptNLPModel, x :: AbstractVector, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer}, v :: AbstractVector, Jtv :: AbstractVector)
+  vals = jac_coord(nlp, x)
+  decrement!(nlp, :neval_jac)
+  jtprod!(nlp, rows, cols, vals, v, Jtv)
+  return Jtv
+end
+
 function NLPModels.jtprod!(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector, Jtv :: AbstractVector)
-  increment!(nlp, :neval_jtprod)
-  Jtv .= 0.0
-  MOI.eval_constraint_jacobian(nlp.eval, nlp.jvals, x)
-  for k = 1 : nlp.meta.nnzj
-    i = nlp.jrows[k]
-    j = nlp.jcols[k]
-    Jtv[j] += nlp.jvals[k] * v[i]
-  end
+  (rows, cols) = jac_structure(nlp)
+  jtprod!(nlp, x, rows, cols, v, Jtv)
   return Jtv
 end
 
 # Uncomment when :JacVec becomes available in MOI.
 #
-# function NLPModels.jprod!(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector, jv :: AbstractVector)
+# function NLPModels.jprod!(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector, Jv :: AbstractVector)
 #   increment!(nlp, :neval_jprod)
-#   MOI.eval_constraint_jacobian_product(nlp.eval, jv, x, v)
-#   return jv
+#   MOI.eval_constraint_jacobian_product(nlp.eval, Jv, x, v)
+#   return Jv
 # end
 #
-# function NLPModels.jtprod!(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector, jtv :: AbstractVector)
+# function NLPModels.jtprod!(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector, Jtv :: AbstractVector)
 #   increment!(nlp, :neval_jtprod)
-#   MOI.eval_constraint_jacobian_transpose_product(nlp.eval, jtv, x, v)
-#   return jtv
+#   MOI.eval_constraint_jacobian_transpose_product(nlp.eval, Jtv, x, v)
+#   return Jtv
 # end
 
 function NLPModels.hess_structure!(nlp :: MathOptNLPModel, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer})
-  rows[1:nlp.meta.nnzh] .= nlp.hrows
-  cols[1:nlp.meta.nnzh] .= nlp.hcols
-  return (rows, cols)
+  hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
+  for index = 1 : nlp.meta.nnzh
+    rows[index] = hesslag_struct[index][1]
+    cols[index] = hesslag_struct[index][2]
+  end
+  return rows, cols
 end
 
 function NLPModels.hess_coord!(nlp :: MathOptNLPModel, x :: AbstractVector, y :: AbstractVector, vals :: AbstractVector; obj_weight :: Float64=1.0)
@@ -174,16 +153,6 @@ function NLPModels.hess_coord!(nlp :: MathOptNLPModel, x :: AbstractVector, vals
   increment!(nlp, :neval_hess)
   MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, zeros(nlp.meta.ncon))
   return vals
-end
-
-function NLPModels.hess(nlp :: MathOptNLPModel, x :: AbstractVector, y :: AbstractVector; obj_weight :: Float64=1.0)
-  hess_coord!(nlp, x, y, nlp.hvals, obj_weight=obj_weight)
-  return sparse(nlp.hrows, nlp.hcols, nlp.hvals, nlp.meta.nvar, nlp.meta.nvar)
-end
-
-function NLPModels.hess(nlp :: MathOptNLPModel, x :: AbstractVector; obj_weight :: Float64=1.0)
-  hess_coord!(nlp, x, nlp.hvals, obj_weight=obj_weight)
-  return sparse(nlp.hrows, nlp.hcols, nlp.hvals, nlp.meta.nvar, nlp.meta.nvar)
 end
 
 function NLPModels.hprod!(nlp :: MathOptNLPModel, x :: AbstractVector, y :: AbstractVector, v :: AbstractVector, hv :: AbstractVector; obj_weight :: Float64=1.0)
