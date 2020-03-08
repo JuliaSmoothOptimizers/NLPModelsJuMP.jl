@@ -40,7 +40,7 @@ function MathOptNLPModel(jmodel :: JuMP.Model; name :: String="Generic")
   ucon = map(con -> con.ub, cons)
 
   nnzj = ncon == 0 ? 0 : sum(length(con.grad_sparsity) for con in eval.constraints)
-  nnzh = length(eval.objective.hess_I) + (ncon == 0 ? 0 : sum(length(ex.hess_I) for ex in eval.constraints))
+  nnzh = length(eval.objective.hess_I) + (ncon == 0 ? 0 : sum(length(con.hess_I) for con in eval.constraints))
 
   meta = NLPModelMeta(nvar,
                       x0=x0,

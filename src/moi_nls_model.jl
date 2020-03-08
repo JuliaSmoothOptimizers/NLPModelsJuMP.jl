@@ -59,10 +59,10 @@ function MathOptNLSModel(cmodel :: JuMP.Model, F :: Vector{JuMP.NonlinearExpress
   MOI.initialize(Feval, [:Grad, :Jac, :Hess, :HessVec])  # Add :JacVec when available
 
   Fnnzj = nequ == 0 ? 0 : sum(length(con.grad_sparsity) for con in Feval.constraints)
-  Fnnzh = length(Feval.objective.hess_I) + (nequ == 0 ? 0 : sum(length(ex.hess_I) for ex in Feval.constraints))
+  Fnnzh = length(Feval.objective.hess_I) + (nequ == 0 ? 0 : sum(length(con.hess_I) for con in Feval.constraints))
 
   cnnzj = ncon == 0 ? 0 : sum(length(con.grad_sparsity) for con in ceval.constraints)
-  cnnzh = length(ceval.objective.hess_I) + (ncon == 0 ? 0 : sum(length(ex.hess_I) for ex in ceval.constraints))
+  cnnzh = length(ceval.objective.hess_I) + (ncon == 0 ? 0 : sum(length(con.hess_I) for con in ceval.constraints))
 
   meta = NLPModelMeta(nvar,
                       x0=x0,
