@@ -19,8 +19,11 @@ end
 
 Construct a `MathOptNLSModel` from a `JuMP` model and a vector of `NonlinearExpression`.
 """
-function MathOptNLSModel(cmodel :: JuMP.Model, F :: Vector{JuMP.NonlinearExpression}; name :: String="Generic")
+function MathOptNLSModel(cmodel :: JuMP.Model, F :: Union{AbstractArray{JuMP.NonlinearExpression},
+                                                          Array{<: AbstractArray{JuMP.NonlinearExpression}}
+                                                         }; name :: String="Generic")
 
+  F_is_array_of_containers = F isa Array{<: AbstractArray{JuMP.NonlinearExpression}}
   nvar = Int(num_variables(cmodel))
   vars = all_variables(cmodel)
   lvar = map(var -> has_lower_bound(var) ? lower_bound(var) : -Inf, vars)
@@ -38,7 +41,11 @@ function MathOptNLSModel(cmodel :: JuMP.Model, F :: Vector{JuMP.NonlinearExpress
   lcon = map(con -> con.lb, cons)
   ucon = map(con -> con.ub, cons)
 
-  @NLobjective(cmodel, Min, 0.5 * sum(Fi^2 for Fi in F))
+  if F_is_array_of_containers
+    @NLobjective(cmodel, Min, 0.5 * sum(sum(Fi^2 for Fi in FF) for FF in F))
+  else
+    @NLobjective(cmodel, Min, 0.5 * sum(Fi^2 for Fi in F))
+  end
   ceval = NLPEvaluator(cmodel)
   MOI.initialize(ceval, [:Grad, :Jac, :Hess, :HessVec, :ExprGraph])  # Add :JacVec when available / :ExprGraph is only required here
 
@@ -47,11 +54,20 @@ function MathOptNLSModel(cmodel :: JuMP.Model, F :: Vector{JuMP.NonlinearExpress
   JuMP._init_NLP(Fmodel)
   @NLobjective(Fmodel, Min, 0.0)
   Fmodel.nlp_data.user_operators = cmodel.nlp_data.user_operators
+  if F_is_array_of_containers
+    for FF in F, Fi in FF
+      expr = ceval.subexpressions_as_julia_expressions[Fi.index]
+      replace!(expr, x)
+      expr = :($expr == 0)
+      JuMP.add_NL_constraint(Fmodel, expr)
+    end
+  else
     for Fi in F
-    expr = ceval.subexpressions_as_julia_expressions[Fi.index]
-    replace!(expr, x)
-    expr = :($expr == 0)
-    JuMP.add_NL_constraint(Fmodel, expr)
+      expr = ceval.subexpressions_as_julia_expressions[Fi.index]
+      replace!(expr, x)
+      expr = :($expr == 0)
+      JuMP.add_NL_constraint(Fmodel, expr)
+    end
   end
 
   nequ = Int(num_nl_constraints(Fmodel))
