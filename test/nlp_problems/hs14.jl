@@ -18,7 +18,7 @@ function hs14()
     -x[1]^2/4 - x[2]^2 + 1 >= 0
   )
 
-  @NLconstraint(
+  @constraint(
     nlp,
     x[1] - 2 * x[2] + 1 == 0
   )

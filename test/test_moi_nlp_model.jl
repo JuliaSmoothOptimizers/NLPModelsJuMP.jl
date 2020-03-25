@@ -3,7 +3,7 @@ println("Testing MathOptNLPModel")
 
 @printf("%-15s  %4s  %4s  %10s  %10s  %10s\n", "Problem", "nvar", "ncon", "|f(x₀)|", "‖∇f(x₀)‖", "‖c(x₀)‖")
 # Test that every problem can be instantiated.
-for prob in [:brownden, :hs5, :hs6, :hs10, :hs11, :hs14]
+for prob in [:brownden, :hs5, :hs6, :hs10, :hs11, :hs14, :lincon]
   prob_fn = eval(prob)
   nlp = MathOptNLPModel(prob_fn())
   n   = nlp.meta.nvar

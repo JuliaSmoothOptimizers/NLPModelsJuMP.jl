@@ -161,7 +161,7 @@ model = Model()
 x0 = [-1.2; 1.0]
 @variable(model, x[i=1:2] >= 0.0, start=x0[i])
 @NLobjective(model, Min, (x[1] - 1)^2 + 100 * (x[2] - x[1]^2)^2)
-@NLconstraint(model, exp(x[1]) + x[2] == 3.0)
+@constraint(model, x[1] + x[2] == 3.0)
 @NLconstraint(model, x[1] * x[2] >= 1.0)
 
 nlp = MathOptNLPModel(model)
