@@ -1,9 +1,3 @@
-using NLPModels
-import NLPModels.increment!, NLPModels.decrement!
-
-using JuMP, MathOptInterface
-const MOI = MathOptInterface
-
 export MathOptNLSModel
 
 mutable struct MathOptNLSModel <: AbstractNLSModel
@@ -11,6 +5,7 @@ mutable struct MathOptNLSModel <: AbstractNLSModel
   nls_meta :: NLSMeta
   Feval    :: Union{MOI.AbstractNLPEvaluator, Nothing}
   ceval    :: Union{MOI.AbstractNLPEvaluator, Nothing}
+  lincon   :: LinearConstraints
   counters :: NLSCounters
 end
 
@@ -24,22 +19,7 @@ function MathOptNLSModel(cmodel :: JuMP.Model, F :: Union{AbstractArray{JuMP.Non
                                                          }; name :: String="Generic")
 
   F_is_array_of_containers = F isa Array{<: AbstractArray{JuMP.NonlinearExpression}}
-  nvar = Int(num_variables(cmodel))
-  vars = all_variables(cmodel)
-  lvar = map(var -> has_lower_bound(var) ? lower_bound(var) : -Inf, vars)
-  uvar = map(var -> has_upper_bound(var) ? upper_bound(var) :  Inf, vars)
-
-  x0 = zeros(nvar)
-  for (i, val) ∈ enumerate(start_value.(vars))
-    if val !== nothing
-      x0[i] = val
-    end
-  end
-
-  ncon = num_nl_constraints(cmodel)
-  cons = cmodel.nlp_data.nlconstr
-  lcon = map(con -> con.lb, cons)
-  ucon = map(con -> con.ub, cons)
+  nvar, lvar, uvar, x0, nnln, nl_lcon, nl_ucon = parser_JuMP(cmodel)
 
   if F_is_array_of_containers
     @NLobjective(cmodel, Min, 0.5 * sum(sum(Fi^2 for Fi in FF) for FF in F))
@@ -77,21 +57,35 @@ function MathOptNLSModel(cmodel :: JuMP.Model, F :: Union{AbstractArray{JuMP.Non
   Fnnzj = nequ == 0 ? 0 : sum(length(con.grad_sparsity) for con in Feval.constraints)
   Fnnzh = length(Feval.objective.hess_I) + (nequ == 0 ? 0 : sum(length(con.hess_I) for con in Feval.constraints))
 
-  cnnzj = ncon == 0 ? 0 : sum(length(con.grad_sparsity) for con in ceval.constraints)
-  cnnzh = length(ceval.objective.hess_I) + (ncon == 0 ? 0 : sum(length(con.hess_I) for con in ceval.constraints))
+  nl_cnnzj = nnln == 0 ? 0 : sum(length(con.grad_sparsity) for con in ceval.constraints)
+  nl_cnnzh = length(ceval.objective.hess_I) + (nnln == 0 ? 0 : sum(length(con.hess_I) for con in ceval.constraints))
+
+  moimodel = backend(cmodel)
+  nlin, linrows, lincols, linvals, lin_lcon, lin_ucon = parser_MOI(moimodel)
+
+  lin_cnnzj = length(linvals)
+  lincon = LinearConstraints(linrows, lincols, linvals)
+
+  ncon = nlin + nnln
+  lcon = vcat(lin_lcon, nl_lcon)
+  ucon = vcat(lin_ucon, nl_ucon)
+  cnnzj = lin_cnnzj + nl_cnnzj
+  cnnzh = nl_cnnzh
 
   meta = NLPModelMeta(nvar,
                       x0=x0,
                       lvar=lvar,
                       uvar=uvar,
                       ncon=ncon,
+                      nlin=nlin,
+                      nnln=nnln,
                       y0=zeros(ncon),
                       lcon=lcon,
                       ucon=ucon,
                       nnzj=cnnzj,
                       nnzh=cnnzh,
-                      lin=[],
-                      nln=collect(1:ncon),
+                      lin=collect(1:nlin),
+                      nln=collect(nlin+1:ncon),
                       minimize=objective_sense(cmodel) == MOI.MIN_SENSE,
                       islp=false,
                       name=name,
@@ -101,6 +95,7 @@ function MathOptNLSModel(cmodel :: JuMP.Model, F :: Union{AbstractArray{JuMP.Non
                          NLSMeta(nequ, nvar, nnzj=Fnnzj, nnzh=Fnnzh),
                          Feval,
                          ceval,
+                         lincon,
                          NLSCounters()
                         )
 end
@@ -201,22 +196,41 @@ end
 
 function NLPModels.cons!(nls :: MathOptNLSModel, x :: AbstractVector, c :: AbstractVector)
   increment!(nls, :neval_cons)
-  MOI.eval_constraint(nls.ceval, c, x)
+  if nls.meta.nlin > 0
+    coo_prod!(nls.lincon.rows, nls.lincon.cols, nls.lincon.vals, x, view(c, nls.meta.lin))
+  end
+  if nls.meta.nnln > 0
+    MOI.eval_constraint(nls.ceval, view(c, nls.meta.nln), x)
+  end
   return c
 end
 
 function NLPModels.jac_structure!(nls :: MathOptNLSModel, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer})
-  jac_struct = MOI.jacobian_structure(nls.ceval)
-  for index = 1 : nls.meta.nnzj
-    rows[index] = jac_struct[index][1]
-    cols[index] = jac_struct[index][2]
+  lin_nnzj = length(nls.lincon.vals)
+  if nls.meta.nlin > 0
+    rows[1:lin_nnzj] .= nls.lincon.rows[1:lin_nnzj]
+    cols[1:lin_nnzj] .= nls.lincon.cols[1:lin_nnzj]
+  end
+  if nls.meta.nnln > 0
+    jac_struct = MOI.jacobian_structure(nls.ceval)
+    for index = lin_nnzj+1 : nls.meta.nnzj
+      row, col = jac_struct[index - lin_nnzj]
+      rows[index] = nls.meta.nlin + row
+      cols[index] = col
+    end
   end
   return rows, cols
 end
 
 function NLPModels.jac_coord!(nls :: MathOptNLSModel, x :: AbstractVector, vals :: AbstractVector)
   increment!(nls, :neval_jac)
-  MOI.eval_constraint_jacobian(nls.ceval, vals, x)
+  lin_nnzj = length(nls.lincon.vals)
+  if nls.meta.nlin > 0
+    vals[1:lin_nnzj] .= nls.lincon.vals[1:lin_nnzj]
+  end
+  if nls.meta.nnln > 0
+    MOI.eval_constraint_jacobian(nls.ceval, view(vals, lin_nnzj+1:nls.meta.nnzj), x)
+  end
   return vals
 end
 
@@ -271,24 +285,24 @@ end
 
 function NLPModels.hess_coord!(nls :: MathOptNLSModel, x :: AbstractVector, y :: AbstractVector, vals :: AbstractVector; obj_weight :: Float64=1.0)
   increment!(nls, :neval_hess)
-  MOI.eval_hessian_lagrangian(nls.ceval, vals, x, obj_weight, y)
+  MOI.eval_hessian_lagrangian(nls.ceval, vals, x, obj_weight, view(y, nls.meta.nln))
   return vals
 end
 
 function NLPModels.hess_coord!(nls :: MathOptNLSModel, x :: AbstractVector, vals :: AbstractVector; obj_weight :: Float64=1.0)
   increment!(nls, :neval_hess)
-  MOI.eval_hessian_lagrangian(nls.ceval, vals, x, obj_weight, zeros(nls.meta.ncon))
+  MOI.eval_hessian_lagrangian(nls.ceval, vals, x, obj_weight, zeros(nls.meta.nnln))
   return vals
 end
 
 function NLPModels.hprod!(nls :: MathOptNLSModel, x :: AbstractVector, y :: AbstractVector, v :: AbstractVector, hv :: AbstractVector; obj_weight :: Float64=1.0)
   increment!(nls, :neval_hprod)
-  MOI.eval_hessian_lagrangian_product(nls.ceval, hv, x, v, obj_weight, y)
+  MOI.eval_hessian_lagrangian_product(nls.ceval, hv, x, v, obj_weight, view(y, nls.meta.nln))
   return hv
 end
 
 function NLPModels.hprod!(nls :: MathOptNLSModel, x :: AbstractVector, v :: AbstractVector, hv :: AbstractVector; obj_weight :: Float64=1.0)
   increment!(nls, :neval_hprod)
-  MOI.eval_hessian_lagrangian_product(nls.ceval, hv, x, v, obj_weight, zeros(nls.meta.ncon))
+  MOI.eval_hessian_lagrangian_product(nls.ceval, hv, x, v, obj_weight, zeros(nls.meta.nnln))
   return hv
 end
