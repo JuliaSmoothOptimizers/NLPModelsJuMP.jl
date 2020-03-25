@@ -117,8 +117,8 @@ function parser_MOI(moimodel)
   contypes = MOI.get(moimodel, MOI.ListOfConstraints())
   for (F, S) in contypes
     F == MOI.SingleVariable && continue
-    F <: AF || warning("Function $F is not supported.")
-    S <: LS || warning("Set $S is not supported.")
+    F <: AF || @warn("Function $F is not supported.")
+    S <: LS || @warn("Set $S is not supported.")
 
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
     for cidx in conindices
