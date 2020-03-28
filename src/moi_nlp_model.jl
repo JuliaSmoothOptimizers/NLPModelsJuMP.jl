@@ -155,7 +155,7 @@ end
 # end
 
 function NLPModels.hess_structure!(nlp :: MathOptNLPModel, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer})
-  if (nlp.eval.has_nlobj) || (nlp.meta.nnln == 0)
+  if (nlp.eval.has_nlobj) || (nlp.meta.nnln > 0)
     hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
     for index = 1 : nlp.meta.nnzh
       rows[index] = hesslag_struct[index][1]
@@ -170,7 +170,7 @@ end
 
 function NLPModels.hess_coord!(nlp :: MathOptNLPModel, x :: AbstractVector, y :: AbstractVector, vals :: AbstractVector; obj_weight :: Float64=1.0)
   increment!(nlp, :neval_hess)
-  if (nlp.eval.has_nlobj) || (nlp.meta.nnln == 0)
+  if (nlp.eval.has_nlobj) || (nlp.meta.nnln > 0)
     MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, view(y, nlp.meta.nln))
   else
     vals .= 0.0
