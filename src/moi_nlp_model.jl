@@ -28,7 +28,6 @@ function MathOptNLPModel(jmodel :: JuMP.Model; name :: String="Generic")
   constant, gradient = parser_obj_MOI(moimodel, nvar)
 
   lin_nnzj = length(linvals)
-  lin_nnzh = length(gradient)
   lincon = LinearConstraints(linrows, lincols, linvals)
   linobj = LinearObjective(constant, gradient)
 
@@ -36,7 +35,7 @@ function MathOptNLPModel(jmodel :: JuMP.Model; name :: String="Generic")
   lcon = vcat(lin_lcon, nl_lcon)
   ucon = vcat(lin_ucon, nl_ucon)
   nnzj = lin_nnzj + nl_nnzj
-  nnzh = lin_nnzh + nl_nnzh
+  nnzh = nl_nnzh
 
   meta = NLPModelMeta(nvar,
                       x0=x0,
