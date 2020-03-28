@@ -4,6 +4,7 @@ mutable struct MathOptNLPModel <: AbstractNLPModel
   meta     :: NLPModelMeta
   eval     :: Union{MOI.AbstractNLPEvaluator, Nothing}
   lincon   :: LinearConstraints
+  linobj   :: LinearObjective
   counters :: Counters
 end
 
@@ -20,19 +21,22 @@ function MathOptNLPModel(jmodel :: JuMP.Model; name :: String="Generic")
   MOI.initialize(eval, [:Grad, :Jac, :Hess, :HessVec])  # Add :JacVec when available
 
   nl_nnzj = nnln == 0 ? 0 : sum(length(nl_con.grad_sparsity) for nl_con in eval.constraints)
-  nl_nnzh = length(eval.objective.hess_I) + (nnln == 0 ? 0 : sum(length(nl_con.hess_I) for nl_con in eval.constraints))
+  nl_nnzh = (eval.has_nlobj ? length(eval.objective.hess_I) : 0) + (nnln == 0 ? 0 : sum(length(nl_con.hess_I) for nl_con in eval.constraints))
 
   moimodel = backend(jmodel)
   nlin, linrows, lincols, linvals, lin_lcon, lin_ucon = parser_MOI(moimodel)
+  constant, gradient = parser_obj_MOI(moimodel, nvar)
 
   lin_nnzj = length(linvals)
+  lin_nnzh = length(gradient)
   lincon = LinearConstraints(linrows, lincols, linvals)
+  linobj = LinearObjective(constant, gradient)
 
   ncon = nlin + nnln
   lcon = vcat(lin_lcon, nl_lcon)
   ucon = vcat(lin_ucon, nl_ucon)
   nnzj = lin_nnzj + nl_nnzj
-  nnzh = nl_nnzh
+  nnzh = lin_nnzh + nl_nnzh
 
   meta = NLPModelMeta(nvar,
                       x0=x0,
@@ -53,17 +57,21 @@ function MathOptNLPModel(jmodel :: JuMP.Model; name :: String="Generic")
                       name=name,
                       )
 
-  return MathOptNLPModel(meta, eval, lincon, Counters())
+  return MathOptNLPModel(meta, eval, lincon, linobj, Counters())
 end
 
 function NLPModels.obj(nlp :: MathOptNLPModel, x :: AbstractVector)
   increment!(nlp, :neval_obj)
-  return MOI.eval_objective(nlp.eval, x)
+  return nlp.eval.has_nlobj ? MOI.eval_objective(nlp.eval, x) : (dot(nlp.linobj.gradient, x) + nlp.linobj.constant)
 end
 
 function NLPModels.grad!(nlp :: MathOptNLPModel, x :: AbstractVector, g :: AbstractVector)
   increment!(nlp, :neval_grad)
-  MOI.eval_objective_gradient(nlp.eval, g, x)
+  if nlp.eval.has_nlobj
+    MOI.eval_objective_gradient(nlp.eval, g, x)
+  else
+    g .= nlp.linobj.gradient
+  end
   return g
 end
 
@@ -148,23 +156,36 @@ end
 # end
 
 function NLPModels.hess_structure!(nlp :: MathOptNLPModel, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer})
-  hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
-  for index = 1 : nlp.meta.nnzh
-    rows[index] = hesslag_struct[index][1]
-    cols[index] = hesslag_struct[index][2]
+  if (nlp.eval.has_nlobj) || (nlp.meta.nnln == 0)
+    hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
+    for index = 1 : nlp.meta.nnzh
+      rows[index] = hesslag_struct[index][1]
+      cols[index] = hesslag_struct[index][2]
+    end
+  else
+    rows .= 0.0
+    cols .= 0.0
   end
   return rows, cols
 end
 
 function NLPModels.hess_coord!(nlp :: MathOptNLPModel, x :: AbstractVector, y :: AbstractVector, vals :: AbstractVector; obj_weight :: Float64=1.0)
   increment!(nlp, :neval_hess)
-  MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, view(y, nlp.meta.nln))
+  if (nlp.eval.has_nlobj) || (nlp.meta.nnln == 0)
+    MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, view(y, nlp.meta.nln))
+  else
+    vals .= 0.0
+  end
   return vals
 end
 
 function NLPModels.hess_coord!(nlp :: MathOptNLPModel, x :: AbstractVector, vals :: AbstractVector; obj_weight :: Float64=1.0)
   increment!(nlp, :neval_hess)
-  MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, zeros(nlp.meta.nnln))
+  if nlp.eval.has_nlobj
+    MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, zeros(nlp.meta.nnln))
+  else
+    vals .= 0.0
+  end
   return vals
 end
 

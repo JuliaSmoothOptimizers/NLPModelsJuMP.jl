@@ -1,3 +1,5 @@
+using LinearAlgebra, SparseArrays
+
 using NLPModels
 import NLPModels.increment!, NLPModels.decrement!
 
@@ -18,6 +20,11 @@ mutable struct LinearConstraints
   rows :: Vector{Int}
   cols :: Vector{Int}
   vals :: Vector{Float64}
+end
+
+mutable struct LinearObjective
+  constant :: Float64
+  gradient :: SparseVector{Float64}
 end
 
 """
@@ -166,4 +173,19 @@ function parser_JuMP(jmodel)
   nl_ucon = map(nl_con -> nl_con.ub, nl_cons)
 
   return nvar, lvar, uvar, x0, nnln, nl_lcon, nl_ucon
+end
+
+"""
+    parser_obj_MOI(moimodel, nvar)
+
+Parse linear objective of a `MOI.ModelLike`.
+"""
+function parser_obj_MOI(moimodel, nvar)
+  fobj = MOI.get(moimodel, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
+  constant = fobj.constant
+  gradient = spzeros(Float64, nvar)
+  for term in fobj.terms
+    gradient[term.variable_index.value] = term.coefficient
+  end
+  return constant, gradient
 end
