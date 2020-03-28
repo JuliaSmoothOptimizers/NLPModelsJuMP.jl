@@ -7,7 +7,7 @@ function hs10()
   set_start_value(x[1], -10)
   set_start_value(x[2],  10)
 
-  @NLobjective(
+  @objective(
     nlp,
     Min,
     x[1] - x[2]
