@@ -5,7 +5,7 @@ using Test, Printf
 nlpmodels_path = joinpath(dirname(pathof(NLPModels)), "..", "test")
 nlpmodels_problems_path = joinpath(nlpmodels_path, "problems")
 
-for problem in [:brownden, :hs5, :hs6, :hs10, :hs11, :hs14, :hs28, :hs39, :lincon]
+for problem in [:brownden, :hs5, :hs6, :hs10, :hs11, :hs14, :lincon]
   include(joinpath("nlp_problems", "$problem.jl"))
   if isfile(joinpath(nlpmodels_problems_path, "$problem.jl"))
     include(joinpath(nlpmodels_problems_path, "$problem.jl"))
