@@ -54,6 +54,25 @@ function replace!(ex, x)
 end
 
 """
+    coo_sym_dot(rows, cols, vals, x, y)
+
+Compute the product `xᵀAy` of a symmetric matrix `A` given by `(rows, cols, vals)`
+Only one triangle of `A` should be passed.
+"""
+function coo_sym_dot(rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer}, vals :: AbstractVector, x :: AbstractVector, y :: AbstractVector)
+  xᵀAy = 0.0
+  nnz = length(vals)
+  @inbounds for k = 1:nnz
+    i, j, c = rows[k], cols[k], vals[k]
+    xᵀAy += c * x[i] * y[j]
+    if i ≠ j
+      xᵀAy += c * x[j] * y[i]
+    end
+  end
+  return xᵀAy
+end
+
+"""
     parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
 
 Parse a `ScalarAffineFunction` fun with its associated set.
