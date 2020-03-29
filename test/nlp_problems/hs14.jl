@@ -7,7 +7,7 @@ function hs14()
   set_start_value(x[1], 2)
   set_start_value(x[2], 2)
 
-  @NLobjective(
+  @objective(
     nlp,
     Min,
     (x[1] - 2)^2 + (x[2] - 1)^2

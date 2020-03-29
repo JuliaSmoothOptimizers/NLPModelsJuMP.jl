@@ -4,7 +4,7 @@ mutable struct MathOptNLPModel <: AbstractNLPModel
   meta     :: NLPModelMeta
   eval     :: Union{MOI.AbstractNLPEvaluator, Nothing}
   lincon   :: LinearConstraints
-  linobj   :: LinearObjective
+  obj      :: Objective
   counters :: Counters
 end
 
@@ -25,17 +25,20 @@ function MathOptNLPModel(jmodel :: JuMP.Model; name :: String="Generic")
 
   moimodel = backend(jmodel)
   nlin, linrows, lincols, linvals, lin_lcon, lin_ucon = parser_MOI(moimodel)
-  constant, gradient = parser_obj_MOI(moimodel, nvar)
-
   lin_nnzj = length(linvals)
   lincon = LinearConstraints(linrows, lincols, linvals)
-  linobj = LinearObjective(constant, gradient)
+
+  if eval.has_nlobj
+    obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), Int[], Int[], Float64[])
+  else
+    obj = parser_objective_MOI(moimodel, nvar)
+  end
 
   ncon = nlin + nnln
   lcon = vcat(lin_lcon, nl_lcon)
   ucon = vcat(lin_ucon, nl_ucon)
   nnzj = lin_nnzj + nl_nnzj
-  nnzh = nl_nnzh
+  nnzh = length(obj.vals) + nl_nnzh
 
   meta = NLPModelMeta(nvar,
                       x0=x0,
@@ -52,24 +55,41 @@ function MathOptNLPModel(jmodel :: JuMP.Model; name :: String="Generic")
                       lin=collect(1:nlin),
                       nln=collect(nlin+1:ncon),
                       minimize=objective_sense(jmodel) == MOI.MIN_SENSE,
-                      islp=!eval.has_nlobj && (nnln == 0),
+                      islp=(obj.type == "LINEAR") && (nnln == 0),
                       name=name,
                       )
 
-  return MathOptNLPModel(meta, eval, lincon, linobj, Counters())
+  return MathOptNLPModel(meta, eval, lincon, obj, Counters())
 end
 
 function NLPModels.obj(nlp :: MathOptNLPModel, x :: AbstractVector)
   increment!(nlp, :neval_obj)
-  return nlp.eval.has_nlobj ? MOI.eval_objective(nlp.eval, x) : (dot(nlp.linobj.gradient, x) + nlp.linobj.constant)
+  if nlp.obj.type == "LINEAR"
+    res = dot(nlp.obj.vect, x) + nlp.obj.constant
+  end
+  if nlp.obj.type == "QUADRATIC"
+    # To be optimized, we should not allocate a vector
+    aux = zeros(Float64, nlp.meta.nvar)
+    coo_sym_prod!(nlp.obj.rows, nlp.obj.cols, nlp.obj.vals, x, aux)
+    res = 0.5 * dot(x, aux) + dot(nlp.obj.vect, x) + nlp.obj.constant
+  end
+  if nlp.obj.type == "NONLINEAR"
+    res = MOI.eval_objective(nlp.eval, x)
+  end
+  return res
 end
 
 function NLPModels.grad!(nlp :: MathOptNLPModel, x :: AbstractVector, g :: AbstractVector)
   increment!(nlp, :neval_grad)
-  if nlp.eval.has_nlobj
+  if nlp.obj.type == "LINEAR"
+    g .= nlp.obj.vect
+  end
+  if nlp.obj.type == "QUADRATIC"
+    coo_sym_prod!(nlp.obj.rows, nlp.obj.cols, nlp.obj.vals, x, g)
+    g .+= nlp.obj.vect
+  end
+  if nlp.obj.type == "NONLINEAR"
     MOI.eval_objective_gradient(nlp.eval, g, x)
-  else
-    g .= nlp.linobj.gradient
   end
   return g
 end
@@ -155,11 +175,19 @@ end
 # end
 
 function NLPModels.hess_structure!(nlp :: MathOptNLPModel, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer})
-  if nlp.meta.nnzh > 0
+  obj_nnzh = length(nlp.obj.vals)
+  if nlp.obj.type == "QUADRATIC"
+    for index = 1 : obj_nnzh
+      rows[index] = nlp.obj.rows[index]
+      cols[index] = nlp.obj.cols[index]
+    end
+  end
+  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
     hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
-    for index = 1 : nlp.meta.nnzh
-      rows[index] = hesslag_struct[index][1]
-      cols[index] = hesslag_struct[index][2]
+    for index = obj_nnzh+1 : nlp.meta.nnzh
+      shift_index = index - obj_nnzh
+      rows[index] = hesslag_struct[shift_index][1]
+      cols[index] = hesslag_struct[shift_index][2]
     end
   end
   return rows, cols
@@ -167,30 +195,63 @@ end
 
 function NLPModels.hess_coord!(nlp :: MathOptNLPModel, x :: AbstractVector, y :: AbstractVector, vals :: AbstractVector; obj_weight :: Float64=1.0)
   increment!(nlp, :neval_hess)
-  if nlp.meta.nnzh > 0
-    MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, view(y, nlp.meta.nln))
+  obj_nnzh = length(nlp.obj.vals)
+  if nlp.obj.type == "QUADRATIC"
+    vals[1:obj_nnzh] .= obj_weight .* nlp.obj.vals
+  end
+  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
+    MOI.eval_hessian_lagrangian(nlp.eval, view(vals, obj_nnzh+1:nlp.meta.nnzh), x, obj_weight, view(y, nlp.meta.nln))
   end
   return vals
 end
 
 function NLPModels.hess_coord!(nlp :: MathOptNLPModel, x :: AbstractVector, vals :: AbstractVector; obj_weight :: Float64=1.0)
   increment!(nlp, :neval_hess)
-  if nlp.eval.has_nlobj
-    MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, zeros(nlp.meta.nnln))
-  else
+  if nlp.obj.type == "LINEAR"
     vals .= 0.0
   end
+  if nlp.obj.type == "QUADRATIC"
+    obj_nnzh = length(nlp.obj.vals)
+    vals[1:obj_nnzh] .= obj_weight .* nlp.obj.vals
+    vals[obj_nnzh+1:nlp.meta.nnzh] .= 0.0
+  end
+  if nlp.obj.type == "NONLINEAR"
+    MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, zeros(nlp.meta.nnln))
+  end
+
   return vals
 end
 
 function NLPModels.hprod!(nlp :: MathOptNLPModel, x :: AbstractVector, y :: AbstractVector, v :: AbstractVector, hv :: AbstractVector; obj_weight :: Float64=1.0)
   increment!(nlp, :neval_hprod)
-  MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, view(y, nlp.meta.nln))
+  obj_nnzh = length(nlp.obj.vals)
+  if (nlp.obj.type == "LINEAR") && (nlp.meta.nnln == 0)
+    hv .= 0.0
+  end
+  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
+    MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, view(y, nlp.meta.nln))
+  end
+  if nlp.obj.type == "QUADRATIC"
+    hv2 = zeros(Float64, nlp.meta.nvar)
+    # Add a option to coo_prod! / coo_sym_prod! that avoid zeros filling
+    coo_sym_prod!(nlp.obj.rows, nlp.obj.cols, nlp.obj.vals, v, hv2)
+    hv2 .*= obj_weight
+    hv .+= hv2
+  end
   return hv
 end
 
 function NLPModels.hprod!(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector, hv :: AbstractVector; obj_weight :: Float64=1.0)
   increment!(nlp, :neval_hprod)
-  MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, zeros(nlp.meta.nnln))
+  if nlp.obj.type == "LINEAR"
+    hv .= 0.0
+  end
+  if nlp.obj.type == "QUADRATIC"
+    coo_sym_prod!(nlp.obj.rows, nlp.obj.cols, nlp.obj.vals, v, hv)
+    hv .*= obj_weight
+  end
+  if nlp.obj.type == "NONLINEAR"
+    MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, zeros(nlp.meta.nnln))
+  end
   return hv
 end

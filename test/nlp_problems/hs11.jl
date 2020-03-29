@@ -7,7 +7,7 @@ function hs11()
   set_start_value(x[1], 4.9)
   set_start_value(x[2], 0.1)
 
-  @NLobjective(
+  @objective(
     nlp,
     Min,
     (x[1] - 5)^2 + x[2]^2 - 25
@@ -15,7 +15,7 @@ function hs11()
 
   @NLconstraint(
     nlp,
-    -x[1]^2 + x[2] >= 0
+    -x[1]^2 + x[2] ≥ 0
   )
 
   return nlp

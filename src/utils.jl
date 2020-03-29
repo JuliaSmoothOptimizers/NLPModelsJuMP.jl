@@ -16,15 +16,22 @@ const ALS = Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64}, MOI.LessThan{F
 const VLS = Union{MOI.Nonnegatives, MOI.Nonpositives, MOI.Zeros}
 const LS  = Union{ALS, VLS}
 
+const SQF = MOI.ScalarQuadraticFunction{Float64}
+const OBJ = Union{SAF, SQF}
+
 mutable struct LinearConstraints
   rows :: Vector{Int}
   cols :: Vector{Int}
   vals :: Vector{Float64}
 end
 
-mutable struct LinearObjective
+mutable struct Objective
+  type     :: String
   constant :: Float64
-  gradient :: SparseVector{Float64}
+  vect     :: SparseVector{Float64}
+  rows     :: Vector{Int}
+  cols     :: Vector{Int}
+  vals     :: Vector{Float64}
 end
 
 """
@@ -176,16 +183,50 @@ function parser_JuMP(jmodel)
 end
 
 """
-    parser_obj_MOI(moimodel, nvar)
+    parser_objective_MOI(moimodel, nvar)
 
-Parse linear objective of a `MOI.ModelLike`.
+Parse linear and quadratic objective of a `MOI.ModelLike`.
 """
-function parser_obj_MOI(moimodel, nvar)
-  fobj = MOI.get(moimodel, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
-  constant = fobj.constant
-  gradient = spzeros(Float64, nvar)
-  for term in fobj.terms
-    gradient[term.variable_index.value] = term.coefficient
+function parser_objective_MOI(moimodel, nvar)
+
+  # Variables associated to linear and quadratic objective
+  type = "UNKNOWN"
+  constant = 0.0
+  vect = spzeros(Float64, nvar)
+  rows = Int[]
+  cols = Int[]
+  vals = Float64[]
+
+  fobj = MOI.get(moimodel, MOI.ObjectiveFunction{OBJ}())
+
+  # Linear objective
+  if typeof(fobj) == SAF
+    type = "LINEAR"
+    constant = fobj.constant
+    for term in fobj.terms
+      vect[term.variable_index.value] = term.coefficient
+    end
   end
-  return constant, gradient
+
+  # Quadratic objective
+  if typeof(fobj) == SQF
+    type = "QUADRATIC"
+    constant = fobj.constant
+    for term in fobj.affine_terms
+      vect[term.variable_index.value] = term.coefficient
+    end
+    for term in fobj.quadratic_terms
+      i = term.variable_index_1.value
+      j = term.variable_index_2.value
+      if i ≥ j
+        push!(rows, i)
+        push!(cols, j)
+      else
+        push!(cols, j)
+        push!(rows, i)
+      end
+      push!(vals, term.coefficient)
+    end
+  end
+  return Objective(type, constant, vect, rows, cols, vals)
 end
