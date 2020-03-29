@@ -68,10 +68,7 @@ function NLPModels.obj(nlp :: MathOptNLPModel, x :: AbstractVector)
     res = dot(nlp.obj.vect, x) + nlp.obj.constant
   end
   if nlp.obj.type == "QUADRATIC"
-    # To be optimized, we should not allocate a vector
-    aux = zeros(Float64, nlp.meta.nvar)
-    coo_sym_prod!(nlp.obj.rows, nlp.obj.cols, nlp.obj.vals, x, aux)
-    res = 0.5 * dot(x, aux) + dot(nlp.obj.vect, x) + nlp.obj.constant
+    res = 0.5 * coo_sym_dot(nlp.obj.rows, nlp.obj.cols, nlp.obj.vals, x, x) + dot(nlp.obj.vect, x) + nlp.obj.constant
   end
   if nlp.obj.type == "NONLINEAR"
     res = MOI.eval_objective(nlp.eval, x)
@@ -224,7 +221,6 @@ end
 
 function NLPModels.hprod!(nlp :: MathOptNLPModel, x :: AbstractVector, y :: AbstractVector, v :: AbstractVector, hv :: AbstractVector; obj_weight :: Float64=1.0)
   increment!(nlp, :neval_hprod)
-  obj_nnzh = length(nlp.obj.vals)
   if (nlp.obj.type == "LINEAR") && (nlp.meta.nnln == 0)
     hv .= 0.0
   end
@@ -232,11 +228,14 @@ function NLPModels.hprod!(nlp :: MathOptNLPModel, x :: AbstractVector, y :: Abst
     MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, view(y, nlp.meta.nln))
   end
   if nlp.obj.type == "QUADRATIC"
-    hv2 = zeros(Float64, nlp.meta.nvar)
-    # Add a option to coo_prod! / coo_sym_prod! that avoid zeros filling
-    coo_sym_prod!(nlp.obj.rows, nlp.obj.cols, nlp.obj.vals, v, hv2)
-    hv2 .*= obj_weight
-    hv .+= hv2
+    obj_nnzh = length(nlp.obj.vals)
+    for k = 1 : obj_nnzh
+      i, j, c = nlp.obj.rows[k], nlp.obj.cols[k], nlp.obj.vals[k]
+      hv[i] += obj_weight * c * v[j]
+      if i ≠ j
+        hv[j] += obj_weight * c * v[i]
+      end
+    end
   end
   return hv
 end
