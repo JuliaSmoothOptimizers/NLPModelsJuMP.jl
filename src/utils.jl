@@ -16,22 +16,29 @@ const ALS = Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64}, MOI.LessThan{F
 const VLS = Union{MOI.Nonnegatives, MOI.Nonpositives, MOI.Zeros}
 const LS  = Union{ALS, VLS}
 
+const SV  = MOI.SingleVariable
 const SQF = MOI.ScalarQuadraticFunction{Float64}
-const OBJ = Union{SAF, SQF}
+const OBJ = Union{SV, SAF, SQF}
 
-mutable struct LinearConstraints
+mutable struct COO
   rows :: Vector{Int}
   cols :: Vector{Int}
   vals :: Vector{Float64}
 end
 
+COO() = COO(Int[], Int[], Float64[])
+
+mutable struct LinearConstraints
+  jacobian :: COO
+  nnzj     :: Int
+end
+
 mutable struct Objective
   type     :: String
   constant :: Float64
-  vect     :: SparseVector{Float64}
-  rows     :: Vector{Int}
-  cols     :: Vector{Int}
-  vals     :: Vector{Float64}
+  gradient :: SparseVector{Float64}
+  hessian  :: COO
+  nnzh     :: Int
 end
 
 """
@@ -167,8 +174,11 @@ function parser_MOI(moimodel)
       end
     end
   end
+  coo = COO(linrows, lincols, linvals)
+  nnzj = length(linvals)
+  lincon = LinearConstraints(coo, nnzj)
 
-  return nlin, linrows, lincols, linvals, lin_lcon, lin_ucon
+  return nlin, lincon, lin_lcon, lin_ucon
 end
 
 """
@@ -218,6 +228,12 @@ function parser_objective_MOI(moimodel, nvar)
 
   fobj = MOI.get(moimodel, MOI.ObjectiveFunction{OBJ}())
 
+  # Single Variable
+  if typeof(fobj) == SV
+    type = "LINEAR"
+    vect[fobj.variable.value] = 1.0
+  end
+
   # Linear objective
   if typeof(fobj) == SAF
     type = "LINEAR"
@@ -247,5 +263,5 @@ function parser_objective_MOI(moimodel, nvar)
       push!(vals, term.coefficient)
     end
   end
-  return Objective(type, constant, vect, rows, cols, vals)
+  return Objective(type, constant, vect, COO(rows, cols, vals), length(vals))
 end

@@ -61,15 +61,12 @@ function MathOptNLSModel(cmodel :: JuMP.Model, F :: Union{AbstractArray{JuMP.Non
   nl_cnnzh = length(ceval.objective.hess_I) + (nnln == 0 ? 0 : sum(length(con.hess_I) for con in ceval.constraints))
 
   moimodel = backend(cmodel)
-  nlin, linrows, lincols, linvals, lin_lcon, lin_ucon = parser_MOI(moimodel)
-
-  lin_cnnzj = length(linvals)
-  lincon = LinearConstraints(linrows, lincols, linvals)
+  nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
 
   ncon = nlin + nnln
   lcon = vcat(lin_lcon, nl_lcon)
   ucon = vcat(lin_ucon, nl_ucon)
-  cnnzj = lin_cnnzj + nl_cnnzj
+  cnnzj = lincon.nnzj + nl_cnnzj
   cnnzh = nl_cnnzh
 
   meta = NLPModelMeta(nvar,
@@ -197,7 +194,7 @@ end
 function NLPModels.cons!(nls :: MathOptNLSModel, x :: AbstractVector, c :: AbstractVector)
   increment!(nls, :neval_cons)
   if nls.meta.nlin > 0
-    coo_prod!(nls.lincon.rows, nls.lincon.cols, nls.lincon.vals, x, view(c, nls.meta.lin))
+    coo_prod!(nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, x, view(c, nls.meta.lin))
   end
   if nls.meta.nnln > 0
     MOI.eval_constraint(nls.ceval, view(c, nls.meta.nln), x)
@@ -206,15 +203,14 @@ function NLPModels.cons!(nls :: MathOptNLSModel, x :: AbstractVector, c :: Abstr
 end
 
 function NLPModels.jac_structure!(nls :: MathOptNLSModel, rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer})
-  lin_nnzj = length(nls.lincon.vals)
   if nls.meta.nlin > 0
-    rows[1:lin_nnzj] .= nls.lincon.rows[1:lin_nnzj]
-    cols[1:lin_nnzj] .= nls.lincon.cols[1:lin_nnzj]
+    rows[1:nls.lincon.nnzj] .= nls.lincon.jacobian.rows[1:nls.lincon.nnzj]
+    cols[1:nls.lincon.nnzj] .= nls.lincon.jacobian.cols[1:nls.lincon.nnzj]
   end
   if nls.meta.nnln > 0
     jac_struct = MOI.jacobian_structure(nls.ceval)
-    for index = lin_nnzj+1 : nls.meta.nnzj
-      row, col = jac_struct[index - lin_nnzj]
+    for index = nls.lincon.nnzj+1 : nls.meta.nnzj
+      row, col = jac_struct[index - nls.lincon.nnzj]
       rows[index] = nls.meta.nlin + row
       cols[index] = col
     end
@@ -224,12 +220,11 @@ end
 
 function NLPModels.jac_coord!(nls :: MathOptNLSModel, x :: AbstractVector, vals :: AbstractVector)
   increment!(nls, :neval_jac)
-  lin_nnzj = length(nls.lincon.vals)
   if nls.meta.nlin > 0
-    vals[1:lin_nnzj] .= nls.lincon.vals[1:lin_nnzj]
+    vals[1:nls.lincon.nnzj] .= nls.lincon.jacobian.vals[1:nls.lincon.nnzj]
   end
   if nls.meta.nnln > 0
-    MOI.eval_constraint_jacobian(nls.ceval, view(vals, lin_nnzj+1:nls.meta.nnzj), x)
+    MOI.eval_constraint_jacobian(nls.ceval, view(vals, nls.lincon.nnzj+1:nls.meta.nnzj), x)
   end
   return vals
 end
