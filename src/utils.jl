@@ -184,7 +184,7 @@ end
 """
     parser_JuMP(jmodel)
 
-Parse variables informations and non-linear constaints of a `JuMP.Model`.
+Parse variables informations of a `JuMP.Model`.
 """
 function parser_JuMP(jmodel)
 
@@ -202,13 +202,7 @@ function parser_JuMP(jmodel)
     end
   end
 
-  # Variables associated to non-linear constraints
-  nnln = num_nl_constraints(jmodel)
-  nl_cons = jmodel.nlp_data.nlconstr
-  nl_lcon = map(nl_con -> nl_con.lb, nl_cons)
-  nl_ucon = map(nl_con -> nl_con.ub, nl_cons)
-
-  return nvar, lvar, uvar, x0, nnln, nl_lcon, nl_ucon
+  return nvar, lvar, uvar, x0
 end
 
 """

@@ -19,7 +19,11 @@ function MathOptNLSModel(cmodel :: JuMP.Model, F :: Union{AbstractArray{JuMP.Non
                                                          }; name :: String="Generic")
 
   F_is_array_of_containers = F isa Array{<: AbstractArray{JuMP.NonlinearExpression}}
-  nvar, lvar, uvar, x0, nnln, nl_lcon, nl_ucon = parser_JuMP(cmodel)
+  nvar, lvar, uvar, x0 = parser_JuMP(cmodel)
+
+  nnln = num_nl_constraints(cmodel)
+  nl_lcon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.lb, cmodel.nlp_data.nlconstr)
+  nl_ucon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.ub, cmodel.nlp_data.nlconstr)
 
   if F_is_array_of_containers
     @NLobjective(cmodel, Min, 0.5 * sum(sum(Fi^2 for Fi in FF) for FF in F))

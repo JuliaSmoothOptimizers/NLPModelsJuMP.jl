@@ -15,18 +15,23 @@ Construct a `MathOptNLPModel` from a `JuMP` model.
 """
 function MathOptNLPModel(jmodel :: JuMP.Model; name :: String="Generic")
 
-  nvar, lvar, uvar, x0, nnln, nl_lcon, nl_ucon = parser_JuMP(jmodel)
+  nvar, lvar, uvar, x0 = parser_JuMP(jmodel)
 
-  eval = NLPEvaluator(jmodel)
-  MOI.initialize(eval, [:Grad, :Jac, :Hess, :HessVec])  # Add :JacVec when available
+  nnln = num_nl_constraints(jmodel)
+
+  nl_lcon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.lb, jmodel.nlp_data.nlconstr)
+  nl_ucon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.ub, jmodel.nlp_data.nlconstr)
+
+  eval = jmodel.nlp_data == nothing ? nothing : NLPEvaluator(jmodel)
+  (eval ≠ nothing) && MOI.initialize(eval, [:Grad, :Jac, :Hess, :HessVec])  # Add :JacVec when available
 
   nl_nnzj = nnln == 0 ? 0 : sum(length(nl_con.grad_sparsity) for nl_con in eval.constraints)
-  nl_nnzh = (eval.has_nlobj ? length(eval.objective.hess_I) : 0) + (nnln == 0 ? 0 : sum(length(nl_con.hess_I) for nl_con in eval.constraints))
+  nl_nnzh = (((eval ≠ nothing) && eval.has_nlobj) ? length(eval.objective.hess_I) : 0) + (nnln == 0 ? 0 : sum(length(nl_con.hess_I) for nl_con in eval.constraints))
 
   moimodel = backend(jmodel)
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
 
-  if eval.has_nlobj
+  if (eval ≠ nothing) && eval.has_nlobj
     obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
   else
     obj = parser_objective_MOI(moimodel, nvar)
