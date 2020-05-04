@@ -9,6 +9,16 @@ mutable struct MathOptNLSModel <: AbstractNLSModel
   counters :: NLSCounters
 end
 
+function show(io :: IO, nls :: MathOptNLSModel)
+  print(io, "$(nls.meta.name) MathOptNLSModel\n")
+  print(io, "The model has $(nls.meta.nvar)")
+  nls.meta.nvar > 1 ? print(io, " variables, ") : print(io, " variable, ")
+  print(io, "$(nls.nls_meta.nequ)")
+  nls.nls_meta.nequ > 1 ? print(io, " equations ") : print(io, " equation ")
+  print(io, "and $(nls.meta.ncon)")
+  nls.meta.ncon > 1 ? print(io, " constraints.\n") : print(io, " constraint.\n")
+end
+
 """
     MathOptNLSModel(model, F, name="Generic")
 

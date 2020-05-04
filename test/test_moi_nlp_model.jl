@@ -15,3 +15,11 @@ for prob in [:brownden, :hs5, :hs6, :hs10, :hs11, :hs14, :lincon, :linsv]
   @printf("%-15s  %4d  %4d  %10.4e  %10.4e  %10s\n", prob, n, m, fx, ngx, ncx)
 end
 println()
+
+println("Testing show on MathOptNLPModel")
+for prob in [:brownden, :hs5, :hs6, :hs10, :hs11, :hs14, :lincon, :linsv]
+  prob_fn = eval(prob)
+  nlp = MathOptNLPModel(prob_fn(), name=string(prob))
+  show(nlp)
+  println()
+end

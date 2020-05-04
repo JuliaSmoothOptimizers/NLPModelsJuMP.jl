@@ -1,4 +1,5 @@
 using LinearAlgebra, SparseArrays
+import Base.show
 
 using NLPModels
 import NLPModels.increment!, NLPModels.decrement!

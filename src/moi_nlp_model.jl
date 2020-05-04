@@ -8,6 +8,15 @@ mutable struct MathOptNLPModel <: AbstractNLPModel
   counters :: Counters
 end
 
+function show(io :: IO, nlp :: MathOptNLPModel)
+  print(io, "$(nlp.meta.name) MathOptNLPModel\n")
+  print(io, "The objective function is $(nlp.obj.type).\n")
+  print(io, "The model has $(nlp.meta.nvar)")
+  nlp.meta.nvar > 1 ? print(io, " variables ") : print(io, " variable ")
+  print(io, "and $(nlp.meta.ncon)")
+  nlp.meta.ncon > 1 ? print(io, " constraints.\n") : print(io, " constraint.\n")
+end
+
 """
     MathOptNLPModel(model, name="Generic")
 

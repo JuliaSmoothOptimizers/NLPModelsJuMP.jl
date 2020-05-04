@@ -19,6 +19,14 @@ for prob in [:mgh01, :mgh07, :lls, :hs30, :hs43, :nlshs20, :nlslc]
 end
 println()
 
+println("Testing show on MathOptNLSModel")
+for prob in [:mgh01, :mgh07, :lls, :hs30, :hs43, :nlshs20, :nlslc]
+  prob_fn = eval(prob)
+  nls = prob_fn()
+  show(nls)
+  println()
+end
+
 println("Testing 2d cat array on NLS")
 model = Model()
 @variable(model, x[1:2])
