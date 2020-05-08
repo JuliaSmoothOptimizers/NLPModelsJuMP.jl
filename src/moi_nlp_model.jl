@@ -226,6 +226,7 @@ function NLPModels.hprod!(nlp :: MathOptNLPModel, x :: AbstractVector, y :: Abst
     MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, view(y, nlp.meta.nln))
   end
   if nlp.obj.type == "QUADRATIC"
+    nlp.meta.nnln == 0 && (hv .= 0.0)
     for k = 1 : nlp.obj.nnzh
       i, j, c = nlp.obj.hessian.rows[k], nlp.obj.hessian.cols[k], nlp.obj.hessian.vals[k]
       hv[i] += obj_weight * c * v[j]
