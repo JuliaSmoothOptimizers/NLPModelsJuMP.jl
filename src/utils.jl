@@ -33,6 +33,12 @@ mutable struct LinearConstraints
   nnzj     :: Int
 end
 
+mutable struct LinearEquations
+  jacobian  :: COO
+  constants :: Vector{Float64}
+  nnzj      :: Int
+end
+
 mutable struct Objective
   type     :: String
   constant :: Float64
@@ -258,4 +264,100 @@ function parser_objective_MOI(moimodel, nvar)
     end
   end
   return Objective(type, constant, vect, COO(rows, cols, vals), length(vals))
+end
+
+"""
+    parser_linear_expression(nvar, F)
+
+Parse linear expressions of type `GenericAffExpr{Float64,VariableRef}`.
+"""
+function parser_linear_expression(cmodel, nvar, F)
+
+  # Linear least squares model
+  F_is_array_of_containers = F isa Array{<:AbstractArray}
+  if F_is_array_of_containers
+    @objective(cmodel, Min, 0.5 * sum(sum(Fi^2 for Fi in FF if typeof(Fi) == GenericAffExpr{Float64,VariableRef}) for FF in F))
+  else
+    @objective(cmodel, Min, 0.5 * sum(Fi^2 for Fi in F if typeof(Fi) == GenericAffExpr{Float64,VariableRef}))
+  end
+  moimodel = backend(cmodel)
+  lls = parser_objective_MOI(moimodel, nvar)
+
+  # Variables associated to linear expressions
+  rows = Int[]
+  cols = Int[]
+  vals = Float64[]
+  constants = Float64[]
+
+  nlinequ = 0
+  for expr in F
+    if typeof(expr) == GenericAffExpr{Float64,VariableRef}
+      nlinequ += 1
+      for (i, key) in enumerate(expr.terms.keys)
+        push!(rows, nlinequ)
+        push!(cols, key.index.value)
+        push!(vals, expr.terms.vals[i])
+      end
+      push!(constants, expr.constant)
+    end
+  end
+  return lls, LinearEquations(COO(rows, cols, vals), constants, length(vals)), nlinequ
+end
+
+"""
+    parser_nonlinear_expression(cmodel, nvar, F)
+
+Parse nonlinear expressions of type `NonlinearExpression`.
+"""
+function parser_nonlinear_expression(cmodel, nvar, F)
+
+  # Nonlinear least squares model
+  nnlnequ = 0
+  F_is_array_of_containers = F isa Array{<:AbstractArray}
+  if F_is_array_of_containers
+    nnlnequ = sum(sum(typeof(Fi) == NonlinearExpression for Fi in FF) for FF in F)
+    if nnlnequ > 0
+      @NLobjective(cmodel, Min, 0.5 * sum(sum(Fi^2 for Fi in FF if typeof(Fi) == NonlinearExpression) for FF in F))
+    end
+  else
+    nnlnequ = sum(typeof(Fi) == NonlinearExpression for Fi in F)
+    if nnlnequ > 0
+      @NLobjective(cmodel, Min, 0.5 * sum(Fi^2 for Fi in F if typeof(Fi) == NonlinearExpression))
+    end
+  end
+  ceval = cmodel.nlp_data == nothing ? nothing : NLPEvaluator(cmodel)
+  (ceval ≠ nothing) && (nnlnequ == 0) && MOI.initialize(ceval, [:Grad, :Jac, :Hess, :HessVec])  # Add :JacVec when available
+  (ceval ≠ nothing) && (nnlnequ > 0)  && MOI.initialize(ceval, [:Grad, :Jac, :Hess, :HessVec, :ExprGraph])  # Add :JacVec when available
+
+  if nnlnequ == 0
+    Feval = nothing
+  else
+    Fmodel = JuMP.Model()
+    @variable(Fmodel, x[1:nvar])
+    JuMP._init_NLP(Fmodel)
+    @objective(Fmodel, Min, 0.0)
+    Fmodel.nlp_data.user_operators = cmodel.nlp_data.user_operators
+    if F_is_array_of_containers
+      for FF in F, Fi in FF
+        if typeof(Fi) == NonlinearExpression
+          expr = ceval.subexpressions_as_julia_expressions[Fi.index]
+          replace!(expr, x)
+          expr = :($expr == 0)
+          JuMP.add_NL_constraint(Fmodel, expr)
+        end
+      end
+    else
+      for Fi in F
+        if typeof(Fi) == NonlinearExpression
+          expr = ceval.subexpressions_as_julia_expressions[Fi.index]
+          replace!(expr, x)
+          expr = :($expr == 0)
+          JuMP.add_NL_constraint(Fmodel, expr)
+        end
+      end
+    end
+    Feval = NLPEvaluator(Fmodel)
+    MOI.initialize(Feval, [:Grad, :Jac, :Hess, :HessVec])  # Add :JacVec when available
+  end
+  return ceval, Feval, nnlnequ
 end
