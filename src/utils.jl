@@ -276,9 +276,9 @@ function parser_linear_expression(cmodel, nvar, F)
   # Linear least squares model
   F_is_array_of_containers = F isa Array{<:AbstractArray}
   if F_is_array_of_containers
-    @objective(cmodel, Min, 0.5 * sum(sum(Fi^2 for Fi in FF if typeof(Fi) == GenericAffExpr{Float64,VariableRef}) for FF in F))
+    @objective(cmodel, Min, 0.0 + 0.5 * sum(sum(Fi^2 for Fi in FF if typeof(Fi) == GenericAffExpr{Float64,VariableRef}) for FF in F))
   else
-    @objective(cmodel, Min, 0.5 * sum(Fi^2 for Fi in F if typeof(Fi) == GenericAffExpr{Float64,VariableRef}))
+    @objective(cmodel, Min, 0.0 + 0.5 * sum(Fi^2 for Fi in F if typeof(Fi) == GenericAffExpr{Float64,VariableRef}))
   end
   moimodel = backend(cmodel)
   lls = parser_objective_MOI(moimodel, nvar)
