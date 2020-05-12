@@ -267,21 +267,11 @@ function parser_objective_MOI(moimodel, nvar)
 end
 
 """
-    parser_linear_expression(nvar, F)
+    parser_linear_expression(cmodel, nvar, F)
 
 Parse linear expressions of type `GenericAffExpr{Float64,VariableRef}`.
 """
 function parser_linear_expression(cmodel, nvar, F)
-
-  # Linear least squares model
-  F_is_array_of_containers = F isa Array{<:AbstractArray}
-  if F_is_array_of_containers
-    @objective(cmodel, Min, 0.0 + 0.5 * sum(sum(Fi^2 for Fi in FF if typeof(Fi) == GenericAffExpr{Float64,VariableRef}) for FF in F))
-  else
-    @objective(cmodel, Min, 0.0 + 0.5 * sum(Fi^2 for Fi in F if typeof(Fi) == GenericAffExpr{Float64,VariableRef}))
-  end
-  moimodel = backend(cmodel)
-  lls = parser_objective_MOI(moimodel, nvar)
 
   # Variables associated to linear expressions
   rows = Int[]
@@ -289,18 +279,38 @@ function parser_linear_expression(cmodel, nvar, F)
   vals = Float64[]
   constants = Float64[]
 
+  # Linear least squares model
   nlinequ = 0
-  for expr in F
-    if typeof(expr) == GenericAffExpr{Float64,VariableRef}
-      nlinequ += 1
-      for (i, key) in enumerate(expr.terms.keys)
-        push!(rows, nlinequ)
-        push!(cols, key.index.value)
-        push!(vals, expr.terms.vals[i])
+  F_is_array_of_containers = F isa Array{<:AbstractArray}
+  if F_is_array_of_containers
+    @objective(cmodel, Min, 0.0 + 0.5 * sum(sum(Fi^2 for Fi in FF if typeof(Fi) == GenericAffExpr{Float64,VariableRef}) for FF in F))
+    for FF in F, expr in FF
+      if typeof(expr) == GenericAffExpr{Float64,VariableRef}
+        nlinequ += 1
+        for (i, key) in enumerate(expr.terms.keys)
+          push!(rows, nlinequ)
+          push!(cols, key.index.value)
+          push!(vals, expr.terms.vals[i])
+        end
+        push!(constants, expr.constant)
       end
-      push!(constants, expr.constant)
+    end
+  else
+    @objective(cmodel, Min, 0.0 + 0.5 * sum(Fi^2 for Fi in F if typeof(Fi) == GenericAffExpr{Float64,VariableRef}))
+    for expr in F
+      if typeof(expr) == GenericAffExpr{Float64,VariableRef}
+        nlinequ += 1
+        for (i, key) in enumerate(expr.terms.keys)
+          push!(rows, nlinequ)
+          push!(cols, key.index.value)
+          push!(vals, expr.terms.vals[i])
+        end
+        push!(constants, expr.constant)
+      end
     end
   end
+  moimodel = backend(cmodel)
+  lls = parser_objective_MOI(moimodel, nvar)
   return lls, LinearEquations(COO(rows, cols, vals), constants, length(vals)), nlinequ
 end
 
