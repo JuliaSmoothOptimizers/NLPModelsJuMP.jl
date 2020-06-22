@@ -20,8 +20,8 @@ function nlshs20()
     x[1]^2 + x[2]^2 ≥ 1
   )
 
-  @NLexpression(model, F1, 10 * (x[2] - x[1]^2))
-  @NLexpression(model, F2, 1 - x[1])
+  @NLexpression(model, F1, 1 - x[1])
+  @NLexpression(model, F2, 10 * (x[2] - x[1]^2))
 
   return MathOptNLSModel(model, [F1, F2], name="nlshs20")
 end
