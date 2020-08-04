@@ -1,5 +1,5 @@
 {
-  "description": "A package for converting nonlinear optimization models between MathProgBase and NLPModels",
+  "description": "A package for converting nonlinear optimization models between JuMP and NLPModels",
   "title": "NLPModelsJuMP.jl",
   "upload_type": "software",
   "creators": [
@@ -10,12 +10,10 @@
     {
       "affiliation": "École Polytechnique/GERAD - Montréal",
       "name": "Dominique Orban"
-    }
-  ],
-  "contributors": [
+    },
     {
-      "name": "Miles Lubin",
-      "type": "Researcher"
+      "affiliation": "École Polytechnique/GERAD - Montréal",
+      "name": "Alexis Montoison"
     }
   ],
   "access_right": "open",

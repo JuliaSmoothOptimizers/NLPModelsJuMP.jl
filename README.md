@@ -1,27 +1,18 @@
 # NLPModelsJuMP
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.2574164.svg)](https://doi.org/10.5281/zenodo.2574164)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.2574162-blue.svg)](https://doi.org/10.5281/zenodo.2574162)
 
-Cite as
+| **Documentation** | **Travis, AppVeyor and Cirrus build statuses** | **Coverage** |
+|:-----------------:|:----------------------------------------------:|:------------:|
+| [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaSmoothOptimizers.github.io/NLPModelsJuMP.jl/dev) | [![Build Status](https://img.shields.io/travis/JuliaSmoothOptimizers/NLPModelsJuMP.jl?logo=travis)](https://travis-ci.org/JuliaSmoothOptimizers/NLPModelsJuMP.jl) [![Build status](https://img.shields.io/cirrus/github/JuliaSmoothOptimizers/NLPModelsJuMP.jl?logo=appveyor)](https://ci.appveyor.com/project/dpo/nlpmodelsjump-jl) [![Build Status](https://img.shields.io/cirrus/github/JuliaSmoothOptimizers/NLPModelsJuMP.jl?logo=Cirrus%20CI)](https://cirrus-ci.com/github/JuliaSmoothOptimizers/NLPModelsJuMP.jl) | [![Coverage Status](https://coveralls.io/repos/github/JuliaSmoothOptimizers/NLPModelsJuMP.jl/badge.svg?branch=master)](https://coveralls.io/github/JuliaSmoothOptimizers/NLPModelsJuMP.jl?branch=master) |
 
-    Abel Soares Siqueira & Dominique Orban. NLPModelsJuMP.jl. Zenodo.
-    http://doi.org/10.5281/zenodo.2574164
-
-[![Build
-Status](https://travis-ci.org/JuliaSmoothOptimizers/NLPModelsJuMP.jl.svg?branch=master)](https://travis-ci.org/JuliaSmoothOptimizers/NLPModelsJuMP.jl)
-[![Build status](https://ci.appveyor.com/api/projects/status/g0ofb4r1aqo56hbo?svg=true)](https://ci.appveyor.com/project/dpo/nlpmodelsjump-jl)
-[![Build Status](https://api.cirrus-ci.com/github/JuliaSmoothOptimizers/NLPModelsJuMP.jl.svg)](https://cirrus-ci.com/github/JuliaSmoothOptimizers/NLPModelsJuMP.jl)
-[![](https://img.shields.io/badge/docs-stable-3f51b5.svg)](https://JuliaSmoothOptimizers.github.io/NLPModelsJuMP.jl/stable)
-
-This package provides nonlinear programming models as implemented by
-[NLPModels](https://github.com/JuliaSmoothOptimizers/NLPModels.jl), through the use of
-[JuMP](https://github.com/JuliaOpt/JuMP.jl).
+NLPModelsJuMP.jl provides conversion from [JuMP.jl](https://github.com/jump-dev/JuMP.jl) / [MathOptInterface.jl](https://github.com/jump-dev/MathOptInterface.jl) models to [NLPModels](https://github.com/JuliaSmoothOptimizers/NLPModels.jl).
 
 **Disclaimer**: NLPModelsJuMP is *not* developed or maintained by the JuMP developers.
 
-See the documentation on NLPModels for the general description of NLPModels. Here, we
+See the [documentation](https://juliasmoothoptimizers.github.io/NLPModels.jl/stable/) on NLPModels for the general description of NLPModels. Here, we
 focus on the use of JuMP to create these.
 
-## NLPModels from a JuMP
+## How to Cite
 
-NLPModelsJuMP provides conversion between MathOptInterface models and NLPModels.
+If you use NLPModelsJuMP.jl in your work, please cite using the format given in [`CITATION.bib`](https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl/blob/master/CITATION.bib).
