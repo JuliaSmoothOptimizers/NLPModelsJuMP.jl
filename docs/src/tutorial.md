@@ -212,4 +212,9 @@ jac_residual(nls, nls.meta.x0)
 
 The package
 [NLSProblems](https://github.com/JuliaSmoothOptimizers/NLSProblems.jl)
-provides a collection of problems defined as `MathOptNLSModel`.
+provides a collection of problems already defined as `MathOptNLSModel`.
+
+```@example nls2
+using NLSProblems # Defines a lot of MathOptNLSModel
+nls = BNST3()
+```
