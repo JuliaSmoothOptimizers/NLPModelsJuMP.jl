@@ -197,8 +197,8 @@ function parser_JuMP(jmodel)
   # Number of variables and bounds constraints
   nvar = Int(num_variables(jmodel))
   vars = all_variables(jmodel)
-  lvar = map(var -> has_lower_bound(var) ? lower_bound(var) : -Inf, vars)
-  uvar = map(var -> has_upper_bound(var) ? upper_bound(var) :  Inf, vars)
+  lvar = map(var -> is_fixed(var) ? fix_value(var) : (has_lower_bound(var) ? lower_bound(var) : -Inf), vars)
+  uvar = map(var -> is_fixed(var) ? fix_value(var) : (has_upper_bound(var) ? upper_bound(var) :  Inf), vars)
 
   # Initial solution
   x0 = zeros(nvar)
