@@ -15,4 +15,7 @@ makedocs(
               "Reference" => "reference.md"]
 )
 
-deploydocs(repo = "github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl.git")
+deploydocs(
+  repo = "github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl.git",
+  push_preview = true
+)
