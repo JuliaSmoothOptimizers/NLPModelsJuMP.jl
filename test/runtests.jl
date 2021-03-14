@@ -1,22 +1,17 @@
-using JuMP, NLPModels, NLPModelsJuMP
+using JuMP, NLPModels, NLPModelsJuMP, NLPModelsTest
 using LinearAlgebra, SparseArrays
 using Test, Printf
 
-nlpmodels_path = joinpath(dirname(pathof(NLPModels)), "..", "test")
-nlpmodels_problems_path = joinpath(nlpmodels_path, "problems")
+nlp_problems = setdiff(NLPModelsTest.nlp_problems, ["MGH01Feas"])
+nls_problems = NLPModelsTest.nls_problems
+extra_nls_problems = ["HS30", "HS43", "MGH07"]
 
-for problem in [:brownden, :hs5, :hs6, :hs10, :hs11, :hs14, :lincon, :linsv]
+for problem in lowercase.(nlp_problems)
   include(joinpath("nlp_problems", "$problem.jl"))
-  if isfile(joinpath(nlpmodels_problems_path, "$problem.jl"))
-    include(joinpath(nlpmodels_problems_path, "$problem.jl"))
-  end
 end
 
-for problem in [:lls, :mgh01, :nlshs20, :hs30, :hs43, :mgh07, :nlslc]
+for problem in lowercase.(nls_problems ∪ extra_nls_problems)
   include(joinpath("nls_problems", "$problem.jl"))
-  if isfile(joinpath(nlpmodels_path, "nls_problems", "$problem.jl"))
-    include(joinpath(nlpmodels_path, "nls_problems", "$problem.jl"))
-  end
 end
 
 include("test_moi_nlp_model.jl")
@@ -24,5 +19,3 @@ include("test_moi_nls_model.jl")
 
 include("nlp_consistency.jl")
 include("nls_consistency.jl")
-
-include("test_view_subarray.jl")

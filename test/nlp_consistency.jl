@@ -1,20 +1,10 @@
-using NLPModels
-
-include(joinpath(nlpmodels_path, "consistency.jl"))
-
-function test_nlp_consistency()
-  println()
-  for problem in [:brownden, :hs5, :hs6, :hs10, :hs11, :hs14, :lincon, :linsv]
-    problem_s = string(problem)
-    @printf("Checking NLP problem %-20s", problem_s)
-    problem_f = eval(problem)
-    nlp_autodiff = eval(Meta.parse("$(problem)_autodiff"))()
-    nlp_manual = eval(Meta.parse(uppercase(string(problem))))()
+for problem in nlp_problems
+  @testset "Problem $problem" begin
+    nlp_manual = eval(Symbol(problem))()
+    problem_f = eval(Symbol(lowercase(problem)))
     nlp_moi = MathOptNLPModel(problem_f())
-    nlps = [nlp_autodiff; nlp_manual; nlp_moi]
+    nlps = [nlp_manual; nlp_moi]
     consistent_nlps(nlps)
+    view_subarray_nlp(nlp_moi)
   end
-  println()
 end
-
-test_nlp_consistency()
