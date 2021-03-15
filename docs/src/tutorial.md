@@ -16,7 +16,7 @@ MathOptNLPModel
 
 `MathOptNLPModel` is a simple yet efficient model. It uses JuMP to define the problem,
 and can be accessed through the NLPModels API.
-An advantage of `MathOptNLPModel` over simpler models such as `ADNLPModel`s is that
+An advantage of `MathOptNLPModel` over simpler models such as [`ADNLPModel`s](https://github.com/JuliaSmoothOptimizers/ADNLPModels.jl) is that
 they provide sparse derivates.
 
 Let's define the famous Rosenbrock function
@@ -123,15 +123,6 @@ for i = 1:5
   x = x - H(x) \ g(x)
   println("x = $x")
 end
-```
-
-Notice how we can use the method with different NLPModels:
-
-```@example jumpnlp
-f(x) = (x[1] - 1.0)^2 + 100 * (x[2] - 1.0)^2
-
-adnlp = ADNLPModel(f, x0)
-x, fx, ngx, optimal, iter = steepest(adnlp)
 ```
 
 ### OptimizationProblems
