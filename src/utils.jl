@@ -9,42 +9,47 @@ const MOI = MathOptInterface
 # ScalarAffineFunctions and VectorAffineFunctions
 const SAF = MOI.ScalarAffineFunction{Float64}
 const VAF = MOI.VectorAffineFunction{Float64}
-const AF  = Union{SAF, VAF}
+const AF = Union{SAF, VAF}
 
 # AffLinSets and VecLinSets
-const ALS = Union{MOI.EqualTo{Float64}, MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.Interval{Float64}}
+const ALS = Union{
+  MOI.EqualTo{Float64},
+  MOI.GreaterThan{Float64},
+  MOI.LessThan{Float64},
+  MOI.Interval{Float64},
+}
 const VLS = Union{MOI.Nonnegatives, MOI.Nonpositives, MOI.Zeros}
-const LS  = Union{ALS, VLS}
+const LS = Union{ALS, VLS}
 
-const SV  = MOI.SingleVariable
+const SV = MOI.SingleVariable
 const SQF = MOI.ScalarQuadraticFunction{Float64}
 const OBJ = Union{SV, SAF, SQF}
 
 mutable struct COO
-  rows :: Vector{Int}
-  cols :: Vector{Int}
-  vals :: Vector{Float64}
+  rows::Vector{Int}
+  cols::Vector{Int}
+  vals::Vector{Float64}
 end
 
 COO() = COO(Int[], Int[], Float64[])
 
 mutable struct LinearConstraints
-  jacobian :: COO
-  nnzj     :: Int
+  jacobian::COO
+  nnzj::Int
 end
 
 mutable struct LinearEquations
-  jacobian  :: COO
-  constants :: Vector{Float64}
-  nnzj      :: Int
+  jacobian::COO
+  constants::Vector{Float64}
+  nnzj::Int
 end
 
 mutable struct Objective
-  type     :: String
-  constant :: Float64
-  gradient :: SparseVector{Float64}
-  hessian  :: COO
-  nnzh     :: Int
+  type::String
+  constant::Float64
+  gradient::SparseVector{Float64}
+  hessian::COO
+  nnzh::Int
 end
 
 """
@@ -72,7 +77,13 @@ end
 Compute the product `xᵀAy` of a symmetric matrix `A` given by `(rows, cols, vals)`
 Only one triangle of `A` should be passed.
 """
-function coo_sym_dot(rows :: AbstractVector{<: Integer}, cols :: AbstractVector{<: Integer}, vals :: AbstractVector, x :: AbstractVector, y :: AbstractVector)
+function coo_sym_dot(
+  rows::AbstractVector{<:Integer},
+  cols::AbstractVector{<:Integer},
+  vals::AbstractVector,
+  x::AbstractVector,
+  y::AbstractVector,
+)
   xᵀAy = 0.0
   nnz = length(vals)
   @inbounds for k = 1:nnz
@@ -153,10 +164,10 @@ Parse linear constraints of a `MOI.ModelLike`.
 function parser_MOI(moimodel)
 
   # Variables associated to linear constraints
-  nlin     = 0
-  linrows  = Int[]
-  lincols  = Int[]
-  linvals  = Float64[]
+  nlin = 0
+  linrows = Int[]
+  lincols = Int[]
+  linvals = Float64[]
   lin_lcon = Float64[]
   lin_ucon = Float64[]
 
@@ -197,8 +208,14 @@ function parser_JuMP(jmodel)
   # Number of variables and bounds constraints
   nvar = Int(num_variables(jmodel))
   vars = all_variables(jmodel)
-  lvar = map(var -> is_fixed(var) ? fix_value(var) : (has_lower_bound(var) ? lower_bound(var) : -Inf), vars)
-  uvar = map(var -> is_fixed(var) ? fix_value(var) : (has_upper_bound(var) ? upper_bound(var) :  Inf), vars)
+  lvar = map(
+    var -> is_fixed(var) ? fix_value(var) : (has_lower_bound(var) ? lower_bound(var) : -Inf),
+    vars,
+  )
+  uvar = map(
+    var -> is_fixed(var) ? fix_value(var) : (has_upper_bound(var) ? upper_bound(var) : Inf),
+    vars,
+  )
 
   # Initial solution
   x0 = zeros(nvar)
@@ -283,9 +300,15 @@ function parser_linear_expression(cmodel, nvar, F)
   nlinequ = 0
   F_is_array_of_containers = F isa Array{<:AbstractArray}
   if F_is_array_of_containers
-    @objective(cmodel, Min, 0.0 + 0.5 * sum(sum(Fi^2 for Fi in FF if typeof(Fi) == GenericAffExpr{Float64,VariableRef}) for FF in F))
+    @objective(
+      cmodel,
+      Min,
+      0.0 +
+      0.5 *
+      sum(sum(Fi^2 for Fi in FF if typeof(Fi) == GenericAffExpr{Float64, VariableRef}) for FF in F)
+    )
     for FF in F, expr in FF
-      if typeof(expr) == GenericAffExpr{Float64,VariableRef}
+      if typeof(expr) == GenericAffExpr{Float64, VariableRef}
         nlinequ += 1
         for (i, key) in enumerate(expr.terms.keys)
           push!(rows, nlinequ)
@@ -296,9 +319,13 @@ function parser_linear_expression(cmodel, nvar, F)
       end
     end
   else
-    @objective(cmodel, Min, 0.0 + 0.5 * sum(Fi^2 for Fi in F if typeof(Fi) == GenericAffExpr{Float64,VariableRef}))
+    @objective(
+      cmodel,
+      Min,
+      0.0 + 0.5 * sum(Fi^2 for Fi in F if typeof(Fi) == GenericAffExpr{Float64, VariableRef})
+    )
     for expr in F
-      if typeof(expr) == GenericAffExpr{Float64,VariableRef}
+      if typeof(expr) == GenericAffExpr{Float64, VariableRef}
         nlinequ += 1
         for (i, key) in enumerate(expr.terms.keys)
           push!(rows, nlinequ)
@@ -327,7 +354,11 @@ function parser_nonlinear_expression(cmodel, nvar, F)
   if F_is_array_of_containers
     nnlnequ = sum(sum(typeof(Fi) == NonlinearExpression for Fi in FF) for FF in F)
     if nnlnequ > 0
-      @NLobjective(cmodel, Min, 0.5 * sum(sum(Fi^2 for Fi in FF if typeof(Fi) == NonlinearExpression) for FF in F))
+      @NLobjective(
+        cmodel,
+        Min,
+        0.5 * sum(sum(Fi^2 for Fi in FF if typeof(Fi) == NonlinearExpression) for FF in F)
+      )
     end
   else
     nnlnequ = sum(typeof(Fi) == NonlinearExpression for Fi in F)
@@ -337,7 +368,9 @@ function parser_nonlinear_expression(cmodel, nvar, F)
   end
   ceval = cmodel.nlp_data == nothing ? nothing : NLPEvaluator(cmodel)
   (ceval ≠ nothing) && (nnlnequ == 0) && MOI.initialize(ceval, [:Grad, :Jac, :Hess, :HessVec])  # Add :JacVec when available
-  (ceval ≠ nothing) && (nnlnequ > 0)  && MOI.initialize(ceval, [:Grad, :Jac, :Hess, :HessVec, :ExprGraph])  # Add :JacVec when available
+  (ceval ≠ nothing) &&
+    (nnlnequ > 0) &&
+    MOI.initialize(ceval, [:Grad, :Jac, :Hess, :HessVec, :ExprGraph])  # Add :JacVec when available
 
   if nnlnequ == 0
     Feval = nothing
