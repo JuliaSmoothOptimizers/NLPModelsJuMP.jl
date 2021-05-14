@@ -6,7 +6,7 @@ nlp_problems = setdiff(NLPModelsTest.nlp_problems, ["MGH01Feas"])
 nls_problems = NLPModelsTest.nls_problems
 extra_nls_problems = ["HS30", "HS43", "MGH07"]
 
-for problem in lowercase.(nlp_problems)
+for problem in lowercase.(nlp_problems ∪ ["tangi"])
   include(joinpath("nlp_problems", "$problem.jl"))
 end
 
