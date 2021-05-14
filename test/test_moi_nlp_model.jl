@@ -11,9 +11,9 @@ println("Testing MathOptNLPModel")
   "‖c(x₀)‖"
 )
 # Test that every problem can be instantiated.
-for prob in Symbol.(lowercase.(nlp_problems))
+for prob in Symbol.(lowercase.(nlp_problems ∪ ["tangi"]))
   prob_fn = eval(prob)
-  nlp = MathOptNLPModel(prob_fn())
+  nlp = MathOptNLPModel(prob_fn(), hessian=(prob != :tangi))
   n = nlp.meta.nvar
   m = nlp.meta.ncon
   x = nlp.meta.x0
