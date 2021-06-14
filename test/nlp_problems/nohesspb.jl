@@ -3,9 +3,9 @@ function nohesspb()
 
   @variable(nlp, x[1:2])
 
-  g(x::T, y::T) where {T<:Real} = x * y + 3
+  g(x::T, y::T) where {T <: Real} = x * y + 3
 
-  function ∇g(v::AbstractVector{T}, x::T, y::T) where {T<:Real}
+  function ∇g(v::AbstractVector{T}, x::T, y::T) where {T <: Real}
     v[1] = y
     v[2] = x
     return v
