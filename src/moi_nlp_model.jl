@@ -27,7 +27,10 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
   (eval ≠ nothing) && MOI.initialize(eval, hessian ? [:Grad, :Jac, :Hess, :HessVec] : [:Grad, :Jac])  # Add :JacVec when available
 
   nl_nnzj = nnln == 0 ? 0 : sum(length(nl_con.grad_sparsity) for nl_con in eval.constraints)
-  nl_nnzh = hessian ? (((eval ≠ nothing) && eval.has_nlobj) ? length(eval.objective.hess_I) : 0) + (nnln == 0 ? 0 : sum(length(nl_con.hess_I) for nl_con in eval.constraints)) : 0
+  nl_nnzh =
+    hessian ?
+    (((eval ≠ nothing) && eval.has_nlobj) ? length(eval.objective.hess_I) : 0) +
+    (nnln == 0 ? 0 : sum(length(nl_con.hess_I) for nl_con in eval.constraints)) : 0
 
   moimodel = backend(jmodel)
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
