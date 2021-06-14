@@ -16,7 +16,7 @@ MathOptNLPModel
 
 `MathOptNLPModel` is a simple yet efficient model. It uses JuMP to define the problem,
 and can be accessed through the NLPModels API.
-An advantage of `MathOptNLPModel` over simpler models such as [`ADNLPModel`s](https://github.com/JuliaSmoothOptimizers/ADNLPModels.jl) is that
+An advantage of `MathOptNLPModel` over simpler models such as [`ADNLPModels`](https://github.com/JuliaSmoothOptimizers/ADNLPModels.jl) is that
 they provide sparse derivates.
 
 Let's define the famous Rosenbrock function
