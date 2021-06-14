@@ -9,9 +9,11 @@ mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
 end
 
 """
-    MathOptNLPModel(model, name="Generic")
+    MathOptNLPModel(model, hessian=true, name="Generic")
 
 Construct a `MathOptNLPModel` from a `JuMP` model.
+
+`hessian` should be set to `false` for multivariate user-defined functions registered without hessian.
 """
 function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String = "Generic")
   nvar, lvar, uvar, x0 = parser_JuMP(jmodel)
