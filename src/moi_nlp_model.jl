@@ -1,7 +1,7 @@
 export MathOptNLPModel
 
-mutable struct MathOptNLPModel <: AbstractNLPModel
-  meta::NLPModelMeta
+mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
+  meta::NLPModelMeta{Float64, Vector{Float64}}
   eval::Union{MOI.AbstractNLPEvaluator, Nothing}
   lincon::LinearConstraints
   obj::Objective

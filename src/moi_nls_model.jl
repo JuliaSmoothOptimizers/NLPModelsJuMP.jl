@@ -1,8 +1,8 @@
 export MathOptNLSModel
 
-mutable struct MathOptNLSModel <: AbstractNLSModel
-  meta::NLPModelMeta
-  nls_meta::NLSMeta
+mutable struct MathOptNLSModel <: AbstractNLSModel{Float64, Vector{Float64}}
+  meta::NLPModelMeta{Float64, Vector{Float64}}
+  nls_meta::NLSMeta{Float64, Vector{Float64}}
   Feval::Union{MOI.AbstractNLPEvaluator, Nothing}
   ceval::Union{MOI.AbstractNLPEvaluator, Nothing}
   lls::Objective
