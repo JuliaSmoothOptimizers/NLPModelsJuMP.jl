@@ -52,9 +52,6 @@ println("gx = $gx")
 println("Hx = $Hx")
 ```
 
-Notice how only the lower triangle of the Hessian is stored, which is the default for
-NLPModels.
-
 Let's do something a little more complex here, defining a function to try to
 solve this problem through steepest descent method with Armijo search.
 Namely, the method
@@ -110,7 +107,7 @@ Newton step.
 ```@example jumpnlp
 f(x) = obj(nlp, x)
 g(x) = grad(nlp, x)
-H(x) = Symmetric(hess(nlp, x), :L)
+H(x) = hess(nlp, x)
 x = nlp.meta.x0
 d = -H(x) \ g(x)
 ```
