@@ -37,7 +37,6 @@ model = Model()
 @test F isa Array{GenericAffExpr{Float64, VariableRef}}
 @test G isa Array{NonlinearExpression}
 @test H isa Array{NonlinearExpression}
-@test [[F G]; H] isa Array{Any}
 nls = MathOptNLSModel(model, [[F G]; H])
 @test all(residual(nls, ones(2)) .== 0.0)
 @test jac_residual(nls, ones(2))' * residual(nls, ones(2)) == [0.0; 0.0]

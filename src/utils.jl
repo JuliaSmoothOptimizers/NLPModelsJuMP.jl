@@ -21,9 +21,9 @@ const ALS = Union{
 const VLS = Union{MOI.Nonnegatives, MOI.Nonpositives, MOI.Zeros}
 const LS = Union{ALS, VLS}
 
-const SV = MOI.SingleVariable
+const VI = MOI.VariableIndex
 const SQF = MOI.ScalarQuadraticFunction{Float64}
-const OBJ = Union{SV, SAF, SQF}
+const OBJ = Union{VI, SAF, SQF}
 
 mutable struct COO
   rows::Vector{Int}
@@ -104,10 +104,10 @@ Parse a `ScalarAffineFunction` fun with its associated set.
 """
 function parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
 
-  # Parse a ScalarAffineTerm{Float64}(coefficient, variable_index)
+  # Parse a ScalarAffineTerm{Float64}(coefficient, variable)
   for term in fun.terms
     push!(linrows, nlin + 1)
-    push!(lincols, term.variable_index.value)
+    push!(lincols, term.variable.value)
     push!(linvals, term.coefficient)
   end
 
@@ -139,7 +139,7 @@ function parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_uco
   # Parse a VectorAffineTerm{Float64}(output_index, scalar_term)
   for term in fun.terms
     push!(linrows, nlin + term.output_index)
-    push!(lincols, term.scalar_term.variable_index.value)
+    push!(lincols, term.scalar_term.variable.value)
     push!(linvals, term.scalar_term.coefficient)
   end
 
@@ -171,9 +171,9 @@ function parser_MOI(moimodel)
   lin_lcon = Float64[]
   lin_ucon = Float64[]
 
-  contypes = MOI.get(moimodel, MOI.ListOfConstraints())
+  contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
-    F == MOI.SingleVariable && continue
+    F == VI && continue
     F <: AF || @warn("Function $F is not supported.")
     S <: LS || @warn("Set $S is not supported.")
 
@@ -246,9 +246,9 @@ function parser_objective_MOI(moimodel, nvar)
   fobj = MOI.get(moimodel, MOI.ObjectiveFunction{OBJ}())
 
   # Single Variable
-  if typeof(fobj) == SV
+  if typeof(fobj) == VI
     type = "LINEAR"
-    vect[fobj.variable.value] = 1.0
+    vect[fobj.value] = 1.0
   end
 
   # Linear objective
@@ -256,7 +256,7 @@ function parser_objective_MOI(moimodel, nvar)
     type = "LINEAR"
     constant = fobj.constant
     for term in fobj.terms
-      vect[term.variable_index.value] = term.coefficient
+      vect[term.variable.value] = term.coefficient
     end
   end
 
@@ -265,11 +265,11 @@ function parser_objective_MOI(moimodel, nvar)
     type = "QUADRATIC"
     constant = fobj.constant
     for term in fobj.affine_terms
-      vect[term.variable_index.value] = term.coefficient
+      vect[term.variable.value] = term.coefficient
     end
     for term in fobj.quadratic_terms
-      i = term.variable_index_1.value
-      j = term.variable_index_2.value
+      i = term.variable_1.value
+      j = term.variable_2.value
       if i ≥ j
         push!(rows, i)
         push!(cols, j)
