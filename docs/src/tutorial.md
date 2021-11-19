@@ -130,7 +130,7 @@ provides a collection of problems defined in JuMP format, which can be converted
 to `MathOptNLPModel`.
 
 ```@example jumpnlp
-using OptimizationProblems # Defines a lot of JuMP models
+using OptimizationProblems.PureJuMP  # Defines a lot of JuMP models
 
 nlp = MathOptNLPModel(woods())
 x, fx, ngx, optimal, iter = steepest(nlp)
