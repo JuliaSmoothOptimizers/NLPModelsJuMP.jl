@@ -68,13 +68,7 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; name::String = "Generic")
 
   return MathOptNLSModel(
     meta,
-    NLSMeta(
-      nequ,
-      nvar,
-      nnzj = Fnnzj,
-      nnzh = Fnnzh,
-      lin = collect(1:nlinequ),
-    ),
+    NLSMeta(nequ, nvar, nnzj = Fnnzj, nnzh = Fnnzh, lin = collect(1:nlinequ)),
     Feval,
     ceval,
     lls,
