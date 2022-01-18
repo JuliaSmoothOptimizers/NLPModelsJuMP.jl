@@ -4,7 +4,7 @@ using Test, Printf
 
 nlp_problems = setdiff(NLPModelsTest.nlp_problems, ["MGH01Feas"])
 nls_problems = NLPModelsTest.nls_problems
-extra_nls_problems = ["HS30", "HS43", "MGH07"]
+extra_nls_problems = ["HS30", "HS43", "MGH07", "nlsnohesspb"]
 
 for problem in lowercase.(nlp_problems ∪ ["nohesspb"])
   include(joinpath("nlp_problems", "$problem.jl"))
