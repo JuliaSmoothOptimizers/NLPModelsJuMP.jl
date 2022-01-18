@@ -346,7 +346,7 @@ end
 
 Parse nonlinear expressions of type `NonlinearExpression`.
 """
-function parser_nonlinear_expression(cmodel, nvar, F)
+function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
 
   # Nonlinear least squares model
   nnlnequ = 0
@@ -367,10 +367,10 @@ function parser_nonlinear_expression(cmodel, nvar, F)
     end
   end
   ceval = cmodel.nlp_data == nothing ? nothing : NLPEvaluator(cmodel)
-  (ceval ≠ nothing) && (nnlnequ == 0) && MOI.initialize(ceval, [:Grad, :Jac, :Hess, :HessVec])  # Add :JacVec when available
+  (ceval ≠ nothing) && (nnlnequ == 0) && MOI.initialize(ceval, hessian ? [:Grad, :Jac, :Hess, :HessVec] : [:Grad, :Jac])  # Add :JacVec when available
   (ceval ≠ nothing) &&
     (nnlnequ > 0) &&
-    MOI.initialize(ceval, [:Grad, :Jac, :Hess, :HessVec, :ExprGraph])  # Add :JacVec when available
+    MOI.initialize(ceval, hessian ? [:Grad, :Jac, :Hess, :HessVec, :ExprGraph] : [:Grad, :Jac, :ExprGraph])  # Add :JacVec when available
 
   if nnlnequ == 0
     Feval = nothing
@@ -400,7 +400,7 @@ function parser_nonlinear_expression(cmodel, nvar, F)
       end
     end
     Feval = NLPEvaluator(Fmodel)
-    MOI.initialize(Feval, [:Grad, :Jac, :Hess, :HessVec])  # Add :JacVec when available
+    MOI.initialize(Feval, hessian ? [:Grad, :Jac, :Hess, :HessVec] : [:Grad, :Jac])  # Add :JacVec when available
   end
   return ceval, Feval, nnlnequ
 end

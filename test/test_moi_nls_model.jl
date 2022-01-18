@@ -12,7 +12,7 @@ println("Testing MathOptNLSModel")
   "‖c(x₀)‖"
 )
 # Test that every problem can be instantiated.
-for prob in Symbol.(lowercase.(nls_problems ∪ extra_nls_problems))
+for prob in Symbol.(lowercase.(nls_problems ∪ extra_nls_problems ∪ ["nlsnohesspb"]))
   prob_fn = eval(prob)
   nls = prob_fn()
   N = nls.nls_meta.nequ
