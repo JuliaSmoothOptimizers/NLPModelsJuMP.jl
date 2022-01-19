@@ -401,6 +401,7 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
     end
     Feval = NLPEvaluator(Fmodel)
     MOI.initialize(Feval, hessian ? [:Grad, :Jac, :Hess, :HessVec] : [:Grad, :Jac])  # Add :JacVec when available
+    Feval.user_output_buffer = ceval.user_output_buffer
   end
   return ceval, Feval, nnlnequ
 end
