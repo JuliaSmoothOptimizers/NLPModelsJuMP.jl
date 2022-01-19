@@ -11,7 +11,7 @@ function nohesspb()
     return v
   end
 
-  register(nlp, :g, 2, g, ∇g)
+  register(nlp, :g, 2, g, autodiff = true)
   @NLobjective(nlp, Min, g(x[1], x[2]))
 
   return nlp
