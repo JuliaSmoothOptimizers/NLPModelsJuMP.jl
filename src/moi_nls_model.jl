@@ -28,13 +28,14 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
   nl_ucon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.ub, cmodel.nlp_data.nlconstr)
 
   lls, linequ, nlinequ = parser_linear_expression(cmodel, nvar, F)
-  ceval, Feval, nnlnequ = parser_nonlinear_expression(cmodel, nvar, F, hessian=hessian)
+  ceval, Feval, nnlnequ = parser_nonlinear_expression(cmodel, nvar, F, hessian = hessian)
 
   nl_Fnnzj = (nnlnequ == 0 ? 0 : sum(length(con.grad_sparsity) for con in Feval.constraints))
   nl_Fnnzh = hessian ? (nnlnequ == 0 ? 0 : sum(length(con.hess_I) for con in Feval.constraints)) : 0
 
   nl_cnnzj = (nnln == 0 ? 0 : sum(length(con.grad_sparsity) for con in ceval.constraints))
-  nl_cnnzh = hessian ?
+  nl_cnnzh =
+    hessian ?
     (nnlnequ == 0 ? 0 : length(ceval.objective.hess_I)) +
     (nnln == 0 ? 0 : sum(length(con.hess_I) for con in ceval.constraints)) : 0
 

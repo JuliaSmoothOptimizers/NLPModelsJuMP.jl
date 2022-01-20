@@ -367,10 +367,15 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
     end
   end
   ceval = cmodel.nlp_data == nothing ? nothing : NLPEvaluator(cmodel)
-  (ceval ≠ nothing) && (nnlnequ == 0) && MOI.initialize(ceval, hessian ? [:Grad, :Jac, :Hess, :HessVec] : [:Grad, :Jac])  # Add :JacVec when available
+  (ceval ≠ nothing) &&
+    (nnlnequ == 0) &&
+    MOI.initialize(ceval, hessian ? [:Grad, :Jac, :Hess, :HessVec] : [:Grad, :Jac])  # Add :JacVec when available
   (ceval ≠ nothing) &&
     (nnlnequ > 0) &&
-    MOI.initialize(ceval, hessian ? [:Grad, :Jac, :Hess, :HessVec, :ExprGraph] : [:Grad, :Jac, :ExprGraph])  # Add :JacVec when available
+    MOI.initialize(
+      ceval,
+      hessian ? [:Grad, :Jac, :Hess, :HessVec, :ExprGraph] : [:Grad, :Jac, :ExprGraph],
+    )  # Add :JacVec when available
 
   if nnlnequ == 0
     Feval = nothing
