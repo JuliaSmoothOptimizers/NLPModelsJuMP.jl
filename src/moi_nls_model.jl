@@ -22,7 +22,7 @@ Construct a `MathOptNLSModel` from a `JuMP` model and a container of JuMP
 function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::String = "Generic")
   nvar, lvar, uvar, x0 = parser_JuMP(cmodel)
 
-  nnln = num_nl_constraints(cmodel)
+  nnln = num_nonlinear_constraints(cmodel)
 
   nl_lcon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.lb, cmodel.nlp_data.nlconstr)
   nl_ucon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.ub, cmodel.nlp_data.nlconstr)

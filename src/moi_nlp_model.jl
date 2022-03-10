@@ -18,7 +18,7 @@ Construct a `MathOptNLPModel` from a `JuMP` model.
 function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String = "Generic")
   nvar, lvar, uvar, x0 = parser_JuMP(jmodel)
 
-  nnln = num_nl_constraints(jmodel)
+  nnln = num_nonlinear_constraints(jmodel)
 
   nl_lcon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.lb, jmodel.nlp_data.nlconstr)
   nl_ucon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.ub, jmodel.nlp_data.nlconstr)
