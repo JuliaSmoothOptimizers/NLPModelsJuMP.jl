@@ -391,7 +391,7 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
           expr = ceval.subexpressions_as_julia_expressions[Fi.index]
           replace!(expr, x)
           expr = :($expr == 0)
-          JuMP.add_NL_constraint(Fmodel, expr)
+          JuMP.add_nonlinear_constraint(Fmodel, expr)
         end
       end
     else
@@ -400,7 +400,7 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
           expr = ceval.subexpressions_as_julia_expressions[Fi.index]
           replace!(expr, x)
           expr = :($expr == 0)
-          JuMP.add_NL_constraint(Fmodel, expr)
+          JuMP.add_nonlinear_constraint(Fmodel, expr)
         end
       end
     end
