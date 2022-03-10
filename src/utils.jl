@@ -6,10 +6,18 @@ import NLPModels.increment!, NLPModels.decrement!
 using JuMP, MathOptInterface
 const MOI = MathOptInterface
 
+# VariableIndex
+const VI = MOI.VariableIndex  # VariableIndex(value)
+
 # ScalarAffineFunctions and VectorAffineFunctions
-const SAF = MOI.ScalarAffineFunction{Float64}
-const VAF = MOI.VectorAffineFunction{Float64}
-const AF = Union{SAF, VAF}
+const SAF = MOI.ScalarAffineFunction{Float64}  # ScalarAffineFunction{T}(terms, constant)
+const VAF = MOI.VectorAffineFunction{Float64}  # VectorAffineFunction{T}(terms, constants)
+const AF  = Union{SAF, VAF}
+
+# ScalarQuadraticFunctions and VectorQuadraticFunctions
+const SQF = MOI.ScalarQuadraticFunction{Float64}  # ScalarQuadraticFunction{T}(affine_terms, quadratic_terms, constant)
+const VQF = MOI.VectorQuadraticFunction{Float64}  # VectorQuadraticFunction{T}(affine_terms, quadratic_terms, constants)
+const QF  = Union{SQF, VQF}
 
 # AffLinSets and VecLinSets
 const ALS = Union{
@@ -21,10 +29,11 @@ const ALS = Union{
 const VLS = Union{MOI.Nonnegatives, MOI.Nonpositives, MOI.Zeros}
 const LS = Union{ALS, VLS}
 
+# Objective
 const VI = MOI.VariableIndex
-const SQF = MOI.ScalarQuadraticFunction{Float64}
 const OBJ = Union{VI, SAF, SQF}
 
+# Coordinate Matrix
 mutable struct COO
   rows::Vector{Int}
   cols::Vector{Int}
@@ -36,6 +45,21 @@ COO() = COO(Int[], Int[], Float64[])
 mutable struct LinearConstraints
   jacobian::COO
   nnzj::Int
+end
+
+mutable struct QuadraticConstraint
+  hessian::COO
+  b::SparseVector{Float64}
+end
+
+mutable struct QuadraticConstraints
+  qcons::Vector{QuadraticConstraint}
+  nnzj::Int
+  jrows::Vector{Int}
+  jcols::Vector{Int}
+  nnzh::Int
+  hrows::Vector{Int}
+  hcols::Vector{Int}
 end
 
 mutable struct LinearEquations
@@ -94,6 +118,52 @@ function coo_sym_dot(
     end
   end
   return xᵀAy
+end
+
+"""
+    jacobian_quad(qcons)
+
+`qcons` is a vector of `QuadraticConstraint` where each constraint has the form ½xᵀQᵢx + xᵀbᵢ.
+Compute the sparcity pattern of the jacobian [Q₁x + b₁; ...; Qₚx + bₚ]ᵀ of `qcons`.
+"""
+function jacobian_quad(qcons)
+  jrows = Int[]
+  jcols = Int[]
+  nquad = length(qcons)
+  for i = 1 : nquad
+    # rows of Qᵢx + bᵢ with nonzeros coefficients
+    vec = unique(con.hessian.rows ∪ con.b.nzind)
+    for elt ∈ vec
+      push!(elt, jcols)
+      push!(i, jrows)
+    end
+  end
+  nnzj = length(jrows)
+  return nnzj, jrows, jcols
+end
+
+"""
+    hessian_quad(qcons)
+
+`qcons` is a vector of `QuadraticConstraint` where each constraint has the form ½xᵀQᵢx + xᵀbᵢ.
+Compute the sparcity pattern of the hessian ΣᵢQᵢ of `qcons`.
+"""
+function hessian_quad(qcons)
+  set = Set{Tuple{Int,Int}}()
+  for con ∈ qcons
+    for tuple ∈ zip(con.rows, con.vals)
+      # Only disctinct tuples are stored in the set
+      push!(tuple, set)
+    end
+  end
+  nnzh = length(set)
+  hrows = zeros(Int, nnzh)
+  hcols = zeros(Int, nnzh)
+  for (index,tuple) in enumerate(set)
+    hrows[index] = tuple[1]
+    hcols[index] = tuple[2]
+  end
+  return nnzh, hrows, hcols
 end
 
 """
@@ -157,11 +227,64 @@ function parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_uco
 end
 
 """
-    parser_MOI(moimodel)
+    parser_SQF(fun, set, qcons, quad_lcon, quad_ucon)
 
-Parse linear constraints of a `MOI.ModelLike`.
+Parse a `ScalarQuadraticFunction` fun with its associated set.
+`qcons`, `quad_lcon`, `quad_ucon` are updated.
 """
-function parser_MOI(moimodel)
+function parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
+
+  b    = spzeros(Float64, nvar)
+  rows = Int[]
+  cols = Int[]
+  vals = Float64[]
+
+  # Parse a ScalarAffineTerm{Float64}(coefficient, variable_index)
+  for term in fun.affine_terms
+    b[term.variable.value] = term.coefficient
+  end
+
+  # Parse a ScalarQuadraticTerm{Float64}(coefficient, variable_index_1, variable_index_2)
+  for term in fun.quadratic_terms
+    i = term.variable_1.value
+    j = term.variable_2.value
+    if i ≥ j
+      push!(rows, i)
+      push!(cols, j)
+    else
+      push!(cols, j)
+      push!(rows, i)
+    end
+    push!(vals, term.coefficient)
+  end
+
+  if typeof(set) in (MOI.Interval{Float64}, MOI.GreaterThan{Float64})
+    push!(quad_lcon, -fun.constant + set.lower)
+  elseif typeof(set) == MOI.EqualTo{Float64}
+    push!(quad_lcon, -fun.constant + set.value)
+  else
+    push!(quad_lcon, -Inf)
+  end
+
+  if typeof(set) in (MOI.Interval{Float64}, MOI.LessThan{Float64})
+    push!(quad_ucon, -fun.constant + set.upper)
+  elseif typeof(set) == MOI.EqualTo{Float64}
+    push!(quad_ucon, -fun.constant + set.value)
+  else
+    push!(quad_ucon, Inf)
+  end
+
+  nnzh = length(vals)
+  qcon = QuadraticConstraint(COO[rows, cols, vals], b)
+  push!(qcons, qcon)
+end
+
+"""
+    parser_MOI(moimodel, nvar)
+
+Parse linear and quadratic constraints of a `MOI.ModelLike`.
+"""
+function parser_MOI(moimodel, nvar)
 
   # Variables associated to linear constraints
   nlin = 0
@@ -171,10 +294,16 @@ function parser_MOI(moimodel)
   lin_lcon = Float64[]
   lin_ucon = Float64[]
 
+  # Variables associated to quadratic constraints
+  nquad = 0
+  qcons = QuadraticConstraint[]
+  quad_lcon = Float64[]
+  quad_ucon = Float64[]
+
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
     F == VI && continue
-    F <: AF || @warn("Function $F is not supported.")
+    F <: AF || F <: SQF || @warn("Function $F is not supported.")
     S <: LS || @warn("Set $S is not supported.")
 
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
@@ -189,13 +318,21 @@ function parser_MOI(moimodel)
         parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
         nlin += set.dimension
       end
+      if typeof(fun) <: SQF
+        parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
+        nquad += 1
+      end
     end
   end
   coo = COO(linrows, lincols, linvals)
   nnzj = length(linvals)
   lincon = LinearConstraints(coo, nnzj)
 
-  return nlin, lincon, lin_lcon, lin_ucon
+  nnzj, jrows, jcols = jacobian_quad(qcons)
+  nnzh, hrows, hcols = hessian_quad(qcons)
+  quadcon = QuadraticConstraints(qcons, nnzj, jrows, jcols, nnzh, hrows, hcols)
+
+  return nlin, lincon, lin_lcon, lin_ucon, nquad, quadcon, quad_lcon, quad_ucon
 end
 
 """

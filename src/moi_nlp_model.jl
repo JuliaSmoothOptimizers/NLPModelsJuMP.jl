@@ -4,6 +4,9 @@ mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
   meta::NLPModelMeta{Float64, Vector{Float64}}
   eval::Union{MOI.AbstractNLPEvaluator, Nothing}
   lincon::LinearConstraints
+  quadcon::Vector{QuadraticConstraint}
+  nquad::Int
+  nnln::Int
   obj::Objective
   counters::Counters
 end
@@ -33,7 +36,10 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
     (nnln == 0 ? 0 : sum(length(nl_con.hess_I) for nl_con in eval.constraints)) : 0
 
   moimodel = backend(jmodel)
-  nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
+  nlin, lincon, lin_lcon, lin_ucon, nquad, quadcon, quad_lcon, quad_ucon = parser_MOI(moimodel, nvar)
+  
+  
+  quad_nnzh = nquad == 0 ? 0 : sum(length(quadcon[i].vals) for i = 1 : nquad)
 
   if (eval ≠ nothing) && eval.has_nlobj
     obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
@@ -41,11 +47,11 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
     obj = parser_objective_MOI(moimodel, nvar)
   end
 
-  ncon = nlin + nnln
-  lcon = vcat(lin_lcon, nl_lcon)
-  ucon = vcat(lin_ucon, nl_ucon)
-  nnzj = lincon.nnzj + nl_nnzj
-  nnzh = obj.nnzh + nl_nnzh
+  ncon = nlin + nquad + nnln
+  lcon = vcat(lin_lcon, quad_lcon, nl_lcon)
+  ucon = vcat(lin_ucon, quad_ucon, nl_ucon)
+  nnzj = lincon.nnzj + ... + nl_nnzj
+  nnzh = obj.nnzh + quad_nnzh + nl_nnzh
 
   meta = NLPModelMeta(
     nvar,
@@ -62,11 +68,11 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
     lin_nnzj = lincon.nnzj,
     nln_nnzj = nl_nnzj,
     minimize = objective_sense(jmodel) == MOI.MIN_SENSE,
-    islp = (obj.type == "LINEAR") && (nnln == 0),
+    islp = (obj.type == "LINEAR") && (nnln == 0) && (nquad == 0),
     name = name,
   )
 
-  return MathOptNLPModel(meta, eval, lincon, obj, Counters())
+  return MathOptNLPModel(meta, eval, lincon, quadcon, nquad, obj, Counters())
 end
 
 function NLPModels.obj(nlp::MathOptNLPModel, x::AbstractVector)
@@ -115,7 +121,11 @@ end
 
 function NLPModels.cons_nln!(nlp::MathOptNLPModel, x::AbstractVector, c::AbstractVector)
   increment!(nlp, :neval_cons_nln)
-  MOI.eval_constraint(nlp.eval, c, x)
+  for i = 1 : nlp.nquad
+    qcon = nlp.quadcon[i]
+    c[i] = 0.5 * coo_sym_dot(qcon.hessian.rows, qcon.hessian.cols, qcon.hessian.vals, x, x) + dot(qcon.b, x)
+  end
+  MOI.eval_constraint(nlp.eval, view(c, (nlp.nquad + 1):(nlp.meta.nnln)), x)
   return c
 end
 

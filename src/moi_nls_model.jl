@@ -40,7 +40,7 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
     (nnln == 0 ? 0 : sum(length(con.hess_I) for con in ceval.constraints)) : 0
 
   moimodel = backend(cmodel)
-  nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
+  nlin, lincon, lin_lcon, lin_ucon, nquad, quadcon, quad_lcon, quad_ucon = parser_MOI(moimodel, nvar)
 
   nequ = nlinequ + nnlnequ
   Fnnzj = linequ.nnzj + nl_Fnnzj
