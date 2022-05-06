@@ -338,7 +338,7 @@ function parser_MOI(moimodel, nvar)
   nnzh, hrows, hcols = hessian_quad(qcons)
   quadcon = QuadraticConstraints(qcons, nquad, nnzj, jrows, jcols, nnzh, hrows, hcols)
 
-  return nlin, lincon, lin_lcon, lin_ucon, nquad, quadcon, quad_lcon, quad_ucon
+  return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon
 end
 
 """

@@ -34,7 +34,7 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
     (nnln == 0 ? 0 : sum(length(nl_con.hess_I) for nl_con in eval.constraints)) : 0
 
   moimodel = backend(jmodel)
-  nlin, lincon, lin_lcon, lin_ucon, nquad, quadcon, quad_lcon, quad_ucon = parser_MOI(moimodel, nvar)
+  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon = parser_MOI(moimodel, nvar)
 
   if (eval ≠ nothing) && eval.has_nlobj
     obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
@@ -42,7 +42,7 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
     obj = parser_objective_MOI(moimodel, nvar)
   end
 
-  ncon = nlin + nquad + nnln
+  ncon = nlin + quadcon.nquad + nnln
   lcon = vcat(lin_lcon, quad_lcon, nl_lcon)
   ucon = vcat(lin_ucon, quad_ucon, nl_ucon)
   nnzj = lincon.nnzj + quadcon.nnzj + nl_nnzj
@@ -63,7 +63,7 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
     lin_nnzj = lincon.nnzj,
     nln_nnzj = quadcon.nnzj + nl_nnzj,
     minimize = objective_sense(jmodel) == MOI.MIN_SENSE,
-    islp = (obj.type == "LINEAR") && (nnln == 0) && (nquad == 0),
+    islp = (obj.type == "LINEAR") && (nnln == 0) && (quadcon.nquad == 0),
     name = name,
   )
 
