@@ -54,6 +54,7 @@ end
 
 mutable struct QuadraticConstraints
   qcons::Vector{QuadraticConstraint}
+  nquad::Int
   nnzj::Int
   jrows::Vector{Int}
   jcols::Vector{Int}
@@ -61,6 +62,9 @@ mutable struct QuadraticConstraints
   hrows::Vector{Int}
   hcols::Vector{Int}
 end
+
+Base.getindex(qcon::QuadraticConstraints, i::Integer) = qcon.qcons[i]
+Base.length(qcon::QuadraticConstraints) = qcon.nquad
 
 mutable struct LinearEquations
   jacobian::COO
@@ -124,7 +128,7 @@ end
     jacobian_quad(qcons)
 
 `qcons` is a vector of `QuadraticConstraint` where each constraint has the form ½xᵀQᵢx + xᵀbᵢ.
-Compute the sparcity pattern of the jacobian [Q₁x + b₁; ...; Qₚx + bₚ]ᵀ of `qcons`.
+Compute the sparsity pattern of the jacobian [Q₁x + b₁; ...; Qₚx + bₚ]ᵀ of `qcons`.
 """
 function jacobian_quad(qcons)
   jrows = Int[]
@@ -132,10 +136,10 @@ function jacobian_quad(qcons)
   nquad = length(qcons)
   for i = 1 : nquad
     # rows of Qᵢx + bᵢ with nonzeros coefficients
-    vec = unique(con.hessian.rows ∪ con.b.nzind)
+    vec = unique(qcons[i].hessian.rows ∪ qcons[i].b.nzind)
     for elt ∈ vec
-      push!(elt, jcols)
-      push!(i, jrows)
+      push!(jcols, elt)
+      push!(jrows, i)
     end
   end
   nnzj = length(jrows)
@@ -146,14 +150,16 @@ end
     hessian_quad(qcons)
 
 `qcons` is a vector of `QuadraticConstraint` where each constraint has the form ½xᵀQᵢx + xᵀbᵢ.
-Compute the sparcity pattern of the hessian ΣᵢQᵢ of `qcons`.
+Compute the sparsity pattern of the hessian ΣᵢQᵢ of `qcons`.
 """
 function hessian_quad(qcons)
   set = Set{Tuple{Int,Int}}()
-  for con ∈ qcons
-    for tuple ∈ zip(con.rows, con.vals)
+  nquad = length(qcons)
+  for i = 1 : nquad
+    con = qcons[i]
+    for tuple ∈ zip(con.hessian.rows, con.hessian.cols)
       # Only disctinct tuples are stored in the set
-      push!(tuple, set)
+      push!(set, tuple)
     end
   end
   nnzh = length(set)
@@ -275,7 +281,7 @@ function parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
   end
 
   nnzh = length(vals)
-  qcon = QuadraticConstraint(COO[rows, cols, vals], b)
+  qcon = QuadraticConstraint(COO(rows, cols, vals), b)
   push!(qcons, qcon)
 end
 
@@ -330,7 +336,7 @@ function parser_MOI(moimodel, nvar)
 
   nnzj, jrows, jcols = jacobian_quad(qcons)
   nnzh, hrows, hcols = hessian_quad(qcons)
-  quadcon = QuadraticConstraints(qcons, nnzj, jrows, jcols, nnzh, hrows, hcols)
+  quadcon = QuadraticConstraints(qcons, nquad, nnzj, jrows, jcols, nnzh, hrows, hcols)
 
   return nlin, lincon, lin_lcon, lin_ucon, nquad, quadcon, quad_lcon, quad_ucon
 end
