@@ -49,6 +49,7 @@ end
 
 mutable struct QuadraticConstraint
   hessian::COO
+  vec::Vector{Int}
   b::SparseVector{Float64}
 end
 
@@ -129,6 +130,7 @@ end
 
 `qcons` is a vector of `QuadraticConstraint` where each constraint has the form ½xᵀQᵢx + xᵀbᵢ.
 Compute the sparsity pattern of the jacobian [Q₁x + b₁; ...; Qₚx + bₚ]ᵀ of `qcons`.
+This function also allocates `qcons[i].vec`.
 """
 function jacobian_quad(qcons)
   jrows = Int[]
@@ -136,8 +138,8 @@ function jacobian_quad(qcons)
   nquad = length(qcons)
   for i = 1 : nquad
     # rows of Qᵢx + bᵢ with nonzeros coefficients
-    vec = unique(qcons[i].hessian.rows ∪ qcons[i].b.nzind)
-    for elt ∈ vec
+    qcons[i].vec = unique(qcons[i].hessian.rows ∪ qcons[i].b.nzind)
+    for elt ∈ qcons[i].vec
       push!(jcols, elt)
       push!(jrows, i)
     end
@@ -281,7 +283,7 @@ function parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
   end
 
   nnzh = length(vals)
-  qcon = QuadraticConstraint(COO(rows, cols, vals), b)
+  qcon = QuadraticConstraint(COO(rows, cols, vals), Int[], b)
   push!(qcons, qcon)
 end
 

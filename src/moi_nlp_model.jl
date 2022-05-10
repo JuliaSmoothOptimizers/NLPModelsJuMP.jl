@@ -164,7 +164,7 @@ function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals:
   for i = 1:(nlp.quadcon.nquad)
     # rows of Qᵢx + bᵢ with nonzeros coefficients
     qcon = nlp.quadcon[i]
-    vec = unique(qcon.hessian.rows ∪ qcon.b.nzind) # Can we improve here? Or store this information?
+    vec = nlp.quadcon[i].vec # unique(qcon.hessian.rows ∪ qcon.b.nzind) # Can we improve here? Or store this information?
     nnzj = length(vec)
     res = similar(x) # Avoid extra allocation
     coo_sym_prod!(qcon.hessian.rows, qcon.hessian.cols, qcon.hessian.vals, x, res)
