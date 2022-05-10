@@ -60,8 +60,7 @@ mutable struct QuadraticConstraints
   jrows::Vector{Int}
   jcols::Vector{Int}
   nnzh::Int
-  hrows::Vector{Int}
-  hcols::Vector{Int}
+  set::Set{Tuple{Int,Int}}
 end
 
 Base.getindex(qcon::QuadraticConstraints, i::Integer) = qcon.qcons[i]
@@ -164,6 +163,10 @@ function hessian_quad(qcons)
       push!(set, tuple)
     end
   end
+  return set
+end
+
+function hessian_structure(set)
   nnzh = length(set)
   hrows = zeros(Int, nnzh)
   hcols = zeros(Int, nnzh)
@@ -171,7 +174,7 @@ function hessian_quad(qcons)
     hrows[index] = tuple[1]
     hcols[index] = tuple[2]
   end
-  return nnzh, hrows, hcols
+  return hrows, hcols
 end
 
 """
@@ -337,8 +340,9 @@ function parser_MOI(moimodel, nvar)
   lincon = LinearConstraints(coo, nnzj)
 
   nnzj, jrows, jcols = jacobian_quad(qcons)
-  nnzh, hrows, hcols = hessian_quad(qcons)
-  quadcon = QuadraticConstraints(qcons, nquad, nnzj, jrows, jcols, nnzh, hrows, hcols)
+  set = hessian_quad(qcons)
+  nnzh = length(set)
+  quadcon = QuadraticConstraints(qcons, nquad, nnzj, jrows, jcols, nnzh, set)
 
   return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon
 end

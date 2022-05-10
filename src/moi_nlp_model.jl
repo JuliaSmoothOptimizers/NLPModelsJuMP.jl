@@ -157,18 +157,20 @@ function NLPModels.jac_lin_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals:
   return vals
 end
 
-function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::AbstractVector)
+function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::AbstractVector{T}) where {T}
   increment!(nlp, :neval_jac_nln)
   quad_nnzj = nlp.quadcon.nnzj
   k = 0
   for i = 1:(nlp.quadcon.nquad)
-    # rows of Qᵢx + bᵢ with nonzeros coefficients
     qcon = nlp.quadcon[i]
-    vec = nlp.quadcon[i].vec # unique(qcon.hessian.rows ∪ qcon.b.nzind) # Can we improve here? Or store this information?
-    nnzj = length(vec)
-    res = similar(x) # Avoid extra allocation
-    coo_sym_prod!(qcon.hessian.rows, qcon.hessian.cols, qcon.hessian.vals, x, res)
-    vals[(k + 1):(k + nnzj)] .= res[vec] .+ qcon.b[vec]
+    vec = qcon.vec
+    for j=1:length(vec)
+      vals[k + j] = qcon.b[j]
+    end
+    nnzj = length(qcon.hessian.vals)
+    for i=1:nnzj
+      vals[k + qcon.hessian.rows[i]] += qcon.hessian.vals[i] * x[qcon.hessian.cols[i]]
+    end
     k += nnzj
   end
   MOI.eval_constraint_jacobian(nlp.eval, view(vals, (quad_nnzj + 1):(nlp.meta.nln_nnzj)), x)
@@ -327,8 +329,9 @@ function NLPModels.hess_structure!(
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
     quad_nnzh = nlp.quadcon.nnzh
-    rows[(1 + nlp.obj.nnzh):(nlp.obj.nnzh + quad_nnzh)] .= nlp.quadcon.hrows
-    cols[(1 + nlp.obj.nnzh):(nlp.obj.nnzh + quad_nnzh)] .= nlp.quadcon.hcols
+    hrows, hcols = hessian_structure(nlp.quadcon.set)
+    rows[(1 + nlp.obj.nnzh):(nlp.obj.nnzh + quad_nnzh)] .= hrows
+    cols[(1 + nlp.obj.nnzh):(nlp.obj.nnzh + quad_nnzh)] .= hcols
     hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
     for index = (nlp.obj.nnzh + quad_nnzh + 1):(nlp.meta.nnzh)
       shift_index = index - nlp.obj.nnzh - quad_nnzh
@@ -406,9 +409,10 @@ function NLPModels.hprod!(
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
     for i = 1:(nlp.quadcon.nquad)
       qcon = nlp.quadcon[i]
-      res = similar(x) # Avoid extra allocation
-      coo_sym_prod!(qcon.hessian.rows, qcon.hessian.cols, qcon.hessian.vals, v, res)
-      hv .+= res .* y[nlp.meta.nlin + i]
+      for (index,tuple) in enumerate(nlp.quadcon.set)
+        hv[tuple[1]] += qcon.hessian.vals[index] * v[tuple[2]]
+      end
+      hv .*= y[nlp.meta.nlin + i]
     end
     ind_nln = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon)
     MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, view(y, ind_nln))
