@@ -120,7 +120,9 @@ function NLPModels.cons_nln!(nlp::MathOptNLPModel, x::AbstractVector, c::Abstrac
     qcon = nlp.quadcon[i]
     c[i] = 0.5 * coo_sym_dot(qcon.hessian.rows, qcon.hessian.cols, qcon.hessian.vals, x, x) + dot(qcon.b, x)
   end
-  MOI.eval_constraint(nlp.eval, view(c, (nlp.quadcon.nquad + 1):(nlp.meta.nnln)), x)
+  if nlp.meta.nnln > nlp.quadcon.nquad
+    MOI.eval_constraint(nlp.eval, view(c, (nlp.quadcon.nquad + 1):(nlp.meta.nnln)), x)
+  end
   return c
 end
 
@@ -142,11 +144,13 @@ function NLPModels.jac_nln_structure!(
   quad_nnzj, jrows, jcols = nlp.quadcon.nnzj, nlp.quadcon.jrows, nlp.quadcon.jcols
   rows[1:quad_nnzj] .= jrows
   cols[1:quad_nnzj] .= jcols
-  jac_struct = MOI.jacobian_structure(nlp.eval)
-  for index =  1:(nlp.meta.nln_nnzj - quad_nnzj)
-    row, col = jac_struct[index]
-    rows[quad_nnzj + index] = row + nlp.quadcon.nquad
-    cols[quad_nnzj + index] = col
+  if nlp.meta.nnln > nlp.quadcon.nquad
+    jac_struct = MOI.jacobian_structure(nlp.eval)
+    for index =  1:(nlp.meta.nln_nnzj - quad_nnzj)
+      row, col = jac_struct[index]
+      rows[quad_nnzj + index] = row + nlp.quadcon.nquad
+      cols[quad_nnzj + index] = col
+    end
   end
   return rows, cols
 end
@@ -173,7 +177,9 @@ function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals:
     end
     k += nnzj
   end
-  MOI.eval_constraint_jacobian(nlp.eval, view(vals, (quad_nnzj + 1):(nlp.meta.nln_nnzj)), x)
+  if nlp.meta.nnln > nlp.quadcon.nquad
+    MOI.eval_constraint_jacobian(nlp.eval, view(vals, (quad_nnzj + 1):(nlp.meta.nln_nnzj)), x)
+  end
   return vals
 end
 
