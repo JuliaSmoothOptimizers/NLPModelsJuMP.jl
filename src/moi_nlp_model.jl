@@ -143,10 +143,10 @@ function NLPModels.jac_nln_structure!(
   rows[1:quad_nnzj] .= jrows
   cols[1:quad_nnzj] .= jcols
   jac_struct = MOI.jacobian_structure(nlp.eval)
-  for index = (quad_nnzj + 1):(nlp.meta.nln_nnzj)
+  for index =  1:(nlp.meta.nln_nnzj - quad_nnzj)
     row, col = jac_struct[index]
-    rows[index] = row + nlp.quadcon.nquad
-    cols[index] = col
+    rows[quad_nnzj + index] = row + nlp.quadcon.nquad
+    cols[quad_nnzj + index] = col
   end
   return rows, cols
 end
@@ -157,19 +157,19 @@ function NLPModels.jac_lin_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals:
   return vals
 end
 
-function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::AbstractVector{T}) where {T}
+function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::AbstractVector)
   increment!(nlp, :neval_jac_nln)
   quad_nnzj = nlp.quadcon.nnzj
+  vals .= 0.0
   k = 0
   for i = 1:(nlp.quadcon.nquad)
     qcon = nlp.quadcon[i]
-    vec = qcon.vec
-    for j=1:length(vec)
-      vals[k + j] = qcon.b[j]
+    for j=1:length(qcon.vec)
+      vals[k + j] = qcon.b[qcon.vec[j]]
     end
     nnzj = length(qcon.hessian.vals)
     for i=1:nnzj
-      vals[k + qcon.hessian.rows[i]] += qcon.hessian.vals[i] * x[qcon.hessian.cols[i]]
+      vals[k + i] += qcon.hessian.vals[i] * x[qcon.hessian.cols[i]]
     end
     k += nnzj
   end
@@ -388,6 +388,7 @@ function NLPModels.hess_coord!(
     vals[(nlp.obj.nnzh + 1):(nlp.meta.nnzh)] .= 0.0
   end
   if nlp.obj.type == "NONLINEAR"
+    vals .= 0.0
     MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, zeros(nlp.meta.nnln))
   end
 
@@ -407,6 +408,8 @@ function NLPModels.hprod!(
     hv .= 0.0
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
+    ind_nln = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon)
+    MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, view(y, ind_nln))
     for i = 1:(nlp.quadcon.nquad)
       qcon = nlp.quadcon[i]
       for (index,tuple) in enumerate(nlp.quadcon.set)
@@ -414,8 +417,6 @@ function NLPModels.hprod!(
       end
       hv .*= y[nlp.meta.nlin + i]
     end
-    ind_nln = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon)
-    MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, view(y, ind_nln))
   end
   if nlp.obj.type == "QUADRATIC"
     nlp.meta.nnln == 0 && (hv .= 0.0)
