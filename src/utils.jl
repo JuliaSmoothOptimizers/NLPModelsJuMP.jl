@@ -166,17 +166,6 @@ function hessian_quad(qcons)
   return set
 end
 
-function hessian_structure(set)
-  nnzh = length(set)
-  hrows = zeros(Int, nnzh)
-  hcols = zeros(Int, nnzh)
-  for (index,tuple) in enumerate(set)
-    hrows[index] = tuple[1]
-    hcols[index] = tuple[2]
-  end
-  return hrows, hcols
-end
-
 """
     parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
 
