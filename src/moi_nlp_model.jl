@@ -334,10 +334,10 @@ function NLPModels.hess_structure!(
     end
   end
   if nlp.quadcon.nquad > 0
-    quad_nnzh = nlp.quadcon.nnzh
-    hrows, hcols = hessian_structure(nlp.quadcon.set)
-    rows[(1 + nlp.obj.nnzh):(nlp.obj.nnzh + quad_nnzh)] .= hrows
-    cols[(1 + nlp.obj.nnzh):(nlp.obj.nnzh + quad_nnzh)] .= hcols
+    for (index, tuple) in enumerate(nlp.quadcon.set)
+      rows[nlp.obj.nnzh + index] = tuple[1]
+      cols[nlp.obj.nnzh + index] = tuple[2]
+    end
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
       hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
