@@ -418,10 +418,10 @@ function NLPModels.hprod!(
     MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, view(y, ind_nln))
     for i = 1:(nlp.quadcon.nquad)
       qcon = nlp.quadcon[i]
-      for (index,tuple) in enumerate(nlp.quadcon.set)
-        hv[tuple[1]] += qcon.hessian.vals[index] * v[tuple[2]]
+      for k = 1:length(qcon.hessian.vals)
+        hv[qcon.hessian.rows[k]] += qcon.hessian.vals[k] * v[qcon.hessian.cols[k]
       end
-      hv .*= y[nlp.meta.nlin + i]
+      hv[i] *= obj_weight * y[nlp.meta.nlin + i]
     end
   end
   if nlp.obj.type == "QUADRATIC"
