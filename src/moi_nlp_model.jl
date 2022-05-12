@@ -333,16 +333,19 @@ function NLPModels.hess_structure!(
       cols[index] = nlp.obj.hessian.cols[index]
     end
   end
-  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
+  if nlp.quadcon.nquad > 0
     quad_nnzh = nlp.quadcon.nnzh
     hrows, hcols = hessian_structure(nlp.quadcon.set)
     rows[(1 + nlp.obj.nnzh):(nlp.obj.nnzh + quad_nnzh)] .= hrows
     cols[(1 + nlp.obj.nnzh):(nlp.obj.nnzh + quad_nnzh)] .= hcols
-    hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
-    for index = (nlp.obj.nnzh + quad_nnzh + 1):(nlp.meta.nnzh)
-      shift_index = index - nlp.obj.nnzh - quad_nnzh
-      rows[index] = hesslag_struct[shift_index][1]
-      cols[index] = hesslag_struct[shift_index][2]
+  end
+  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
+      hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
+      for index = (nlp.obj.nnzh + quad_nnzh + 1):(nlp.meta.nnzh)
+        shift_index = index - nlp.obj.nnzh - quad_nnzh
+        rows[index] = hesslag_struct[shift_index][1]
+        cols[index] = hesslag_struct[shift_index][2]
+      end
     end
   end
   return rows, cols
@@ -359,7 +362,7 @@ function NLPModels.hess_coord!(
   if nlp.obj.type == "QUADRATIC"
     vals[1:(nlp.obj.nnzh)] .= obj_weight .* nlp.obj.hessian.vals
   end
-  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
+  if nlp.quadcon.nquad > 0
     quad_nnzh = nlp.quadcon.nnzh
     k = 0
     for i = 1:(nlp.quadcon.nquad)
@@ -368,12 +371,14 @@ function NLPModels.hess_coord!(
       vals[(k + 1):(k + nnzh)] .= qcon.hessian.vals .* y[nlp.meta.nlin + i]
       k += nnzh
     end
+  end
+  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
     MOI.eval_hessian_lagrangian(
       nlp.eval,
       view(vals, (nlp.obj.nnzh + quad_nnzh + 1):(nlp.meta.nnzh)),
       x,
       obj_weight,
-      view(y, (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon)),
+      view(y, (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon))
     )
   end
   return vals
@@ -413,16 +418,17 @@ function NLPModels.hprod!(
   if (nlp.obj.type == "LINEAR") && (nlp.meta.nnln == 0)
     hv .= 0.0
   end
-  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
+  if nlp.quadcon.nquad > 0
+    for i = 1:(nlp.quadcon.nquad)
+    qcon = nlp.quadcon[i]
+    for k = 1:length(qcon.hessian.vals)
+      hv[qcon.hessian.rows[k]] += qcon.hessian.vals[k] * v[qcon.hessian.cols[k]]
+    end
+    hv[i] *= obj_weight * y[nlp.meta.nlin + i]
+  end
+  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
     ind_nln = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon)
     MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, view(y, ind_nln))
-    for i = 1:(nlp.quadcon.nquad)
-      qcon = nlp.quadcon[i]
-      for k = 1:length(qcon.hessian.vals)
-        hv[qcon.hessian.rows[k]] += qcon.hessian.vals[k] * v[qcon.hessian.cols[k]
-      end
-      hv[i] *= obj_weight * y[nlp.meta.nlin + i]
-    end
   end
   if nlp.obj.type == "QUADRATIC"
     nlp.meta.nnln == 0 && (hv .= 0.0)
