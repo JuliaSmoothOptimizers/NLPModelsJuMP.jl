@@ -163,7 +163,6 @@ end
 
 function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::AbstractVector)
   increment!(nlp, :neval_jac_nln)
-  quad_nnzj = nlp.quadcon.nnzj
   vals .= 0.0
   k = 0
   for i = 1:(nlp.quadcon.nquad)
@@ -178,7 +177,7 @@ function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals:
     k += nnzj
   end
   if nlp.meta.nnln > nlp.quadcon.nquad
-    MOI.eval_constraint_jacobian(nlp.eval, view(vals, (quad_nnzj + 1):(nlp.meta.nln_nnzj)), x)
+    MOI.eval_constraint_jacobian(nlp.eval, view(vals, (nlp.quadcon.nnzj + 1):(nlp.meta.nln_nnzj)), x)
   end
   return vals
 end
@@ -340,12 +339,11 @@ function NLPModels.hess_structure!(
     end
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
-      hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
-      for index = (nlp.obj.nnzh + quad_nnzh + 1):(nlp.meta.nnzh)
-        shift_index = index - nlp.obj.nnzh - quad_nnzh
-        rows[index] = hesslag_struct[shift_index][1]
-        cols[index] = hesslag_struct[shift_index][2]
-      end
+    hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
+    for index = (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.meta.nnzh)
+      shift_index = index - nlp.obj.nnzh - nlp.quadcon.nnzh
+      rows[index] = hesslag_struct[shift_index][1]
+      cols[index] = hesslag_struct[shift_index][2]
     end
   end
   return rows, cols
@@ -375,7 +373,7 @@ function NLPModels.hess_coord!(
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
     MOI.eval_hessian_lagrangian(
       nlp.eval,
-      view(vals, (nlp.obj.nnzh + quad_nnzh + 1):(nlp.meta.nnzh)),
+      view(vals, (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.meta.nnzh)),
       x,
       obj_weight,
       view(y, (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon))
@@ -420,11 +418,12 @@ function NLPModels.hprod!(
   end
   if nlp.quadcon.nquad > 0
     for i = 1:(nlp.quadcon.nquad)
-    qcon = nlp.quadcon[i]
-    for k = 1:length(qcon.hessian.vals)
-      hv[qcon.hessian.rows[k]] += qcon.hessian.vals[k] * v[qcon.hessian.cols[k]]
+      qcon = nlp.quadcon[i]
+      for k = 1:length(qcon.hessian.vals)
+        hv[qcon.hessian.rows[k]] += qcon.hessian.vals[k] * v[qcon.hessian.cols[k]]
+      end
+      hv[i] *= y[nlp.meta.nlin + i]
     end
-    hv[i] *= obj_weight * y[nlp.meta.nlin + i]
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
     ind_nln = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon)
