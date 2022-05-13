@@ -286,13 +286,7 @@ end
 
 function NLPModels.cons_lin!(nls::MathOptNLSModel, x::AbstractVector, c::AbstractVector)
   increment!(nls, :neval_cons_lin)
-  coo_prod!(
-    nls.lincon.jacobian.rows,
-    nls.lincon.jacobian.cols,
-    nls.lincon.jacobian.vals,
-    x,
-    c,
-  )
+  coo_prod!(nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, x, c)
   return c
 end
 
