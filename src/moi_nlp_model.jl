@@ -4,6 +4,7 @@ mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
   meta::NLPModelMeta{Float64, Vector{Float64}}
   eval::Union{MOI.AbstractNLPEvaluator, Nothing}
   lincon::LinearConstraints
+  quadcon::QuadraticConstraints
   obj::Objective
   counters::Counters
 end
@@ -33,7 +34,7 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
     (nnln == 0 ? 0 : sum(length(nl_con.hess_I) for nl_con in eval.constraints)) : 0
 
   moimodel = backend(jmodel)
-  nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
+  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon = parser_MOI(moimodel, nvar)
 
   if (eval ≠ nothing) && eval.has_nlobj
     obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
@@ -41,11 +42,11 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
     obj = parser_objective_MOI(moimodel, nvar)
   end
 
-  ncon = nlin + nnln
-  lcon = vcat(lin_lcon, nl_lcon)
-  ucon = vcat(lin_ucon, nl_ucon)
-  nnzj = lincon.nnzj + nl_nnzj
-  nnzh = obj.nnzh + nl_nnzh
+  ncon = nlin + quadcon.nquad + nnln
+  lcon = vcat(lin_lcon, quad_lcon, nl_lcon)
+  ucon = vcat(lin_ucon, quad_ucon, nl_ucon)
+  nnzj = lincon.nnzj + quadcon.nnzj + nl_nnzj
+  nnzh = obj.nnzh + quadcon.nnzh + nl_nnzh
 
   meta = NLPModelMeta(
     nvar,
@@ -60,13 +61,13 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
     nnzh = nnzh,
     lin = collect(1:nlin),
     lin_nnzj = lincon.nnzj,
-    nln_nnzj = nl_nnzj,
+    nln_nnzj = quadcon.nnzj + nl_nnzj,
     minimize = objective_sense(jmodel) == MOI.MIN_SENSE,
-    islp = (obj.type == "LINEAR") && (nnln == 0),
+    islp = (obj.type == "LINEAR") && (nnln == 0) && (quadcon.nquad == 0),
     name = name,
   )
 
-  return MathOptNLPModel(meta, eval, lincon, obj, Counters())
+  return MathOptNLPModel(meta, eval, lincon, quadcon, obj, Counters())
 end
 
 function NLPModels.obj(nlp::MathOptNLPModel, x::AbstractVector)
@@ -109,7 +110,13 @@ end
 
 function NLPModels.cons_nln!(nlp::MathOptNLPModel, x::AbstractVector, c::AbstractVector)
   increment!(nlp, :neval_cons_nln)
-  MOI.eval_constraint(nlp.eval, c, x)
+  for i = 1:(nlp.quadcon.nquad)
+    qcon = nlp.quadcon[i]
+    c[i] = 0.5 * coo_sym_dot(qcon.hessian.rows, qcon.hessian.cols, qcon.hessian.vals, x, x) + dot(qcon.b, x)
+  end
+  if nlp.meta.nnln > nlp.quadcon.nquad
+    MOI.eval_constraint(nlp.eval, view(c, (nlp.quadcon.nquad + 1):(nlp.meta.nnln)), x)
+  end
   return c
 end
 
@@ -128,11 +135,16 @@ function NLPModels.jac_nln_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
-  jac_struct = MOI.jacobian_structure(nlp.eval)
-  for index = 1:(nlp.meta.nln_nnzj)
-    row, col = jac_struct[index]
-    rows[index] = row
-    cols[index] = col
+  quad_nnzj, jrows, jcols = nlp.quadcon.nnzj, nlp.quadcon.jrows, nlp.quadcon.jcols
+  rows[1:quad_nnzj] .= jrows
+  cols[1:quad_nnzj] .= jcols
+  if nlp.meta.nnln > nlp.quadcon.nquad
+    jac_struct = MOI.jacobian_structure(nlp.eval)
+    for index =  1:(nlp.meta.nln_nnzj - quad_nnzj)
+      row, col = jac_struct[index]
+      rows[quad_nnzj + index] = row + nlp.quadcon.nquad
+      cols[quad_nnzj + index] = col
+    end
   end
   return rows, cols
 end
@@ -145,7 +157,22 @@ end
 
 function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::AbstractVector)
   increment!(nlp, :neval_jac_nln)
-  MOI.eval_constraint_jacobian(nlp.eval, vals, x)
+  vals .= 0.0
+  k = 0
+  for i = 1:(nlp.quadcon.nquad)
+    qcon = nlp.quadcon[i]
+    for j=1:length(qcon.vec)
+      vals[k + j] = qcon.b[qcon.vec[j]]
+    end
+    nnzj = length(qcon.hessian.vals)
+    for i=1:nnzj
+      vals[k + i] += qcon.hessian.vals[i] * x[qcon.hessian.cols[i]]
+    end
+    k += nnzj
+  end
+  if nlp.meta.nnln > nlp.quadcon.nquad
+    MOI.eval_constraint_jacobian(nlp.eval, view(vals, (nlp.quadcon.nnzj + 1):(nlp.meta.nln_nnzj)), x)
+  end
   return vals
 end
 
@@ -299,10 +326,16 @@ function NLPModels.hess_structure!(
       cols[index] = nlp.obj.hessian.cols[index]
     end
   end
-  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
+  if nlp.quadcon.nquad > 0
+    for (index, tuple) in enumerate(nlp.quadcon.set)
+      rows[nlp.obj.nnzh + index] = tuple[1]
+      cols[nlp.obj.nnzh + index] = tuple[2]
+    end
+  end
+  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
     hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
-    for index = (nlp.obj.nnzh + 1):(nlp.meta.nnzh)
-      shift_index = index - nlp.obj.nnzh
+    for index = (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.meta.nnzh)
+      shift_index = index - nlp.obj.nnzh - nlp.quadcon.nnzh
       rows[index] = hesslag_struct[shift_index][1]
       cols[index] = hesslag_struct[shift_index][2]
     end
@@ -321,13 +354,23 @@ function NLPModels.hess_coord!(
   if nlp.obj.type == "QUADRATIC"
     vals[1:(nlp.obj.nnzh)] .= obj_weight .* nlp.obj.hessian.vals
   end
-  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
+  if nlp.quadcon.nquad > 0
+    quad_nnzh = nlp.quadcon.nnzh
+    k = 0
+    for i = 1:(nlp.quadcon.nquad)
+      qcon = nlp.quadcon[i]
+      nnzh = length(qcon.hessian.vals)
+      vals[(k + 1):(k + nnzh)] .= qcon.hessian.vals .* y[nlp.meta.nlin + i]
+      k += nnzh
+    end
+  end
+  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
     MOI.eval_hessian_lagrangian(
       nlp.eval,
-      view(vals, (nlp.obj.nnzh + 1):(nlp.meta.nnzh)),
+      view(vals, (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.meta.nnzh)),
       x,
       obj_weight,
-      view(y, nlp.meta.nln),
+      view(y, (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon))
     )
   end
   return vals
@@ -348,6 +391,7 @@ function NLPModels.hess_coord!(
     vals[(nlp.obj.nnzh + 1):(nlp.meta.nnzh)] .= 0.0
   end
   if nlp.obj.type == "NONLINEAR"
+    vals .= 0.0
     MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, zeros(nlp.meta.nnln))
   end
 
@@ -366,8 +410,18 @@ function NLPModels.hprod!(
   if (nlp.obj.type == "LINEAR") && (nlp.meta.nnln == 0)
     hv .= 0.0
   end
-  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
-    MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, view(y, nlp.meta.nln))
+  if nlp.quadcon.nquad > 0
+    for i = 1:(nlp.quadcon.nquad)
+      qcon = nlp.quadcon[i]
+      for k = 1:length(qcon.hessian.vals)
+        hv[qcon.hessian.rows[k]] += qcon.hessian.vals[k] * v[qcon.hessian.cols[k]]
+      end
+      hv[i] *= y[nlp.meta.nlin + i]
+    end
+  end
+  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
+    ind_nln = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon)
+    MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, view(y, ind_nln))
   end
   if nlp.obj.type == "QUADRATIC"
     nlp.meta.nnln == 0 && (hv .= 0.0)
@@ -398,7 +452,8 @@ function NLPModels.hprod!(
     hv .*= obj_weight
   end
   if nlp.obj.type == "NONLINEAR"
-    MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, zeros(nlp.meta.nnln))
+    nnln = nlp.meta.nnln - nlp.quadcon.nquad
+    MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, zeros(nnln))
   end
   return hv
 end
