@@ -5,6 +5,10 @@ mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
   eval::Union{MOI.AbstractNLPEvaluator, Nothing}
   lincon::LinearConstraints
   obj::Objective
+  jac_nln_rows::Vector{Int}
+  jac_nln_cols::Vector{Int}
+  hess_nln_rows::Vector{Int}
+  hess_nln_cols::Vector{Int}
   counters::Counters
 end
 
@@ -18,29 +22,49 @@ Construct a `MathOptNLPModel` from a `JuMP` model.
 function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String = "Generic")
   nvar, lvar, uvar, x0 = parser_JuMP(jmodel)
 
+  eval = NLPEvaluator(jmodel)
   nnln = num_nonlinear_constraints(jmodel)
 
-  nl_lcon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.lb, jmodel.nlp_data.nlconstr)
-  nl_ucon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.ub, jmodel.nlp_data.nlconstr)
+  nl_lcon = fill(-Inf, nnln)
+  nl_ucon = fill(Inf, nnln)
+  for (i, (_, constraint)) in enumerate(eval.model.constraints)
+    rhs = constraint.set
+    if rhs isa MOI.EqualTo
+      nl_lcon[i] = rhs.value
+      nl_ucon[i] = rhs.value
+    elseif rhs isa MOI.GreaterThan
+      nl_lcon[i] = rhs.lower
+    elseif rhs isa MOI.LessThan
+      nl_ucon[i] = rhs.upper
+    elseif rhs isa MOI.Interval
+      nl_lcon[i] = rhs.lower
+      nl_ucon[i] = rhs.upper
+    else
+      error("Unexpected constraint type: $(typeof(rhs))")
+    end
+  end
 
   eval = jmodel.nlp_data == nothing ? nothing : NLPEvaluator(jmodel)
   (eval ≠ nothing) &&
     MOI.initialize(eval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec])
 
-  nl_nnzj = nnln == 0 ? 0 : sum(length(nl_con.grad_sparsity) for nl_con in eval.constraints)
-  nl_nnzh =
-    hessian ?
-    (((eval ≠ nothing) && eval.has_nlobj) ? length(eval.objective.hess_I) : 0) +
-    (nnln == 0 ? 0 : sum(length(nl_con.hess_I) for nl_con in eval.constraints)) : 0
+  jac = MOI.jacobian_structure(eval)
+  jac_rows, jac_cols = getindex.(jac, 1), getindex.(jac, 2)
+  nl_nnzj = length(jac)
+
+  hess = hessian ? MOI.hessian_lagrangian_structure(eval) : Tuple{Int, Int}[]
+  hess_rows = hessian ? getindex.(hess, 1) : Int[]
+  hess_cols = hessian ? getindex.(hess, 2) : Int[]
+  nl_nnzh = length(hess)
 
   moimodel = backend(jmodel)
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
 
-  if (eval ≠ nothing) && eval.has_nlobj
-    obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
-  else
-    obj = parser_objective_MOI(moimodel, nvar)
-  end
+  # if (eval.model.objective !== nothing) && eval.has_nlobj
+    # obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
+  # else
+  obj = parser_objective_MOI(moimodel, nvar)
+  # end
 
   ncon = nlin + nnln
   lcon = vcat(lin_lcon, nl_lcon)
@@ -67,7 +91,7 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
     name = name,
   )
 
-  return MathOptNLPModel(meta, eval, lincon, obj, Counters())
+  return MathOptNLPModel(meta, eval, lincon, obj, jac_rows, jac_cols, hess_rows, hess_cols, Counters())
 end
 
 function NLPModels.obj(nlp::MathOptNLPModel, x::AbstractVector)
