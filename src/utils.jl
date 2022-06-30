@@ -391,7 +391,7 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
       @NLobjective(cmodel, Min, 0.5 * sum(Fi^2 for Fi in F if typeof(Fi) == NonlinearExpression))
     end
   end
-  ceval = cmodel.nlp_data == nothing ? nothing : NLPEvaluator(cmodel)
+  ceval = NLPEvaluator(cmodel)
   (ceval ≠ nothing) &&
     (nnlnequ == 0) &&
     MOI.initialize(
@@ -413,32 +413,33 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
     @variable(Fmodel, x[1:nvar])
     JuMP._init_NLP(Fmodel)
     @objective(Fmodel, Min, 0.0)
-    Fmodel.nlp_data.user_operators = cmodel.nlp_data.user_operators
-    if F_is_array_of_containers
-      for FF in F, Fi in FF
-        if typeof(Fi) == NonlinearExpression
-          expr = ceval.subexpressions_as_julia_expressions[Fi.index]
-          replace!(expr, x)
-          expr = :($expr == 0)
-          JuMP.add_nonlinear_constraint(Fmodel, expr)
-        end
-      end
-    else
-      for Fi in F
-        if typeof(Fi) == NonlinearExpression
-          expr = ceval.subexpressions_as_julia_expressions[Fi.index]
-          replace!(expr, x)
-          expr = :($expr == 0)
-          JuMP.add_nonlinear_constraint(Fmodel, expr)
-        end
-      end
-    end
+    # Fmodel.nlp_data.user_operators = cmodel.nlp_data.user_operators
+    # if F_is_array_of_containers
+    #   for FF in F, Fi in FF
+    #     if typeof(Fi) == NonlinearExpression
+    #       expr = ceval.subexpressions_as_julia_expressions[Fi.index]
+    #       replace!(expr, x)
+    #       expr = :($expr == 0)
+    #       JuMP.add_nonlinear_constraint(Fmodel, expr)
+    #     end
+    #   end
+    # else
+    #   for Fi in F
+    #     if typeof(Fi) == NonlinearExpression
+    #       expr = ceval.subexpressions_as_julia_expressions[Fi.index]
+    #       replace!(expr, x)
+    #       expr = :($expr == 0)
+    #       JuMP.add_nonlinear_constraint(Fmodel, expr)
+    #     end
+    #   end
+    # end
+    Fmodel.nlp_model.operators = cmodel.nlp_model.operators
     Feval = NLPEvaluator(Fmodel)
     MOI.initialize(
       Feval,
       hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec],
     )
-    Feval.user_output_buffer = ceval.user_output_buffer
+    # Feval.user_output_buffer = ceval.user_output_buffer
   end
   return ceval, Feval, nnlnequ
 end

@@ -22,22 +22,46 @@ Construct a `MathOptNLSModel` from a `JuMP` model and a container of JuMP
 function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::String = "Generic")
   nvar, lvar, uvar, x0 = parser_JuMP(cmodel)
 
-  nnln = num_nonlinear_constraints(cmodel)
-
-  nl_lcon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.lb, cmodel.nlp_data.nlconstr)
-  nl_ucon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.ub, cmodel.nlp_data.nlconstr)
-
   lls, linequ, nlinequ = parser_linear_expression(cmodel, nvar, F)
   ceval, Feval, nnlnequ = parser_nonlinear_expression(cmodel, nvar, F, hessian = hessian)
+  nnln = num_nonlinear_constraints(cmodel)
 
-  nl_Fnnzj = (nnlnequ == 0 ? 0 : sum(length(con.grad_sparsity) for con in Feval.constraints))
-  nl_Fnnzh = hessian ? (nnlnequ == 0 ? 0 : sum(length(con.hess_I) for con in Feval.constraints)) : 0
+  nl_lcon = fill(-Inf, nnln)
+  nl_ucon = fill(Inf, nnln)
+  for (i, (_, constraint)) in enumerate(ceval.model.constraints)
+    rhs = constraint.set
+    if rhs isa MOI.EqualTo
+      nl_lcon[i] = rhs.value
+      nl_ucon[i] = rhs.value
+    elseif rhs isa MOI.GreaterThan
+      nl_lcon[i] = rhs.lower
+    elseif rhs isa MOI.LessThan
+      nl_ucon[i] = rhs.upper
+    elseif rhs isa MOI.Interval
+      nl_lcon[i] = rhs.lower
+      nl_ucon[i] = rhs.upper
+    else
+      error("Unexpected constraint type: $(typeof(rhs))")
+    end
+  end
 
-  nl_cnnzj = (nnln == 0 ? 0 : sum(length(con.grad_sparsity) for con in ceval.constraints))
-  nl_cnnzh =
-    hessian ?
-    (nnlnequ == 0 ? 0 : length(ceval.objective.hess_I)) +
-    (nnln == 0 ? 0 : sum(length(con.hess_I) for con in ceval.constraints)) : 0
+  Fjac = MOI.jacobian_structure(Feval)
+  Fjac_rows, Fjac_cols = getindex.(Fjac, 1), getindex.(Fjac, 2)
+  nl_Fnnzj = length(Fjac)
+
+  Fhess = hessian ? MOI.hessian_lagrangian_structure(Feval) : Tuple{Int, Int}[]
+  Fhess_rows = hessian ? getindex.(Fhess, 1) : Int[]
+  Fhess_cols = hessian ? getindex.(Fhess, 2) : Int[]
+  nl_Fnnzh = length(Fhess)
+
+  cjac = MOI.jacobian_structure(ceval)
+  cjac_rows, cjac_cols = getindex.(cjac, 1), getindex.(cjac, 2)
+  nl_cnnzj = length(cjac)
+
+  chess = hessian ? MOI.hessian_lagrangian_structure(ceval) : Tuple{Int, Int}[]
+  chess_rows = hessian ? getindex.(chess, 1) : Int[]
+  chess_cols = hessian ? getindex.(chess, 2) : Int[]
+  nl_cnnzh = length(chess)
 
   moimodel = backend(cmodel)
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
