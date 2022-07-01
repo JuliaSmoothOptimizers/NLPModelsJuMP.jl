@@ -439,7 +439,7 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
     #     end
     #   end
     # end
-    # Fmodel.nlp_model.operators = cmodel.nlp_model.operators
+    Fmodel.nlp_model.operators = cmodel.nlp_model.operators
     Feval = NLPEvaluator(Fmodel)
     MOI.initialize(
       Feval,
