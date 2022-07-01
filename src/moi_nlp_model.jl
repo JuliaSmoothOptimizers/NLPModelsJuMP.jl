@@ -60,11 +60,11 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
   moimodel = backend(jmodel)
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
 
-  # if (eval.model.objective !== nothing) && eval.has_nlobj
-    # obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
-  # else
-  obj = parser_objective_MOI(moimodel, nvar)
-  # end
+  if nonlinear_model(jmodel).objective !== nothing
+    obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
+  else
+    obj = parser_objective_MOI(moimodel, nvar)
+  end
 
   ncon = nlin + nnln
   lcon = vcat(lin_lcon, nl_lcon)
