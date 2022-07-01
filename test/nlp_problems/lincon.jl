@@ -15,11 +15,11 @@ function lincon()
   d = [1.0; -1.0]
   @constraint(nlp, C * x[6:7] + d in MOI.Zeros(2))
 
-  @constraint(nlp, -10.0 <= b' * x[8:9] + 1.0 <= 10.0)
+  @constraint(nlp, -10.0 ≤ b' * x[8:9] + 1.0 ≤ 10.0)
 
-  @constraint(nlp, c' * x[10:12] + 2.0 >= 3.0)
+  @constraint(nlp, c' * x[10:12] + 2.0 ≥ 3.0)
 
-  @constraint(nlp, d' * x[13:14] - 4.0 <= 12.0)
+  @constraint(nlp, d' * x[13:14] - 4.0 ≤ 12.0)
 
   @constraint(nlp, 15.0 * x[15] - 21.0 == 1.0)
 

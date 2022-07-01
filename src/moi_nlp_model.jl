@@ -27,7 +27,7 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
 
   nl_lcon = fill(-Inf, nnln)
   nl_ucon = fill(Inf, nnln)
-  for (i, (_, constraint)) in enumerate(eval.model.constraints)
+  for (i, (_, constraint)) in enumerate(nonlinear_model(jmodel).constraints)
     rhs = constraint.set
     if rhs isa MOI.EqualTo
       nl_lcon[i] = rhs.value
