@@ -413,6 +413,12 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
     @variable(Fmodel, x[1:nvar])
     JuMP._init_NLP(Fmodel)
     @objective(Fmodel, Min, 0.0)
+    nln_Fmodel = nonlinear_model(Fmodel)
+    for expression in nonlinear_model(cmodel).expressions
+      nln_Fmodel.last_constraint_index += 1
+      index = MOI.Nonlinear.ConstraintIndex(nln_Fmodel.last_constraint_index)
+      nln_Fmodel.constraints[index] = MOI.Nonlinear.Constraint(expression, MOI.EqualTo{Float64}(0.0))
+    end
     # Fmodel.nlp_data.user_operators = cmodel.nlp_data.user_operators
     # if F_is_array_of_containers
     #   for FF in F, Fi in FF
@@ -433,7 +439,7 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
     #     end
     #   end
     # end
-    Fmodel.nlp_model.operators = cmodel.nlp_model.operators
+    # Fmodel.nlp_model.operators = cmodel.nlp_model.operators
     Feval = NLPEvaluator(Fmodel)
     MOI.initialize(
       Feval,

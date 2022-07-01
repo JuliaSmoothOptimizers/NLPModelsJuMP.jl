@@ -28,7 +28,7 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
 
   nl_lcon = fill(-Inf, nnln)
   nl_ucon = fill(Inf, nnln)
-  for (i, (_, constraint)) in enumerate(ceval.model.constraints)
+  for (i, (_, constraint)) in enumerate(nonlinear_model(cmodel).constraints)
     rhs = constraint.set
     if rhs isa MOI.EqualTo
       nl_lcon[i] = rhs.value
@@ -45,22 +45,24 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
     end
   end
 
-  Fjac = MOI.jacobian_structure(Feval)
-  Fjac_rows, Fjac_cols = getindex.(Fjac, 1), getindex.(Fjac, 2)
+  Fjac = Feval !== nothing ? MOI.jacobian_structure(Feval) : Tuple{Int,Int}[]
+  Fjac_rows = Feval !== nothing ? getindex.(Fjac, 1) : Int[]
+  Fjac_cols = Feval !== nothing ? getindex.(Fjac, 2) : Int[]
   nl_Fnnzj = length(Fjac)
 
-  Fhess = hessian ? MOI.hessian_lagrangian_structure(Feval) : Tuple{Int, Int}[]
-  Fhess_rows = hessian ? getindex.(Fhess, 1) : Int[]
-  Fhess_cols = hessian ? getindex.(Fhess, 2) : Int[]
+  Fhess = hessian && Feval !== nothing ? MOI.hessian_lagrangian_structure(Feval) : Tuple{Int, Int}[]
+  Fhess_rows = hessian && Feval !== nothing ? getindex.(Fhess, 1) : Int[]
+  Fhess_cols = hessian && Feval !== nothing ? getindex.(Fhess, 2) : Int[]
   nl_Fnnzh = length(Fhess)
 
-  cjac = MOI.jacobian_structure(ceval)
-  cjac_rows, cjac_cols = getindex.(cjac, 1), getindex.(cjac, 2)
+  cjac = ceval !== nothing ? MOI.jacobian_structure(ceval) : Tuple{Int,Int}[]
+  cjac_rows = ceval !== nothing ? getindex.(cjac, 1) : Int[]
+  cjac_cols = ceval !== nothing ? getindex.(cjac, 2) : Int[]
   nl_cnnzj = length(cjac)
 
-  chess = hessian ? MOI.hessian_lagrangian_structure(ceval) : Tuple{Int, Int}[]
-  chess_rows = hessian ? getindex.(chess, 1) : Int[]
-  chess_cols = hessian ? getindex.(chess, 2) : Int[]
+  chess = hessian && ceval !== nothing ? MOI.hessian_lagrangian_structure(ceval) : Tuple{Int, Int}[]
+  chess_rows = hessian && ceval !== nothing ? getindex.(chess, 1) : Int[]
+  chess_cols = hessian && ceval !== nothing ? getindex.(chess, 2) : Int[]
   nl_cnnzh = length(chess)
 
   moimodel = backend(cmodel)
