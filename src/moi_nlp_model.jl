@@ -183,8 +183,12 @@ function NLPModels.jprod_lin!(
   v::AbstractVector,
   Jv::AbstractVector,
 )
-  rows, cols = jac_lin_structure(nlp)
-  jprod_lin!(nlp, x, rows, cols, v, Jv)
+  increment!(nlp, :neval_jprod_lin)
+  Jv .= 0.0
+  for k = 1:nlp.lincon.nnzj
+    row, col, val = nlp.lincon.jacobian.rows[k], nlp.lincon.jacobian.cols[k], nlp.lincon.jacobian.vals[k]
+    Jv[row] += v[col] * val
+  end
   return Jv
 end
 
@@ -244,8 +248,12 @@ function NLPModels.jtprod_lin!(
   v::AbstractVector,
   Jtv::AbstractVector,
 )
-  (rows, cols) = jac_lin_structure(nlp)
-  jtprod_lin!(nlp, x, rows, cols, v, Jtv)
+  increment!(nlp, :neval_jtprod_lin)
+  Jtv .= 0.0
+  for k = 1:nlp.lincon.nnzj
+    row, col, val = nlp.lincon.jacobian.rows[k], nlp.lincon.jacobian.cols[k], nlp.lincon.jacobian.vals[k]
+    Jtv[col] += v[row] * val
+  end
   return Jtv
 end
 
