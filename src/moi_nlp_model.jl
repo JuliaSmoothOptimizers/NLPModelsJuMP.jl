@@ -194,8 +194,8 @@ function NLPModels.jprod_nln!(
   v::AbstractVector,
   Jv::AbstractVector,
 )
-  rows, cols = jac_nln_structure(nlp)
-  jprod_nln!(nlp, x, rows, cols, v, Jv)
+  increment!(nlp, :neval_jprod_nln)
+  MOI.eval_constraint_jacobian_product(nlp.eval, Jv, x, v)
   return Jv
 end
 
@@ -269,24 +269,10 @@ function NLPModels.jtprod_nln!(
   v::AbstractVector,
   Jtv::AbstractVector,
 )
-  (rows, cols) = jac_nln_structure(nlp)
-  jtprod_nln!(nlp, x, rows, cols, v, Jtv)
+  increment!(nlp, :neval_jtprod_nln)
+  MOI.eval_constraint_jacobian_transpose_product(nlp.eval, Jtv, x, v)
   return Jtv
 end
-
-# Uncomment when :JacVec becomes available in MOI.
-#
-# function NLPModels.jprod!(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector, Jv :: AbstractVector)
-#   increment!(nlp, :neval_jprod)
-#   MOI.eval_constraint_jacobian_product(nlp.eval, Jv, x, v)
-#   return Jv
-# end
-#
-# function NLPModels.jtprod!(nlp :: MathOptNLPModel, x :: AbstractVector, v :: AbstractVector, Jtv :: AbstractVector)
-#   increment!(nlp, :neval_jtprod)
-#   MOI.eval_constraint_jacobian_transpose_product(nlp.eval, Jtv, x, v)
-#   return Jtv
-# end
 
 function NLPModels.hess_structure!(
   nlp::MathOptNLPModel,
