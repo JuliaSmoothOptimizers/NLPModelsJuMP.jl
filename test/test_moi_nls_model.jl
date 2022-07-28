@@ -79,32 +79,34 @@ nls = MathOptNLSModel(model, F)
 @test sort(residual(nls, [1.5; 2.5])) == [-1.5; -0.5; -0.5; 0.5; 0.5; 1.5]
 @test jac_residual(nls, [1.5; 2.5])' * residual(nls, [1.5; 2.5]) == [0.0; 0.0]
 
-println("Testing array of JuMP containers on NLS")
-# Linear expressions
-model = Model()
-@variable(model, x[1:4])
-D = Dict(1 => 2, 2 => 4)
-@expression(model, F[i = 1:2, j = 1:D[i]], x[i] - j)
-@expression(model, G[i = -1:1, j = 3:4], x[j] - i)
-@test F isa JuMP.Containers.SparseAxisArray
-@test G isa JuMP.Containers.DenseAxisArray
-@test [F, G] isa Array{<:AbstractArray{GenericAffExpr{Float64, VariableRef}}}
-nls = MathOptNLSModel(model, [F, G])
-@test sort(residual(nls, [1.5; 2.5; 0.0; 0.0])) ==
-      [-1.5; -1.0; -1.0; -0.5; -0.5; 0.0; 0.0; 0.5; 0.5; 1.0; 1.0; 1.5]
-@test jac_residual(nls, [1.5; 2.5; 0.0; 0.0])' * residual(nls, [1.5; 2.5; 0.0; 0.0]) ==
-      [0.0; 0.0; 0.0; 0.0]
-# Nonlinear expressions
-model = Model()
-@variable(model, x[1:4])
-D = Dict(1 => 2, 2 => 4)
-@NLexpression(model, F[i = 1:2, j = 1:D[i]], x[i] - j)
-@NLexpression(model, G[i = -1:1, j = 3:4], x[j] - i)
-@test F isa JuMP.Containers.SparseAxisArray
-@test G isa JuMP.Containers.DenseAxisArray
-@test [F, G] isa Array{<:AbstractArray{NonlinearExpression}}
-nls = MathOptNLSModel(model, [F, G])
-@test sort(residual(nls, [1.5; 2.5; 0.0; 0.0])) ==
-      [-1.5; -1.0; -1.0; -0.5; -0.5; 0.0; 0.0; 0.5; 0.5; 1.0; 1.0; 1.5]
-@test jac_residual(nls, [1.5; 2.5; 0.0; 0.0])' * residual(nls, [1.5; 2.5; 0.0; 0.0]) ==
-      [0.0; 0.0; 0.0; 0.0]
+if VERSION < v"1.9.0-DEV"
+  println("Testing array of JuMP containers on NLS")
+  # Linear expressions
+  model = Model()
+  @variable(model, x[1:4])
+  D = Dict(1 => 2, 2 => 4)
+  @expression(model, F[i = 1:2, j = 1:D[i]], x[i] - j)
+  @expression(model, G[i = -1:1, j = 3:4], x[j] - i)
+  @test F isa JuMP.Containers.SparseAxisArray
+  @test G isa JuMP.Containers.DenseAxisArray
+  @test [F, G] isa Array{<:AbstractArray{GenericAffExpr{Float64, VariableRef}}}
+  nls = MathOptNLSModel(model, [F, G])
+  @test sort(residual(nls, [1.5; 2.5; 0.0; 0.0])) ==
+        [-1.5; -1.0; -1.0; -0.5; -0.5; 0.0; 0.0; 0.5; 0.5; 1.0; 1.0; 1.5]
+  @test jac_residual(nls, [1.5; 2.5; 0.0; 0.0])' * residual(nls, [1.5; 2.5; 0.0; 0.0]) ==
+        [0.0; 0.0; 0.0; 0.0]
+  # Nonlinear expressions
+  model = Model()
+  @variable(model, x[1:4])
+  D = Dict(1 => 2, 2 => 4)
+  @NLexpression(model, F[i = 1:2, j = 1:D[i]], x[i] - j)
+  @NLexpression(model, G[i = -1:1, j = 3:4], x[j] - i)
+  @test F isa JuMP.Containers.SparseAxisArray
+  @test G isa JuMP.Containers.DenseAxisArray
+  @test [F, G] isa Array{<:AbstractArray{NonlinearExpression}}
+  nls = MathOptNLSModel(model, [F, G])
+  @test sort(residual(nls, [1.5; 2.5; 0.0; 0.0])) ==
+        [-1.5; -1.0; -1.0; -0.5; -0.5; 0.0; 0.0; 0.5; 0.5; 1.0; 1.0; 1.5]
+  @test jac_residual(nls, [1.5; 2.5; 0.0; 0.0])' * residual(nls, [1.5; 2.5; 0.0; 0.0]) ==
+        [0.0; 0.0; 0.0; 0.0]
+end
