@@ -342,7 +342,14 @@ function NLPModels.jprod_lin!(
   v::AbstractVector,
   Jv::AbstractVector,
 )
-  jprod_lin!(nls, nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, v, Jv)
+  jprod_lin!(
+    nls,
+    nls.lincon.jacobian.rows,
+    nls.lincon.jacobian.cols,
+    nls.lincon.jacobian.vals,
+    v,
+    Jv,
+  )
   return Jv
 end
 
@@ -363,7 +370,14 @@ function NLPModels.jtprod_lin!(
   v::AbstractVector,
   Jtv::AbstractVector,
 )
-  jtprod_lin!(nls, nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, v, Jtv)
+  jtprod_lin!(
+    nls,
+    nls.lincon.jacobian.rows,
+    nls.lincon.jacobian.cols,
+    nls.lincon.jacobian.vals,
+    v,
+    Jtv,
+  )
   return Jtv
 end
 
