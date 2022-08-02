@@ -301,8 +301,10 @@ function NLPModels.jac_lin_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
-  rows[1:(nls.lincon.nnzj)] .= nls.lincon.jacobian.rows[1:(nls.lincon.nnzj)]
-  cols[1:(nls.lincon.nnzj)] .= nls.lincon.jacobian.cols[1:(nls.lincon.nnzj)]
+  for index = 1:(nls.lincon.nnzj)
+    rows[index] = nls.lincon.jacobian.rows[index]
+    cols[index] = nls.lincon.jacobian.cols[index]
+  end
   return rows, cols
 end
 
@@ -322,7 +324,9 @@ end
 
 function NLPModels.jac_lin_coord!(nls::MathOptNLSModel, x::AbstractVector, vals::AbstractVector)
   increment!(nls, :neval_jac_lin)
-  vals[1:(nls.lincon.nnzj)] .= nls.lincon.jacobian.vals[1:(nls.lincon.nnzj)]
+  for index = 1:(nls.lincon.nnzj)
+    vals[index] = nls.lincon.jacobian.vals[index]
+  end
   return vals
 end
 
@@ -335,39 +339,10 @@ end
 function NLPModels.jprod_lin!(
   nls::MathOptNLSModel,
   x::AbstractVector,
-  rows::AbstractVector{<:Integer},
-  cols::AbstractVector{<:Integer},
   v::AbstractVector,
   Jv::AbstractVector,
 )
-  vals = jac_lin_coord(nls, x)
-  decrement!(nls, :neval_jac_lin)
-  jprod_lin!(nls, rows, cols, vals, v, Jv)
-  return Jv
-end
-
-function NLPModels.jprod_nln!(
-  nls::MathOptNLSModel,
-  x::AbstractVector,
-  rows::AbstractVector{<:Integer},
-  cols::AbstractVector{<:Integer},
-  v::AbstractVector,
-  Jv::AbstractVector,
-)
-  vals = jac_nln_coord(nls, x)
-  decrement!(nls, :neval_jac_nln)
-  jprod_nln!(nls, rows, cols, vals, v, Jv)
-  return Jv
-end
-
-function NLPModels.jprod_lin!(
-  nls::MathOptNLSModel,
-  x::AbstractVector,
-  v::AbstractVector,
-  Jv::AbstractVector,
-)
-  rows, cols = jac_lin_structure(nls)
-  jprod_lin!(nls, x, rows, cols, v, Jv)
+  jprod_lin!(nls, nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, v, Jv)
   return Jv
 end
 
@@ -382,67 +357,13 @@ function NLPModels.jprod_nln!(
   return Jv
 end
 
-function NLPModels.jtprod!(
-  nls::MathOptNLSModel,
-  x::AbstractVector,
-  rows::AbstractVector{<:Integer},
-  cols::AbstractVector{<:Integer},
-  v::AbstractVector,
-  Jtv::AbstractVector,
-)
-  vals = jac_coord(nls, x)
-  decrement!(nls, :neval_jac)
-  jtprod!(nls, rows, cols, vals, v, Jtv)
-  return Jtv
-end
-
-function NLPModels.jtprod!(
-  nls::MathOptNLSModel,
-  x::AbstractVector,
-  v::AbstractVector,
-  Jtv::AbstractVector,
-)
-  (rows, cols) = jac_structure(nls)
-  jtprod!(nls, x, rows, cols, v, Jtv)
-  return Jtv
-end
-
-function NLPModels.jtprod_lin!(
-  nls::MathOptNLSModel,
-  x::AbstractVector,
-  rows::AbstractVector{<:Integer},
-  cols::AbstractVector{<:Integer},
-  v::AbstractVector,
-  Jtv::AbstractVector,
-)
-  vals = jac_lin_coord(nls, x)
-  decrement!(nls, :neval_jac_lin)
-  jtprod_lin!(nls, rows, cols, vals, v, Jtv)
-  return Jtv
-end
-
 function NLPModels.jtprod_lin!(
   nls::MathOptNLSModel,
   x::AbstractVector,
   v::AbstractVector,
   Jtv::AbstractVector,
 )
-  (rows, cols) = jac_lin_structure(nls)
-  jtprod_lin!(nls, x, rows, cols, v, Jtv)
-  return Jtv
-end
-
-function NLPModels.jtprod_nln!(
-  nls::MathOptNLSModel,
-  x::AbstractVector,
-  rows::AbstractVector{<:Integer},
-  cols::AbstractVector{<:Integer},
-  v::AbstractVector,
-  Jtv::AbstractVector,
-)
-  vals = jac_nln_coord(nls, x)
-  decrement!(nls, :neval_jac_nln)
-  jtprod_nln!(nls, rows, cols, vals, v, Jtv)
+  jtprod_lin!(nls, nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, v, Jtv)
   return Jtv
 end
 
