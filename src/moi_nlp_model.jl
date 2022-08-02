@@ -24,7 +24,7 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
   nl_ucon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.ub, jmodel.nlp_data.nlconstr)
 
   eval = jmodel.nlp_data == nothing ? nothing : NLPEvaluator(jmodel)
-  (eval ≠ nothing) && MOI.initialize(eval, hessian ? [:Grad, :Jac, :Hess, :HessVec] : [:Grad, :Jac])  # Add :JacVec when available
+  (eval ≠ nothing) && MOI.initialize(eval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec])
 
   nl_nnzj = nnln == 0 ? 0 : sum(length(nl_con.grad_sparsity) for nl_con in eval.constraints)
   nl_nnzh =
@@ -118,8 +118,10 @@ function NLPModels.jac_lin_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
-  rows[1:(nlp.lincon.nnzj)] .= nlp.lincon.jacobian.rows[1:(nlp.lincon.nnzj)]
-  cols[1:(nlp.lincon.nnzj)] .= nlp.lincon.jacobian.cols[1:(nlp.lincon.nnzj)]
+  for index = 1:(nlp.lincon.nnzj)
+    rows[index] = nlp.lincon.jacobian.rows[index]
+    cols[index] = nlp.lincon.jacobian.cols[index]
+  end
   return rows, cols
 end
 
@@ -139,7 +141,9 @@ end
 
 function NLPModels.jac_lin_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::AbstractVector)
   increment!(nlp, :neval_jac_lin)
-  vals[1:(nlp.lincon.nnzj)] .= nlp.lincon.jacobian.vals[1:(nlp.lincon.nnzj)]
+  for index = 1:(nlp.lincon.nnzj)
+    vals[index] = nlp.lincon.jacobian.vals[index]
+  end
   return vals
 end
 
@@ -152,43 +156,10 @@ end
 function NLPModels.jprod_lin!(
   nlp::MathOptNLPModel,
   x::AbstractVector,
-  rows::AbstractVector{<:Integer},
-  cols::AbstractVector{<:Integer},
   v::AbstractVector,
   Jv::AbstractVector,
 )
-  vals = jac_lin_coord(nlp, x)
-  decrement!(nlp, :neval_jac_lin)
-  jprod_lin!(nlp, rows, cols, vals, v, Jv)
-  return Jv
-end
-
-function NLPModels.jprod_nln!(
-  nlp::MathOptNLPModel,
-  x::AbstractVector,
-  rows::AbstractVector{<:Integer},
-  cols::AbstractVector{<:Integer},
-  v::AbstractVector,
-  Jv::AbstractVector,
-)
-  vals = jac_nln_coord(nlp, x)
-  decrement!(nlp, :neval_jac_nln)
-  jprod_nln!(nlp, rows, cols, vals, v, Jv)
-  return Jv
-end
-
-function NLPModels.jprod_lin!(
-  nlp::MathOptNLPModel,
-  x::AbstractVector,
-  v::AbstractVector,
-  Jv::AbstractVector,
-)
-  increment!(nlp, :neval_jprod_lin)
-  Jv .= 0.0
-  for k = 1:nlp.lincon.nnzj
-    row, col, val = nlp.lincon.jacobian.rows[k], nlp.lincon.jacobian.cols[k], nlp.lincon.jacobian.vals[k]
-    Jv[row] += v[col] * val
-  end
+  jprod_lin!(nlp, nlp.lincon.jacobian.rows, nlp.lincon.jacobian.cols, nlp.lincon.jacobian.vals, v, Jv)
   return Jv
 end
 
@@ -203,71 +174,13 @@ function NLPModels.jprod_nln!(
   return Jv
 end
 
-function NLPModels.jtprod!(
-  nlp::MathOptNLPModel,
-  x::AbstractVector,
-  rows::AbstractVector{<:Integer},
-  cols::AbstractVector{<:Integer},
-  v::AbstractVector,
-  Jtv::AbstractVector,
-)
-  vals = jac_coord(nlp, x)
-  decrement!(nlp, :neval_jac)
-  jtprod!(nlp, rows, cols, vals, v, Jtv)
-  return Jtv
-end
-
-function NLPModels.jtprod!(
-  nlp::MathOptNLPModel,
-  x::AbstractVector,
-  v::AbstractVector,
-  Jtv::AbstractVector,
-)
-  (rows, cols) = jac_structure(nlp)
-  jtprod!(nlp, x, rows, cols, v, Jtv)
-  return Jtv
-end
-
-function NLPModels.jtprod_lin!(
-  nlp::MathOptNLPModel,
-  x::AbstractVector,
-  rows::AbstractVector{<:Integer},
-  cols::AbstractVector{<:Integer},
-  v::AbstractVector,
-  Jtv::AbstractVector,
-)
-  vals = jac_lin_coord(nlp, x)
-  decrement!(nlp, :neval_jac_lin)
-  jtprod_lin!(nlp, rows, cols, vals, v, Jtv)
-  return Jtv
-end
-
 function NLPModels.jtprod_lin!(
   nlp::MathOptNLPModel,
   x::AbstractVector,
   v::AbstractVector,
   Jtv::AbstractVector,
 )
-  increment!(nlp, :neval_jtprod_lin)
-  Jtv .= 0.0
-  for k = 1:nlp.lincon.nnzj
-    row, col, val = nlp.lincon.jacobian.rows[k], nlp.lincon.jacobian.cols[k], nlp.lincon.jacobian.vals[k]
-    Jtv[col] += v[row] * val
-  end
-  return Jtv
-end
-
-function NLPModels.jtprod_nln!(
-  nlp::MathOptNLPModel,
-  x::AbstractVector,
-  rows::AbstractVector{<:Integer},
-  cols::AbstractVector{<:Integer},
-  v::AbstractVector,
-  Jtv::AbstractVector,
-)
-  vals = jac_nln_coord(nlp, x)
-  decrement!(nlp, :neval_jac_nln)
-  jtprod_nln!(nlp, rows, cols, vals, v, Jtv)
+  jtprod_lin!(nlp, nlp.lincon.jacobian.rows, nlp.lincon.jacobian.cols, nlp.lincon.jacobian.vals, v, Jtv)
   return Jtv
 end
 
@@ -344,7 +257,6 @@ function NLPModels.hess_coord!(
   if nlp.obj.type == "NONLINEAR"
     MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, zeros(nlp.meta.nnln))
   end
-
   return vals
 end
 
