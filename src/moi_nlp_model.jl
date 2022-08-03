@@ -241,7 +241,9 @@ function NLPModels.hess_coord!(
 )
   increment!(nlp, :neval_hess)
   if nlp.obj.type == "QUADRATIC"
-    vals[1:(nlp.obj.nnzh)] .= obj_weight .* nlp.obj.hessian.vals
+    for index = 1:(nlp.obj.nnzh)
+      vals[index] = obj_weight * nlp.obj.hessian.vals[index]
+    end
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
     MOI.eval_hessian_lagrangian(
@@ -266,8 +268,12 @@ function NLPModels.hess_coord!(
     vals .= 0.0
   end
   if nlp.obj.type == "QUADRATIC"
-    vals[1:(nlp.obj.nnzh)] .= obj_weight .* nlp.obj.hessian.vals
-    vals[(nlp.obj.nnzh + 1):(nlp.meta.nnzh)] .= 0.0
+    for index = 1:(nlp.obj.nnzh)
+      vals[index] = obj_weight * nlp.obj.hessian.vals[index]
+    end
+    for index = (nlp.obj.nnzh + 1):(nlp.meta.nnzh)
+      vals[index] = 0.0
+    end
   end
   if nlp.obj.type == "NONLINEAR"
     MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, zeros(nlp.meta.nnln))
