@@ -24,7 +24,8 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
   nl_ucon = nnln == 0 ? Float64[] : map(nl_con -> nl_con.ub, jmodel.nlp_data.nlconstr)
 
   eval = jmodel.nlp_data == nothing ? nothing : NLPEvaluator(jmodel)
-  (eval ≠ nothing) && MOI.initialize(eval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec])
+  (eval ≠ nothing) &&
+    MOI.initialize(eval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec])
 
   nl_nnzj = nnln == 0 ? 0 : sum(length(nl_con.grad_sparsity) for nl_con in eval.constraints)
   nl_nnzh =
@@ -159,7 +160,14 @@ function NLPModels.jprod_lin!(
   v::AbstractVector,
   Jv::AbstractVector,
 )
-  jprod_lin!(nlp, nlp.lincon.jacobian.rows, nlp.lincon.jacobian.cols, nlp.lincon.jacobian.vals, v, Jv)
+  jprod_lin!(
+    nlp,
+    nlp.lincon.jacobian.rows,
+    nlp.lincon.jacobian.cols,
+    nlp.lincon.jacobian.vals,
+    v,
+    Jv,
+  )
   return Jv
 end
 
@@ -180,7 +188,14 @@ function NLPModels.jtprod_lin!(
   v::AbstractVector,
   Jtv::AbstractVector,
 )
-  jtprod_lin!(nlp, nlp.lincon.jacobian.rows, nlp.lincon.jacobian.cols, nlp.lincon.jacobian.vals, v, Jtv)
+  jtprod_lin!(
+    nlp,
+    nlp.lincon.jacobian.rows,
+    nlp.lincon.jacobian.cols,
+    nlp.lincon.jacobian.vals,
+    v,
+    Jtv,
+  )
   return Jtv
 end
 
