@@ -152,8 +152,9 @@ function NLPModels.jprod_residual!(
     MOI.eval_constraint_jacobian_product(nls.Feval, view(Jv, nls.nls_meta.nln), x, v)
   end
   if nls.nls_meta.nlin > 0
-    for k = 1:nls.linequ.nnzj
-      row, col, val = nls.linequ.jacobian.rows[k], nls.linequ.jacobian.cols[k], nls.linequ.jacobian.vals[k]
+    for k = 1:(nls.linequ.nnzj)
+      row, col, val =
+        nls.linequ.jacobian.rows[k], nls.linequ.jacobian.cols[k], nls.linequ.jacobian.vals[k]
       Jv[row] += v[col] * val
     end
   end
@@ -172,8 +173,9 @@ function NLPModels.jtprod_residual!(
     MOI.eval_constraint_jacobian_transpose_product(nls.Feval, Jtv, x, view(v, nls.nls_meta.nln))
   end
   if nls.nls_meta.nlin > 0
-    for k = 1:nls.linequ.nnzj
-      row, col, val = nls.linequ.jacobian.rows[k], nls.linequ.jacobian.cols[k], nls.linequ.jacobian.vals[k]
+    for k = 1:(nls.linequ.nnzj)
+      row, col, val =
+        nls.linequ.jacobian.rows[k], nls.linequ.jacobian.cols[k], nls.linequ.jacobian.vals[k]
       Jtv[col] += v[row] * val
     end
   end
@@ -318,7 +320,14 @@ function NLPModels.jprod_lin!(
   v::AbstractVector,
   Jv::AbstractVector,
 )
-  jprod_lin!(nls, nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, v, Jv)
+  jprod_lin!(
+    nls,
+    nls.lincon.jacobian.rows,
+    nls.lincon.jacobian.cols,
+    nls.lincon.jacobian.vals,
+    v,
+    Jv,
+  )
   return Jv
 end
 
@@ -339,7 +348,14 @@ function NLPModels.jtprod_lin!(
   v::AbstractVector,
   Jtv::AbstractVector,
 )
-  jtprod_lin!(nls, nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, v, Jtv)
+  jtprod_lin!(
+    nls,
+    nls.lincon.jacobian.rows,
+    nls.lincon.jacobian.cols,
+    nls.lincon.jacobian.vals,
+    v,
+    Jtv,
+  )
   return Jtv
 end
 
