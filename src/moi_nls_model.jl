@@ -147,11 +147,11 @@ function NLPModels.jprod_residual!(
   Jv::AbstractVector,
 )
   increment!(nls, :neval_jprod_residual)
+  nls.nls_meta.nlin > 0 && (Jv .= 0.0)
   if nls.nls_meta.nnln > 0
-    MOI.eval_constraint_jacobian_product(nls.Feval, Jv, x, v)
+    MOI.eval_constraint_jacobian_product(nls.Feval, view(Jv, nls.nls_meta.nln), x, v)
   end
   if nls.nls_meta.nlin > 0
-    nls.nls_meta.nnln == 0 && (Jv .= 0.0)
     for k = 1:nls.linequ.nnzj
       row, col, val = nls.linequ.jacobian.rows[k], nls.linequ.jacobian.cols[k], nls.linequ.jacobian.vals[k]
       Jv[row] += v[col] * val
@@ -167,11 +167,11 @@ function NLPModels.jtprod_residual!(
   Jtv::AbstractVector,
 )
   increment!(nls, :neval_jtprod_residual)
+  nls.nls_meta.nlin > 0 && (Jtv .= 0.0)
   if nls.nls_meta.nnln > 0
-    MOI.eval_constraint_jacobian_transpose_product(nls.Feval, Jtv, x, v)
+    MOI.eval_constraint_jacobian_transpose_product(nls.Feval, Jtv, x, view(v, nls.nls_meta.nln))
   end
   if nls.nls_meta.nlin > 0
-    nls.nls_meta.nnln == 0 && (Jtv .= 0.0)
     for k = 1:nls.linequ.nnzj
       row, col, val = nls.linequ.jacobian.rows[k], nls.linequ.jacobian.cols[k], nls.linequ.jacobian.vals[k]
       Jtv[col] += v[row] * val
