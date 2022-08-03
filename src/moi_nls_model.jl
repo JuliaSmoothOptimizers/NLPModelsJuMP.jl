@@ -143,40 +143,21 @@ end
 function NLPModels.jprod_residual!(
   nls::MathOptNLSModel,
   x::AbstractVector,
-  rows::AbstractVector{<:Integer},
-  cols::AbstractVector{<:Integer},
   v::AbstractVector,
   Jv::AbstractVector,
 )
-  vals = jac_coord_residual(nls, x)
-  decrement!(nls, :neval_jac_residual)
-  jprod_residual!(nls, rows, cols, vals, v, Jv)
+  increment!(nls, :neval_jprod_residual)
+  nls.nls_meta.nlin > 0 && (Jv .= 0.0)
+  if nls.nls_meta.nnln > 0
+    MOI.eval_constraint_jacobian_product(nls.Feval, view(Jv, nls.nls_meta.nln), x, v)
+  end
+  if nls.nls_meta.nlin > 0
+    for k = 1:nls.linequ.nnzj
+      row, col, val = nls.linequ.jacobian.rows[k], nls.linequ.jacobian.cols[k], nls.linequ.jacobian.vals[k]
+      Jv[row] += v[col] * val
+    end
+  end
   return Jv
-end
-
-function NLPModels.jprod_residual!(
-  nls::MathOptNLSModel,
-  x::AbstractVector,
-  v::AbstractVector,
-  Jv::AbstractVector,
-)
-  rows, cols = jac_structure_residual(nls)
-  jprod_residual!(nls, x, rows, cols, v, Jv)
-  return Jv
-end
-
-function NLPModels.jtprod_residual!(
-  nls::MathOptNLSModel,
-  x::AbstractVector,
-  rows::AbstractVector{<:Integer},
-  cols::AbstractVector{<:Integer},
-  v::AbstractVector,
-  Jtv::AbstractVector,
-)
-  vals = jac_coord_residual(nls, x)
-  decrement!(nls, :neval_jac_residual)
-  jtprod_residual!(nls, rows, cols, vals, v, Jtv)
-  return Jtv
 end
 
 function NLPModels.jtprod_residual!(
@@ -185,24 +166,19 @@ function NLPModels.jtprod_residual!(
   v::AbstractVector,
   Jtv::AbstractVector,
 )
-  rows, cols = jac_structure_residual(nls)
-  jtprod_residual!(nls, x, rows, cols, v, Jtv)
+  increment!(nls, :neval_jtprod_residual)
+  nls.nls_meta.nlin > 0 && (Jtv .= 0.0)
+  if nls.nls_meta.nnln > 0
+    MOI.eval_constraint_jacobian_transpose_product(nls.Feval, Jtv, x, view(v, nls.nls_meta.nln))
+  end
+  if nls.nls_meta.nlin > 0
+    for k = 1:nls.linequ.nnzj
+      row, col, val = nls.linequ.jacobian.rows[k], nls.linequ.jacobian.cols[k], nls.linequ.jacobian.vals[k]
+      Jtv[col] += v[row] * val
+    end
+  end
   return Jtv
 end
-
-# Uncomment when :JacVec becomes available in MOI.
-#
-# function NLPModels.jprod_residual!(nls :: MathOptNLSModel, x :: AbstractVector, v :: AbstractVector, Jv :: AbstractVector)
-#   increment!(nls, :neval_jprod_residual)
-#   MOI.eval_constraint_jacobian_product(nls.Feval, Jv, x, v)
-#   return Jv
-# end
-#
-# function NLPModels.jtprod_residual!(nls :: MathOptNLSModel, x :: AbstractVector, v :: AbstractVector, Jtv :: AbstractVector)
-#   increment!(nls, :neval_jtprod_residual)
-#   MOI.eval_constraint_jacobian_transpose_product(nls.Feval, Jtv, x, v)
-#   return Jtv
-# end
 
 function NLPModels.hess_structure_residual!(
   nls::MathOptNLSModel,

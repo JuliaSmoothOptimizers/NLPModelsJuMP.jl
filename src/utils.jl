@@ -369,13 +369,13 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
   ceval = cmodel.nlp_data == nothing ? nothing : NLPEvaluator(cmodel)
   (ceval ≠ nothing) &&
     (nnlnequ == 0) &&
-    MOI.initialize(ceval, hessian ? [:Grad, :Jac, :Hess, :HessVec] : [:Grad, :Jac])  # Add :JacVec when available
+    MOI.initialize(ceval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec])
   (ceval ≠ nothing) &&
     (nnlnequ > 0) &&
     MOI.initialize(
       ceval,
-      hessian ? [:Grad, :Jac, :Hess, :HessVec, :ExprGraph] : [:Grad, :Jac, :ExprGraph],
-    )  # Add :JacVec when available
+      hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec, :ExprGraph] : [:Grad, :Jac, :JacVec, :ExprGraph]
+    )
 
   if nnlnequ == 0
     Feval = nothing
@@ -405,7 +405,7 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
       end
     end
     Feval = NLPEvaluator(Fmodel)
-    MOI.initialize(Feval, hessian ? [:Grad, :Jac, :Hess, :HessVec] : [:Grad, :Jac])  # Add :JacVec when available
+    MOI.initialize(Feval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec])
     Feval.user_output_buffer = ceval.user_output_buffer
   end
   return ceval, Feval, nnlnequ
