@@ -93,7 +93,7 @@ function NLPModels.residual!(nls::MathOptNLSModel, x::AbstractVector, Fx::Abstra
       x,
       view(Fx, nls.nls_meta.lin),
     )
-    Fx[nls.nls_meta.lin] .+= nls.linequ.constants
+    view(Fx, nls.nls_meta.lin) .+= nls.linequ.constants
   end
   if nls.nls_meta.nnln > 0
     MOI.eval_constraint(nls.Feval, view(Fx, nls.nls_meta.nln), x)
@@ -107,8 +107,10 @@ function NLPModels.jac_structure_residual!(
   cols::AbstractVector{<:Integer},
 )
   if nls.nls_meta.nlin > 0
-    rows[1:(nls.linequ.nnzj)] .= nls.linequ.jacobian.rows[1:(nls.linequ.nnzj)]
-    cols[1:(nls.linequ.nnzj)] .= nls.linequ.jacobian.cols[1:(nls.linequ.nnzj)]
+    for index = 1:(nls.linequ.nnzj)
+      rows[index] = nls.linequ.jacobian.rows[index]
+      cols[index] = nls.linequ.jacobian.cols[index]
+    end
   end
   if nls.nls_meta.nnln > 0
     jac_struct_residual = MOI.jacobian_structure(nls.Feval)
@@ -128,7 +130,9 @@ function NLPModels.jac_coord_residual!(
 )
   increment!(nls, :neval_jac_residual)
   if nls.nls_meta.nlin > 0
-    vals[1:(nls.linequ.nnzj)] .= nls.linequ.jacobian.vals[1:(nls.linequ.nnzj)]
+    for index = 1:(nls.linequ.nnzj)
+      vals[index] = nls.linequ.jacobian.vals[index]
+    end
   end
   if nls.nls_meta.nnln > 0
     MOI.eval_constraint_jacobian(
@@ -401,7 +405,9 @@ function NLPModels.hess_coord!(
 )
   increment!(nls, :neval_hess)
   if nls.nls_meta.nlin > 0
-    vals[1:(nls.lls.nnzh)] .= obj_weight .* nls.lls.hessian.vals
+    for index = 1:(nls.lls.nnzh)
+      vals[index] = obj_weight * nls.lls.hessian.vals[index]
+    end
   end
   if (nls.nls_meta.nnln > 0) || (nls.meta.nnln > 0)
     MOI.eval_hessian_lagrangian(
@@ -423,7 +429,9 @@ function NLPModels.hess_coord!(
 )
   increment!(nls, :neval_hess)
   if nls.nls_meta.nlin > 0
-    vals[1:(nls.lls.nnzh)] .= obj_weight .* nls.lls.hessian.vals
+    for index = 1:(nls.lls.nnzh)
+      vals[index] = obj_weight * nls.lls.hessian.vals[index]
+    end
   end
   if nls.nls_meta.nnln > 0
     MOI.eval_hessian_lagrangian(
@@ -434,7 +442,9 @@ function NLPModels.hess_coord!(
       zeros(nls.meta.nnln),
     )
   else
-    vals[(nls.lls.nnzh + 1):(nls.meta.nnzh)] .= 0.0
+    for index = (nls.lls.nnzh + 1):(nls.meta.nnzh)
+      vals[index] = 0.0
+    end
   end
   return vals
 end
