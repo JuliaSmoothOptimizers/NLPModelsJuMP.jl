@@ -131,9 +131,8 @@ function NLPModels.jac_nln_structure!(
 )
   jac_struct = MOI.jacobian_structure(nlp.eval)
   for index = 1:(nlp.meta.nln_nnzj)
-    row, col = jac_struct[index]
-    rows[index] = row
-    cols[index] = col
+    rows[index] = jac_struct[index][1]
+    cols[index] = jac_struct[index][2]
   end
   return rows, cols
 end
@@ -219,9 +218,8 @@ function NLPModels.hess_structure!(
     hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
     for index = (nlp.obj.nnzh + 1):(nlp.meta.nnzh)
       shift_index = index - nlp.obj.nnzh
-      row, col = hesslag_struct[shift_index]
-      rows[index] = row
-      cols[index] = col
+      rows[index] = hesslag_struct[shift_index][1]
+      cols[index] = hesslag_struct[shift_index][2]
     end
   end
   return rows, cols
