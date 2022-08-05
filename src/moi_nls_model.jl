@@ -107,10 +107,8 @@ function NLPModels.jac_structure_residual!(
   cols::AbstractVector{<:Integer},
 )
   if nls.nls_meta.nlin > 0
-    for index = 1:(nls.linequ.nnzj)
-      rows[index] = nls.linequ.jacobian.rows[index]
-      cols[index] = nls.linequ.jacobian.cols[index]
-    end
+    view(rows, 1:nls.linequ.nnzj) .= nls.linequ.jacobian.rows
+    view(cols, 1:nls.linequ.nnzj) .= nls.linequ.jacobian.cols
   end
   if nls.nls_meta.nnln > 0
     jac_struct_residual = MOI.jacobian_structure(nls.Feval)
@@ -130,9 +128,7 @@ function NLPModels.jac_coord_residual!(
 )
   increment!(nls, :neval_jac_residual)
   if nls.nls_meta.nlin > 0
-    for index = 1:(nls.linequ.nnzj)
-      vals[index] = nls.linequ.jacobian.vals[index]
-    end
+    view(vals, 1:nls.linequ.nnzj) .= nls.linequ.jacobian.vals
   end
   if nls.nls_meta.nnln > 0
     MOI.eval_constraint_jacobian(
@@ -254,13 +250,7 @@ function NLPModels.grad!(nls::MathOptNLSModel, x::AbstractVector, g::AbstractVec
   end
   if nls.nls_meta.nlin > 0
     nls.nls_meta.nnln == 0 && (g .= 0.0)
-    for k = 1:(nls.lls.nnzh)
-      i, j, c = nls.lls.hessian.rows[k], nls.lls.hessian.cols[k], nls.lls.hessian.vals[k]
-      g[i] += c * x[j]
-      if i ≠ j
-        g[j] += c * x[i]
-      end
-    end
+    coo_sym_add_mul!(nls.lls.hessian.rows, nls.lls.hessian.cols, nls.lls.hessian.vals, x, g, 1.0)
     g .+= nls.lls.gradient
   end
   return g
@@ -283,10 +273,8 @@ function NLPModels.jac_lin_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
-  for index = 1:(nls.lincon.nnzj)
-    rows[index] = nls.lincon.jacobian.rows[index]
-    cols[index] = nls.lincon.jacobian.cols[index]
-  end
+  view(rows, 1:nls.lincon.nnzj) .= nls.lincon.jacobian.rows
+  view(cols, 1:nls.lincon.nnzj) .= nls.lincon.jacobian.cols
   return rows, cols
 end
 
@@ -306,9 +294,7 @@ end
 
 function NLPModels.jac_lin_coord!(nls::MathOptNLSModel, x::AbstractVector, vals::AbstractVector)
   increment!(nls, :neval_jac_lin)
-  for index = 1:(nls.lincon.nnzj)
-    vals[index] = nls.lincon.jacobian.vals[index]
-  end
+  view(vals, 1:nls.lincon.nnzj) .= nls.lincon.jacobian.vals
   return vals
 end
 
@@ -380,17 +366,16 @@ function NLPModels.hess_structure!(
   cols::AbstractVector{<:Integer},
 )
   if nls.nls_meta.nlin > 0
-    for index = 1:(nls.lls.nnzh)
-      rows[index] = nls.lls.hessian.rows[index]
-      cols[index] = nls.lls.hessian.cols[index]
-    end
+    view(rows, 1:nls.lls.nnzh) .= nls.lls.hessian.rows
+    view(cols, 1:nls.lls.nnzh) .= nls.lls.hessian.cols
   end
   if nls.nls_meta.nnln > 0
     hesslag_struct = MOI.hessian_lagrangian_structure(nls.ceval)
     for index = (nls.lls.nnzh + 1):(nls.meta.nnzh)
       shift_index = index - nls.lls.nnzh
-      rows[index] = hesslag_struct[shift_index][1]
-      cols[index] = hesslag_struct[shift_index][2]
+      row, col = hesslag_struct[shift_index]
+      rows[index] = row
+      cols[index] = col
     end
   end
   return rows, cols
@@ -405,9 +390,7 @@ function NLPModels.hess_coord!(
 )
   increment!(nls, :neval_hess)
   if nls.nls_meta.nlin > 0
-    for index = 1:(nls.lls.nnzh)
-      vals[index] = obj_weight * nls.lls.hessian.vals[index]
-    end
+    view(vals, 1:nls.lls.nnzh) .= obj_weight .* nls.lls.hessian.vals
   end
   if (nls.nls_meta.nnln > 0) || (nls.meta.nnln > 0)
     MOI.eval_hessian_lagrangian(
@@ -429,9 +412,7 @@ function NLPModels.hess_coord!(
 )
   increment!(nls, :neval_hess)
   if nls.nls_meta.nlin > 0
-    for index = 1:(nls.lls.nnzh)
-      vals[index] = obj_weight * nls.lls.hessian.vals[index]
-    end
+    view(vals, 1:nls.lls.nnzh) .= obj_weight .* nls.lls.hessian.vals
   end
   if nls.nls_meta.nnln > 0
     MOI.eval_hessian_lagrangian(
@@ -442,9 +423,7 @@ function NLPModels.hess_coord!(
       zeros(nls.meta.nnln),
     )
   else
-    for index = (nls.lls.nnzh + 1):(nls.meta.nnzh)
-      vals[index] = 0.0
-    end
+    view(vals, nls.lls.nnzh+1:nls.meta.nnzh) .= 0.0
   end
   return vals
 end
@@ -463,13 +442,7 @@ function NLPModels.hprod!(
   end
   if nls.nls_meta.nlin > 0
     (nls.nls_meta.nnln == 0) && (nls.meta.nnln == 0) && (hv .= 0.0)
-    for k = 1:(nls.lls.nnzh)
-      i, j, c = nls.lls.hessian.rows[k], nls.lls.hessian.cols[k], nls.lls.hessian.vals[k]
-      hv[i] += obj_weight * c * v[j]
-      if i ≠ j
-        hv[j] += obj_weight * c * v[i]
-      end
-    end
+    coo_sym_add_mul!(nls.lls.hessian.rows, nls.lls.hessian.cols, nls.lls.hessian.vals, v, hv, obj_weight)
   end
   return hv
 end
@@ -487,13 +460,7 @@ function NLPModels.hprod!(
   end
   if nls.nls_meta.nlin > 0
     (nls.nls_meta.nnln == 0) && (hv .= 0.0)
-    for k = 1:(nls.lls.nnzh)
-      i, j, c = nls.lls.hessian.rows[k], nls.lls.hessian.cols[k], nls.lls.hessian.vals[k]
-      hv[i] += obj_weight * c * v[j]
-      if i ≠ j
-        hv[j] += obj_weight * c * v[i]
-      end
-    end
+    coo_sym_add_mul!(nls.lls.hessian.rows, nls.lls.hessian.cols, nls.lls.hessian.vals, v, hv, obj_weight)
   end
   return hv
 end
