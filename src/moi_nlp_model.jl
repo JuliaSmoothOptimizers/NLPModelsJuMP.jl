@@ -119,10 +119,8 @@ function NLPModels.jac_lin_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
-  for index = 1:(nlp.lincon.nnzj)
-    rows[index] = nlp.lincon.jacobian.rows[index]
-    cols[index] = nlp.lincon.jacobian.cols[index]
-  end
+  view(rows, 1:nlp.lincon.nnzj) .= nlp.lincon.jacobian.rows
+  view(cols, 1:nlp.lincon.nnzj) .= nlp.lincon.jacobian.cols
   return rows, cols
 end
 
@@ -142,9 +140,7 @@ end
 
 function NLPModels.jac_lin_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::AbstractVector)
   increment!(nlp, :neval_jac_lin)
-  for index = 1:(nlp.lincon.nnzj)
-    vals[index] = nlp.lincon.jacobian.vals[index]
-  end
+  view(vals, 1:nlp.lincon.nnzj) .= nlp.lincon.jacobian.vals
   return vals
 end
 
@@ -216,17 +212,16 @@ function NLPModels.hess_structure!(
   cols::AbstractVector{<:Integer},
 )
   if nlp.obj.type == "QUADRATIC"
-    for index = 1:(nlp.obj.nnzh)
-      rows[index] = nlp.obj.hessian.rows[index]
-      cols[index] = nlp.obj.hessian.cols[index]
-    end
+    view(rows, 1:nlp.obj.nnzh) .= nlp.obj.hessian.rows
+    view(cols, 1:nlp.obj.nnzh) .= nlp.obj.hessian.cols
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
     hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
     for index = (nlp.obj.nnzh + 1):(nlp.meta.nnzh)
       shift_index = index - nlp.obj.nnzh
-      rows[index] = hesslag_struct[shift_index][1]
-      cols[index] = hesslag_struct[shift_index][2]
+      row, col = hesslag_struct[shift_index]
+      rows[index] = row
+      cols[index] = col
     end
   end
   return rows, cols
@@ -241,9 +236,7 @@ function NLPModels.hess_coord!(
 )
   increment!(nlp, :neval_hess)
   if nlp.obj.type == "QUADRATIC"
-    for index = 1:(nlp.obj.nnzh)
-      vals[index] = obj_weight * nlp.obj.hessian.vals[index]
-    end
+    view(vals, 1:nlp.obj.nnzh) .= obj_weight .* nlp.obj.hessian.vals
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
     MOI.eval_hessian_lagrangian(
@@ -268,12 +261,8 @@ function NLPModels.hess_coord!(
     vals .= 0.0
   end
   if nlp.obj.type == "QUADRATIC"
-    for index = 1:(nlp.obj.nnzh)
-      vals[index] = obj_weight * nlp.obj.hessian.vals[index]
-    end
-    for index = (nlp.obj.nnzh + 1):(nlp.meta.nnzh)
-      vals[index] = 0.0
-    end
+    view(vals, 1:nlp.obj.nnzh) .= obj_weight .* nlp.obj.hessian.vals
+    view(vals, nlp.obj.nnzh+1:nlp.meta.nnzh) .= 0.0
   end
   if nlp.obj.type == "NONLINEAR"
     MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, zeros(nlp.meta.nnln))
@@ -298,13 +287,7 @@ function NLPModels.hprod!(
   end
   if nlp.obj.type == "QUADRATIC"
     nlp.meta.nnln == 0 && (hv .= 0.0)
-    for k = 1:(nlp.obj.nnzh)
-      i, j, c = nlp.obj.hessian.rows[k], nlp.obj.hessian.cols[k], nlp.obj.hessian.vals[k]
-      hv[i] += obj_weight * c * v[j]
-      if i ≠ j
-        hv[j] += obj_weight * c * v[i]
-      end
-    end
+    coo_sym_add_mul!(nlp.obj.hessian.rows, nlp.obj.hessian.cols, nlp.obj.hessian.vals, v, hv, obj_weight)
   end
   return hv
 end
