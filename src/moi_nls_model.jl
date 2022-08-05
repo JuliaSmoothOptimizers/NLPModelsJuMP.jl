@@ -113,9 +113,8 @@ function NLPModels.jac_structure_residual!(
   if nls.nls_meta.nnln > 0
     jac_struct_residual = MOI.jacobian_structure(nls.Feval)
     for index = (nls.linequ.nnzj + 1):(nls.nls_meta.nnzj)
-      row, col = jac_struct_residual[index - nls.linequ.nnzj]
-      rows[index] = nls.nls_meta.nlin + row
-      cols[index] = col
+      rows[index] = jac_struct_residual[index - nls.linequ.nnzj][1] + nls.nls_meta.nlin
+      cols[index] = jac_struct_residual[index - nls.linequ.nnzj][2]
     end
   end
   return rows, cols
@@ -285,9 +284,8 @@ function NLPModels.jac_nln_structure!(
 )
   jac_struct = MOI.jacobian_structure(nls.ceval)
   for index = 1:(nls.meta.nln_nnzj)
-    row, col = jac_struct[index]
-    rows[index] = row
-    cols[index] = col
+    rows[index] = jac_struct[index][1]
+    cols[index] = jac_struct[index][2]
   end
   return rows, cols
 end
@@ -373,9 +371,8 @@ function NLPModels.hess_structure!(
     hesslag_struct = MOI.hessian_lagrangian_structure(nls.ceval)
     for index = (nls.lls.nnzh + 1):(nls.meta.nnzh)
       shift_index = index - nls.lls.nnzh
-      row, col = hesslag_struct[shift_index]
-      rows[index] = row
-      cols[index] = col
+      rows[index] = hesslag_struct[shift_index][1]
+      cols[index] = hesslag_struct[shift_index][2]
     end
   end
   return rows, cols
