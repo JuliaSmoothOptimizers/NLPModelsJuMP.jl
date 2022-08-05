@@ -72,9 +72,34 @@ function replace!(ex, x)
 end
 
 """
+    coo_sym_add_mul!(rows, cols, vals, x, y, α)
+
+Update of the form `y ← y + αAx` where `A` is a symmetric matrix given by `(rows, cols, vals)`.
+Only one triangle of `A` should be passed.
+"""
+function coo_sym_add_mul!(
+  rows::AbstractVector{<:Integer},
+  cols::AbstractVector{<:Integer},
+  vals::AbstractVector,
+  x::AbstractVector,
+  y::AbstractVector,
+  α::Float64,
+)
+  nnz = length(vals)
+  @inbounds for k = 1:nnz
+    i, j, c = rows[k], cols[k], vals[k]
+    y[i] += α * c * x[j]
+    if i ≠ j
+      y[j] += α * c * x[i]
+    end
+  end
+  return y
+end
+
+"""
     coo_sym_dot(rows, cols, vals, x, y)
 
-Compute the product `xᵀAy` of a symmetric matrix `A` given by `(rows, cols, vals)`
+Compute the product `xᵀAy` of a symmetric matrix `A` given by `(rows, cols, vals)`.
 Only one triangle of `A` should be passed.
 """
 function coo_sym_dot(
