@@ -119,8 +119,8 @@ function NLPModels.jac_lin_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
-  view(rows, 1:nlp.lincon.nnzj) .= nlp.lincon.jacobian.rows
-  view(cols, 1:nlp.lincon.nnzj) .= nlp.lincon.jacobian.cols
+  view(rows, 1:(nlp.lincon.nnzj)) .= nlp.lincon.jacobian.rows
+  view(cols, 1:(nlp.lincon.nnzj)) .= nlp.lincon.jacobian.cols
   return rows, cols
 end
 
@@ -139,7 +139,7 @@ end
 
 function NLPModels.jac_lin_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::AbstractVector)
   increment!(nlp, :neval_jac_lin)
-  view(vals, 1:nlp.lincon.nnzj) .= nlp.lincon.jacobian.vals
+  view(vals, 1:(nlp.lincon.nnzj)) .= nlp.lincon.jacobian.vals
   return vals
 end
 
@@ -211,8 +211,8 @@ function NLPModels.hess_structure!(
   cols::AbstractVector{<:Integer},
 )
   if nlp.obj.type == "QUADRATIC"
-    view(rows, 1:nlp.obj.nnzh) .= nlp.obj.hessian.rows
-    view(cols, 1:nlp.obj.nnzh) .= nlp.obj.hessian.cols
+    view(rows, 1:(nlp.obj.nnzh)) .= nlp.obj.hessian.rows
+    view(cols, 1:(nlp.obj.nnzh)) .= nlp.obj.hessian.cols
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
     hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
@@ -234,7 +234,7 @@ function NLPModels.hess_coord!(
 )
   increment!(nlp, :neval_hess)
   if nlp.obj.type == "QUADRATIC"
-    view(vals, 1:nlp.obj.nnzh) .= obj_weight .* nlp.obj.hessian.vals
+    view(vals, 1:(nlp.obj.nnzh)) .= obj_weight .* nlp.obj.hessian.vals
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
     MOI.eval_hessian_lagrangian(
@@ -259,8 +259,8 @@ function NLPModels.hess_coord!(
     vals .= 0.0
   end
   if nlp.obj.type == "QUADRATIC"
-    view(vals, 1:nlp.obj.nnzh) .= obj_weight .* nlp.obj.hessian.vals
-    view(vals, nlp.obj.nnzh+1:nlp.meta.nnzh) .= 0.0
+    view(vals, 1:(nlp.obj.nnzh)) .= obj_weight .* nlp.obj.hessian.vals
+    view(vals, (nlp.obj.nnzh + 1):(nlp.meta.nnzh)) .= 0.0
   end
   if nlp.obj.type == "NONLINEAR"
     MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, zeros(nlp.meta.nnln))
@@ -285,7 +285,14 @@ function NLPModels.hprod!(
   end
   if nlp.obj.type == "QUADRATIC"
     nlp.meta.nnln == 0 && (hv .= 0.0)
-    coo_sym_add_mul!(nlp.obj.hessian.rows, nlp.obj.hessian.cols, nlp.obj.hessian.vals, v, hv, obj_weight)
+    coo_sym_add_mul!(
+      nlp.obj.hessian.rows,
+      nlp.obj.hessian.cols,
+      nlp.obj.hessian.vals,
+      v,
+      hv,
+      obj_weight,
+    )
   end
   return hv
 end
