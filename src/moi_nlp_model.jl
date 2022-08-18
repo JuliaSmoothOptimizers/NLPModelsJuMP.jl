@@ -2,13 +2,10 @@ export MathOptNLPModel
 
 mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
   meta::NLPModelMeta{Float64, Vector{Float64}}
-  eval::Union{MOI.AbstractNLPEvaluator, Nothing}
+  eval::MOI.Nonlinear.Evaluator
   lincon::LinearConstraints
+  nlcon::NonLinearStructure
   obj::Objective
-  jac_nln_rows::Vector{Int}
-  jac_nln_cols::Vector{Int}
-  hess_nln_rows::Vector{Int}
-  hess_nln_cols::Vector{Int}
   counters::Counters
 end
 
@@ -22,45 +19,13 @@ Construct a `MathOptNLPModel` from a `JuMP` model.
 function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String = "Generic")
   nvar, lvar, uvar, x0 = parser_JuMP(jmodel)
 
-  eval = NLPEvaluator(jmodel)
-  nnln = num_nonlinear_constraints(jmodel)
-
-  nl_lcon = fill(-Inf, nnln)
-  nl_ucon = fill(Inf, nnln)
-  for (i, (_, constraint)) in enumerate(nonlinear_model(jmodel).constraints)
-    rhs = constraint.set
-    if rhs isa MOI.EqualTo
-      nl_lcon[i] = rhs.value
-      nl_ucon[i] = rhs.value
-    elseif rhs isa MOI.GreaterThan
-      nl_lcon[i] = rhs.lower
-    elseif rhs isa MOI.LessThan
-      nl_ucon[i] = rhs.upper
-    elseif rhs isa MOI.Interval
-      nl_lcon[i] = rhs.lower
-      nl_ucon[i] = rhs.upper
-    else
-      error("Unexpected constraint type: $(typeof(rhs))")
-    end
-  end
-
-  eval = jmodel.nlp_data == nothing ? nothing : NLPEvaluator(jmodel)
-  (eval ≠ nothing) &&
-    MOI.initialize(eval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec])
-
-  jac = MOI.jacobian_structure(eval)
-  jac_rows, jac_cols = getindex.(jac, 1), getindex.(jac, 2)
-  nl_nnzj = length(jac)
-
-  hess = hessian ? MOI.hessian_lagrangian_structure(eval) : Tuple{Int, Int}[]
-  hess_rows = hessian ? getindex.(hess, 1) : Int[]
-  hess_cols = hessian ? getindex.(hess, 2) : Int[]
-  nl_nnzh = length(hess)
-
   moimodel = backend(jmodel)
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
 
-  if nonlinear_model(jmodel).objective !== nothing
+  eval = NLPEvaluator(jmodel)
+  nnln, nlcon, nl_lcon, nl_ucon = parser_NL(jmodel, eval, hessian=hessian)
+
+  if jmodel.nlp_model.objective !== nothing
     obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
   else
     obj = parser_objective_MOI(moimodel, nvar)
@@ -69,8 +34,8 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
   ncon = nlin + nnln
   lcon = vcat(lin_lcon, nl_lcon)
   ucon = vcat(lin_ucon, nl_ucon)
-  nnzj = lincon.nnzj + nl_nnzj
-  nnzh = obj.nnzh + nl_nnzh
+  nnzj = lincon.nnzj + nlcon.nnzj
+  nnzh = obj.nnzh + nlcon.nnzh
 
   meta = NLPModelMeta(
     nvar,
@@ -85,13 +50,13 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
     nnzh = nnzh,
     lin = collect(1:nlin),
     lin_nnzj = lincon.nnzj,
-    nln_nnzj = nl_nnzj,
+    nln_nnzj = nlcon.nnzj,
     minimize = objective_sense(jmodel) == MOI.MIN_SENSE,
     islp = (obj.type == "LINEAR") && (nnln == 0),
     name = name,
   )
 
-  return MathOptNLPModel(meta, eval, lincon, obj, jac_rows, jac_cols, hess_rows, hess_cols, Counters())
+  return MathOptNLPModel(meta, eval, lincon, nlcon, obj, Counters())
 end
 
 function NLPModels.obj(nlp::MathOptNLPModel, x::AbstractVector)
@@ -153,11 +118,8 @@ function NLPModels.jac_nln_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
-  jac_struct = MOI.jacobian_structure(nlp.eval)
-  for index = 1:(nlp.meta.nln_nnzj)
-    rows[index] = jac_struct[index][1]
-    cols[index] = jac_struct[index][2]
-  end
+  view(rows, nlp.lincon.nnzj+1:nlp.meta.nnzj) .= nlp.nlcon.jac_rows .+ nlp.meta.nlin
+  view(cols, nlp.lincon.nnzj+1:nlp.meta.nnzj) .= nlp.nlcon.jac_cols
   return rows, cols
 end
 
@@ -169,7 +131,7 @@ end
 
 function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::AbstractVector)
   increment!(nlp, :neval_jac_nln)
-  MOI.eval_constraint_jacobian(nlp.eval, vals, x)
+  MOI.eval_constraint_jacobian(nlp.eval, view(vals, nlp.lincon.nnzj+1:nlp.meta.nnzj), x)
   return vals
 end
 
@@ -197,7 +159,7 @@ function NLPModels.jprod_nln!(
   Jv::AbstractVector,
 )
   increment!(nlp, :neval_jprod_nln)
-  MOI.eval_constraint_jacobian_product(nlp.eval, Jv, x, v)
+  MOI.eval_constraint_jacobian_product(nlp.eval, view(Jv, nlp.meta.nln), x, v)
   return Jv
 end
 
@@ -225,7 +187,7 @@ function NLPModels.jtprod_nln!(
   Jtv::AbstractVector,
 )
   increment!(nlp, :neval_jtprod_nln)
-  MOI.eval_constraint_jacobian_transpose_product(nlp.eval, Jtv, x, v)
+  MOI.eval_constraint_jacobian_transpose_product(nlp.eval, Jtv, x, view(v, nlp.meta.nln))
   return Jtv
 end
 
@@ -239,12 +201,8 @@ function NLPModels.hess_structure!(
     view(cols, 1:(nlp.obj.nnzh)) .= nlp.obj.hessian.cols
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
-    hesslag_struct = MOI.hessian_lagrangian_structure(nlp.eval)
-    for index = (nlp.obj.nnzh + 1):(nlp.meta.nnzh)
-      shift_index = index - nlp.obj.nnzh
-      rows[index] = hesslag_struct[shift_index][1]
-      cols[index] = hesslag_struct[shift_index][2]
-    end
+    view(rows, nlp.obj.nnzh+1:nlp.meta.nnzh) .= nlp.nlcon.hess_rows
+    view(cols, nlp.obj.nnzh+1:nlp.meta.nnzh) .= nlp.nlcon.hess_cols
   end
   return rows, cols
 end
