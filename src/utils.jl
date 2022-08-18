@@ -38,6 +38,15 @@ mutable struct LinearConstraints
   nnzj::Int
 end
 
+mutable struct NonLinearStructure
+  jac_rows::Vector{Int}
+  jac_cols::Vector{Int}
+  nnzj::Int
+  hess_rows::Vector{Int}
+  hess_cols::Vector{Int}
+  nnzh::Int
+end
+
 mutable struct LinearEquations
   jacobian::COO
   constants::Vector{Float64}
@@ -224,6 +233,48 @@ function parser_MOI(moimodel)
 end
 
 """
+    parser_NL(jmodel, moimodel)
+
+Parse nonlinear constraints of a `MOI.Nonlinear.Evaluator`.
+"""
+function parser_NL(jmodel, eval; hessian::Bool = true)
+
+  nnln = num_nonlinear_constraints(jmodel)
+  nl_lcon = fill(-Inf, nnln)
+  nl_ucon = fill(Inf, nnln)
+  for (i, (_, nl_constraint)) in enumerate(jmodel.nlp_model.constraints)
+    rhs = nl_constraint.set
+    if rhs isa MOI.EqualTo
+      nl_lcon[i] = rhs.value
+      nl_ucon[i] = rhs.value
+    elseif rhs isa MOI.GreaterThan
+      nl_lcon[i] = rhs.lower
+    elseif rhs isa MOI.LessThan
+      nl_ucon[i] = rhs.upper
+    elseif rhs isa MOI.Interval
+      nl_lcon[i] = rhs.lower
+      nl_ucon[i] = rhs.upper
+    else
+      error("Unexpected constraint type: $(typeof(rhs))")
+    end
+  end
+
+  MOI.initialize(eval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec])
+
+  jac = MOI.jacobian_structure(eval)
+  jac_rows, jac_cols = getindex.(jac, 1), getindex.(jac, 2)
+  nnzj = length(jac)
+
+  hess = hessian ? MOI.hessian_lagrangian_structure(eval) : Tuple{Int, Int}[]
+  hess_rows = hessian ? getindex.(hess, 1) : Int[]
+  hess_cols = hessian ? getindex.(hess, 2) : Int[]
+  nnzh = length(hess)
+  nlcon = NonLinearStructure(jac_rows, jac_cols, nnzj, hess_rows, hess_cols, nnzh)
+
+  return nnln, nlcon, nl_lcon, nl_ucon
+end
+
+"""
     parser_JuMP(jmodel)
 
 Parse variables informations of a `JuMP.Model`.
@@ -392,60 +443,33 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
     end
   end
   ceval = NLPEvaluator(cmodel)
-  (ceval ≠ nothing) &&
-    (nnlnequ == 0) &&
-    MOI.initialize(
-      ceval,
-      hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec],
-    )
-  (ceval ≠ nothing) &&
-    (nnlnequ > 0) &&
-    MOI.initialize(
-      ceval,
-      hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec, :ExprGraph] :
-      [:Grad, :Jac, :JacVec, :ExprGraph],
-    )
+  MOI.initialize(ceval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec, :ExprGraph] : [:Grad, :Jac, :JacVec, :ExprGraph])
 
-  if nnlnequ == 0
-    Feval = nothing
-  else
-    Fmodel = JuMP.Model()
-    @variable(Fmodel, x[1:nvar])
-    JuMP._init_NLP(Fmodel)
-    @objective(Fmodel, Min, 0.0)
-    nln_Fmodel = nonlinear_model(Fmodel)
-    for expression in nonlinear_model(cmodel).expressions
-      nln_Fmodel.last_constraint_index += 1
-      index = MOI.Nonlinear.ConstraintIndex(nln_Fmodel.last_constraint_index)
-      nln_Fmodel.constraints[index] = MOI.Nonlinear.Constraint(expression, MOI.EqualTo{Float64}(0.0))
-    end
-    # Fmodel.nlp_data.user_operators = cmodel.nlp_data.user_operators
-    # if F_is_array_of_containers
-    #   for FF in F, Fi in FF
-    #     if typeof(Fi) == NonlinearExpression
-    #       expr = ceval.subexpressions_as_julia_expressions[Fi.index]
-    #       replace!(expr, x)
-    #       expr = :($expr == 0)
-    #       JuMP.add_nonlinear_constraint(Fmodel, expr)
-    #     end
-    #   end
-    # else
-    #   for Fi in F
-    #     if typeof(Fi) == NonlinearExpression
-    #       expr = ceval.subexpressions_as_julia_expressions[Fi.index]
-    #       replace!(expr, x)
-    #       expr = :($expr == 0)
-    #       JuMP.add_nonlinear_constraint(Fmodel, expr)
-    #     end
-    #   end
-    # end
-    Fmodel.nlp_model.operators = cmodel.nlp_model.operators
-    Feval = NLPEvaluator(Fmodel)
-    MOI.initialize(
-      Feval,
-      hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec],
-    )
-    # Feval.user_output_buffer = ceval.user_output_buffer
+  Fmodel = JuMP.Model()
+  @variable(Fmodel, x[1:nvar])
+  JuMP._init_NLP(Fmodel)
+  @objective(Fmodel, Min, 0.0)
+  nln_Fmodel = Fmodel.nlp_model
+  for expression in cmodel.nlp_model.expressions
+    nln_Fmodel.last_constraint_index += 1
+    index = MOI.Nonlinear.ConstraintIndex(nln_Fmodel.last_constraint_index)
+    nln_Fmodel.constraints[index] = MOI.Nonlinear.Constraint(expression, MOI.EqualTo{Float64}(0.0))
   end
-  return ceval, Feval, nnlnequ
+  Fmodel.nlp_model.operators = cmodel.nlp_model.operators
+  Feval = NLPEvaluator(Fmodel)
+  MOI.initialize(Feval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec])
+
+  Fjac = Feval ≠ nothing ? MOI.jacobian_structure(Feval) : Tuple{Int,Int}[]
+  Fjac_rows = Feval ≠ nothing ? getindex.(Fjac, 1) : Int[]
+  Fjac_cols = Feval ≠ nothing ? getindex.(Fjac, 2) : Int[]
+  nl_Fnnzj = length(Fjac)
+
+  Fhess = hessian && Feval ≠ nothing ? MOI.hessian_lagrangian_structure(Feval) : Tuple{Int, Int}[]
+  Fhess_rows = hessian && Feval ≠ nothing ? getindex.(Fhess, 1) : Int[]
+  Fhess_cols = hessian && Feval ≠ nothing ? getindex.(Fhess, 2) : Int[]
+  nl_Fnnzh = length(Fhess)
+
+  nlequ = NonLinearStructure(Fjac_rows, Fjac_cols, nl_Fnnzj, Fhess_rows, Fhess_cols, nl_Fnnzh)
+
+  return ceval, Feval, nlequ, nnlnequ
 end

@@ -3,11 +3,13 @@ export MathOptNLSModel
 mutable struct MathOptNLSModel <: AbstractNLSModel{Float64, Vector{Float64}}
   meta::NLPModelMeta{Float64, Vector{Float64}}
   nls_meta::NLSMeta{Float64, Vector{Float64}}
-  Feval::Union{MOI.AbstractNLPEvaluator, Nothing}
-  ceval::Union{MOI.AbstractNLPEvaluator, Nothing}
+  Feval::MOI.Nonlinear.Evaluator
+  ceval::MOI.Nonlinear.Evaluator
   lls::Objective
   linequ::LinearEquations
+  nlequ::NonLinearStructure
   lincon::LinearConstraints
+  nlcon::NonLinearStructure
   counters::NLSCounters
 end
 
@@ -23,60 +25,21 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
   nvar, lvar, uvar, x0 = parser_JuMP(cmodel)
 
   lls, linequ, nlinequ = parser_linear_expression(cmodel, nvar, F)
-  ceval, Feval, nnlnequ = parser_nonlinear_expression(cmodel, nvar, F, hessian = hessian)
-  nnln = num_nonlinear_constraints(cmodel)
-
-  nl_lcon = fill(-Inf, nnln)
-  nl_ucon = fill(Inf, nnln)
-  for (i, (_, constraint)) in enumerate(nonlinear_model(cmodel).constraints)
-    rhs = constraint.set
-    if rhs isa MOI.EqualTo
-      nl_lcon[i] = rhs.value
-      nl_ucon[i] = rhs.value
-    elseif rhs isa MOI.GreaterThan
-      nl_lcon[i] = rhs.lower
-    elseif rhs isa MOI.LessThan
-      nl_ucon[i] = rhs.upper
-    elseif rhs isa MOI.Interval
-      nl_lcon[i] = rhs.lower
-      nl_ucon[i] = rhs.upper
-    else
-      error("Unexpected constraint type: $(typeof(rhs))")
-    end
-  end
-
-  Fjac = Feval !== nothing ? MOI.jacobian_structure(Feval) : Tuple{Int,Int}[]
-  Fjac_rows = Feval !== nothing ? getindex.(Fjac, 1) : Int[]
-  Fjac_cols = Feval !== nothing ? getindex.(Fjac, 2) : Int[]
-  nl_Fnnzj = length(Fjac)
-
-  Fhess = hessian && Feval !== nothing ? MOI.hessian_lagrangian_structure(Feval) : Tuple{Int, Int}[]
-  Fhess_rows = hessian && Feval !== nothing ? getindex.(Fhess, 1) : Int[]
-  Fhess_cols = hessian && Feval !== nothing ? getindex.(Fhess, 2) : Int[]
-  nl_Fnnzh = length(Fhess)
-
-  cjac = ceval !== nothing ? MOI.jacobian_structure(ceval) : Tuple{Int,Int}[]
-  cjac_rows = ceval !== nothing ? getindex.(cjac, 1) : Int[]
-  cjac_cols = ceval !== nothing ? getindex.(cjac, 2) : Int[]
-  nl_cnnzj = length(cjac)
-
-  chess = hessian && ceval !== nothing ? MOI.hessian_lagrangian_structure(ceval) : Tuple{Int, Int}[]
-  chess_rows = hessian && ceval !== nothing ? getindex.(chess, 1) : Int[]
-  chess_cols = hessian && ceval !== nothing ? getindex.(chess, 2) : Int[]
-  nl_cnnzh = length(chess)
+  ceval, Feval, nlequ, nnlnequ = parser_nonlinear_expression(cmodel, nvar, F, hessian = hessian)
 
   moimodel = backend(cmodel)
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
+  nnln, nlcon, nl_lcon, nl_ucon = parser_NL(cmodel, ceval, hessian=hessian)
 
   nequ = nlinequ + nnlnequ
-  Fnnzj = linequ.nnzj + nl_Fnnzj
-  Fnnzh = nl_Fnnzh
+  Fnnzj = linequ.nnzj + nlequ.nnzj
+  Fnnzh = nlequ.nnzh
 
   ncon = nlin + nnln
   lcon = vcat(lin_lcon, nl_lcon)
   ucon = vcat(lin_ucon, nl_ucon)
-  cnnzj = lincon.nnzj + nl_cnnzj
-  cnnzh = lls.nnzh + nl_cnnzh
+  cnnzj = lincon.nnzj + nlcon.nnzj
+  cnnzh = lls.nnzh + nlcon.nnzh
 
   meta = NLPModelMeta(
     nvar,
@@ -91,7 +54,7 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
     nnzh = cnnzh,
     lin = collect(1:nlin),
     lin_nnzj = lincon.nnzj,
-    nln_nnzj = nl_cnnzj,
+    nln_nnzj = nlcon.nnzj,
     minimize = objective_sense(cmodel) == MOI.MIN_SENSE,
     islp = false,
     name = name,
@@ -104,7 +67,9 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
     ceval,
     lls,
     linequ,
+    nlequ,
     lincon,
+    nlcon,
     NLSCounters(),
   )
 end
@@ -133,15 +98,13 @@ function NLPModels.jac_structure_residual!(
   cols::AbstractVector{<:Integer},
 )
   if nls.nls_meta.nlin > 0
-    view(rows, 1:(nls.linequ.nnzj)) .= nls.linequ.jacobian.rows
+    view(rows, 1:(nls.linequ.nnzj)) .= nls.linequ.jacobian.rows .+ nls.meta.nlin
     view(cols, 1:(nls.linequ.nnzj)) .= nls.linequ.jacobian.cols
   end
   if nls.nls_meta.nnln > 0
+    view(rows, nls.linequ.nnzj+1:nls.nls_meta.nnzj) .= nls.nlequ.jac_rows .+ nls.nls_meta.nlin
+    view(cols, nls.linequ.nnzj+1:nls.nls_meta.nnzj) .= nls.nlequ.jac_cols
     jac_struct_residual = MOI.jacobian_structure(nls.Feval)
-    for index = (nls.linequ.nnzj + 1):(nls.nls_meta.nnzj)
-      rows[index] = jac_struct_residual[index - nls.linequ.nnzj][1] + nls.nls_meta.nlin
-      cols[index] = jac_struct_residual[index - nls.linequ.nnzj][2]
-    end
   end
   return rows, cols
 end
@@ -213,11 +176,8 @@ function NLPModels.hess_structure_residual!(
   cols::AbstractVector{<:Integer},
 )
   if nls.nls_meta.nnln > 0
-    hess_struct_residual = MOI.hessian_lagrangian_structure(nls.Feval)
-    for index = 1:(nls.nls_meta.nnzh)
-      rows[index] = hess_struct_residual[index][1]
-      cols[index] = hess_struct_residual[index][2]
-    end
+    view(rows, 1:nls.nls_meta.nnzh) .= nls.nlequ.hess_rows
+    view(cols, 1:nls.nls_meta.nnzh) .= nls.nlequ.hess_cols
   end
   return rows, cols
 end
@@ -308,11 +268,8 @@ function NLPModels.jac_nln_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
-  jac_struct = MOI.jacobian_structure(nls.ceval)
-  for index = 1:(nls.meta.nln_nnzj)
-    rows[index] = jac_struct[index][1]
-    cols[index] = jac_struct[index][2]
-  end
+  view(rows, nls.lincon.nnzj+1:nls.meta.nnzj) .= nls.nlcon.jac_rows .+ nls.meta.nlin
+  view(cols, nls.lincon.nnzj+1:nls.meta.nnzj) .= nls.nlcon.jac_cols
   return rows, cols
 end
 
@@ -324,7 +281,7 @@ end
 
 function NLPModels.jac_nln_coord!(nls::MathOptNLSModel, x::AbstractVector, vals::AbstractVector)
   increment!(nls, :neval_jac_nln)
-  MOI.eval_constraint_jacobian(nls.ceval, vals, x)
+  MOI.eval_constraint_jacobian(nls.ceval, view(vals, nls.lincon.nnzj+1:nls.meta.nnzj), x)
   return vals
 end
 
@@ -352,7 +309,7 @@ function NLPModels.jprod_nln!(
   Jv::AbstractVector,
 )
   increment!(nls, :neval_jprod_nln)
-  MOI.eval_constraint_jacobian_product(nls.ceval, Jv, x, v)
+  MOI.eval_constraint_jacobian_product(nls.ceval, view(Jv, nls.meta.nln), x, v)
   return Jv
 end
 
@@ -380,7 +337,7 @@ function NLPModels.jtprod_nln!(
   Jtv::AbstractVector,
 )
   increment!(nls, :neval_jtprod_nln)
-  MOI.eval_constraint_jacobian_transpose_product(nls.ceval, Jtv, x, v)
+  MOI.eval_constraint_jacobian_transpose_product(nls.ceval, Jtv, x, view(v, nls.meta.nln))
   return Jtv
 end
 
@@ -394,12 +351,8 @@ function NLPModels.hess_structure!(
     view(cols, 1:(nls.lls.nnzh)) .= nls.lls.hessian.cols
   end
   if nls.nls_meta.nnln > 0
-    hesslag_struct = MOI.hessian_lagrangian_structure(nls.ceval)
-    for index = (nls.lls.nnzh + 1):(nls.meta.nnzh)
-      shift_index = index - nls.lls.nnzh
-      rows[index] = hesslag_struct[shift_index][1]
-      cols[index] = hesslag_struct[shift_index][2]
-    end
+    view(rows, nls.lls.nnzh+1:nls.meta.nnzh) .= nls.nlcon.hess_rows
+    view(cols, nls.lls.nnzh+1:nls.meta.nnzh) .= nls.nlcon.hess_cols
   end
   return rows, cols
 end
