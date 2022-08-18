@@ -118,7 +118,7 @@ function NLPModels.jac_nln_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
-  view(rows, nlp.lincon.nnzj+1:nlp.meta.nnzj) .= nlp.nlcon.jac_rows .+ nlp.meta.nlin
+  view(rows, nlp.lincon.nnzj+1:nlp.meta.nnzj) .= nlp.nlcon.jac_rows
   view(cols, nlp.lincon.nnzj+1:nlp.meta.nnzj) .= nlp.nlcon.jac_cols
   return rows, cols
 end
