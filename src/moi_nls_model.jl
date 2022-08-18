@@ -98,7 +98,7 @@ function NLPModels.jac_structure_residual!(
   cols::AbstractVector{<:Integer},
 )
   if nls.nls_meta.nlin > 0
-    view(rows, 1:(nls.linequ.nnzj)) .= nls.linequ.jacobian.rows .+ nls.meta.nlin
+    view(rows, 1:(nls.linequ.nnzj)) .= nls.linequ.jacobian.rows
     view(cols, 1:(nls.linequ.nnzj)) .= nls.linequ.jacobian.cols
   end
   if nls.nls_meta.nnln > 0
@@ -268,7 +268,7 @@ function NLPModels.jac_nln_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
-  view(rows, nls.lincon.nnzj+1:nls.meta.nnzj) .= nls.nlcon.jac_rows .+ nls.meta.nlin
+  view(rows, nls.lincon.nnzj+1:nls.meta.nnzj) .= nls.nlcon.jac_rows
   view(cols, nls.lincon.nnzj+1:nls.meta.nnzj) .= nls.nlcon.jac_cols
   return rows, cols
 end
