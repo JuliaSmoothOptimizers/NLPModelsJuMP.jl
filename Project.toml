@@ -11,7 +11,7 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-JuMP = "1.0.0 - 1.1.1"
+JuMP = "1.0.0 - 1.1.1, 1"
 MathOptInterface = "1"
 NLPModels = "0.18, 0.19"
 julia = "^1.6"
