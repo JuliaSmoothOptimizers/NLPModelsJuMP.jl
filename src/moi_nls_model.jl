@@ -268,8 +268,8 @@ function NLPModels.jac_nln_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
-  view(rows, nls.lincon.nnzj+1:nls.meta.nnzj) .= nls.nlcon.jac_rows
-  view(cols, nls.lincon.nnzj+1:nls.meta.nnzj) .= nls.nlcon.jac_cols
+  view(rows, 1:(nls.nlcon.nnzj)) .= nls.nlcon.jac_rows
+  view(cols, 1:(nls.nlcon.nnzj)) .= nls.nlcon.jac_cols
   return rows, cols
 end
 
@@ -281,7 +281,7 @@ end
 
 function NLPModels.jac_nln_coord!(nls::MathOptNLSModel, x::AbstractVector, vals::AbstractVector)
   increment!(nls, :neval_jac_nln)
-  MOI.eval_constraint_jacobian(nls.ceval, view(vals, nls.lincon.nnzj+1:nls.meta.nnzj), x)
+  MOI.eval_constraint_jacobian(nls.ceval, view(vals, 1:(nls.nlcon.nnzj)), x)
   return vals
 end
 
@@ -309,7 +309,7 @@ function NLPModels.jprod_nln!(
   Jv::AbstractVector,
 )
   increment!(nls, :neval_jprod_nln)
-  MOI.eval_constraint_jacobian_product(nls.ceval, view(Jv, nls.meta.nln), x, v)
+  MOI.eval_constraint_jacobian_product(nls.ceval, Jv, x, v)
   return Jv
 end
 
@@ -337,7 +337,7 @@ function NLPModels.jtprod_nln!(
   Jtv::AbstractVector,
 )
   increment!(nls, :neval_jtprod_nln)
-  MOI.eval_constraint_jacobian_transpose_product(nls.ceval, Jtv, x, view(v, nls.meta.nln))
+  MOI.eval_constraint_jacobian_transpose_product(nls.ceval, Jtv, x, v)
   return Jtv
 end
 
