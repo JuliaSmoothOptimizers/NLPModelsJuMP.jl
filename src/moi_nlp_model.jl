@@ -159,7 +159,7 @@ function NLPModels.jprod_nln!(
   Jv::AbstractVector,
 )
   increment!(nlp, :neval_jprod_nln)
-  MOI.eval_constraint_jacobian_product(nlp.eval, Jv, x, v) # view(Jv, nlp.meta.nln), x, v)
+  MOI.eval_constraint_jacobian_product(nlp.eval, Jv, x, v)
   return Jv
 end
 
