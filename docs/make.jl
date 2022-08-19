@@ -7,7 +7,7 @@ makedocs(
   strict = true,
   format = Documenter.HTML(
     prettyurls = get(ENV, "CI", nothing) == "true",
-    ansicolor=true,
+    ansicolor = true,
     assets = ["assets/style.css"],
   ),
   sitename = "NLPModelsJuMP.jl",
