@@ -428,34 +428,35 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
   nnlnequ = 0
   F_is_array_of_containers = F isa Array{<:AbstractArray}
   if F_is_array_of_containers
-    nnlnequ = sum(sum(typeof(Fi) == NonlinearExpression for Fi in FF) for FF in F)
+    nnlnequ = sum(sum(isa(Fi, NonlinearExpression) for Fi in FF) for FF in F)
     if nnlnequ > 0
       @NLobjective(
         cmodel,
         Min,
-        0.5 * sum(sum(Fi^2 for Fi in FF if typeof(Fi) == NonlinearExpression) for FF in F)
+        0.5 * sum(sum(Fi^2 for Fi in FF if isa(Fi, NonlinearExpression)) for FF in F)
       )
     end
   else
-    nnlnequ = sum(typeof(Fi) == NonlinearExpression for Fi in F)
+    nnlnequ = sum(isa(Fi, NonlinearExpression) for Fi in F)
     if nnlnequ > 0
-      @NLobjective(cmodel, Min, 0.5 * sum(Fi^2 for Fi in F if typeof(Fi) == NonlinearExpression))
+      @NLobjective(cmodel, Min, 0.5 * sum(Fi^2 for Fi in F if isa(Fi, NonlinearExpression)))
     end
   end
-  ceval = NLPEvaluator(cmodel)
-  MOI.initialize(ceval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec, :ExprGraph] : [:Grad, :Jac, :JacVec, :ExprGraph])
 
   Fmodel = JuMP.Model()
   @variable(Fmodel, x[1:nvar])
   JuMP._init_NLP(Fmodel)
-  @objective(Fmodel, Min, 0.0)
-  nln_Fmodel = Fmodel.nlp_model
-  for expression in cmodel.nlp_model.expressions
-    nln_Fmodel.last_constraint_index += 1
-    index = MOI.Nonlinear.ConstraintIndex(nln_Fmodel.last_constraint_index)
-    nln_Fmodel.constraints[index] = MOI.Nonlinear.Constraint(expression, MOI.EqualTo{Float64}(0.0))
-  end
+  Fmodel.nlp_model.expressions = cmodel.nlp_model.expressions
   Fmodel.nlp_model.operators = cmodel.nlp_model.operators
+  for (i, Fi) in enumerate(F)
+    if isa(Fi, NonlinearExpression)
+      ci = MOI.Nonlinear.ConstraintIndex(i)
+      index = Fi.index
+      Fmodel.nlp_model.constraints[ci] = MOI.Nonlinear.Constraint(Fmodel.nlp_model.expressions[index], MOI.EqualTo{Float64}(0.0))
+      Fmodel.nlp_model.last_constraint_index += 1
+    end
+  end
+
   Feval = NLPEvaluator(Fmodel)
   MOI.initialize(Feval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec])
 
@@ -471,5 +472,5 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
 
   nlequ = NonLinearStructure(Fjac_rows, Fjac_cols, nl_Fnnzj, Fhess_rows, Fhess_cols, nl_Fnnzh)
 
-  return ceval, Feval, nlequ, nnlnequ
+  return Feval, nlequ, nnlnequ
 end
