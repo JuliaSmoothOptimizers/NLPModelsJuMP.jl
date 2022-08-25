@@ -425,7 +425,6 @@ Parse nonlinear expressions of type `NonlinearExpression`.
 function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
 
   # Nonlinear least squares model
-  nnlnequ = 0
   F_is_array_of_containers = F isa Array{<:AbstractArray}
   if F_is_array_of_containers
     nnlnequ = sum(sum(isa(Fi, NonlinearExpression) for Fi in FF) for FF in F)
@@ -442,18 +441,21 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
       @NLobjective(cmodel, Min, 0.5 * sum(Fi^2 for Fi in F if isa(Fi, NonlinearExpression)))
     end
   end
+  println(nnlnequ)
 
   Fmodel = JuMP.Model()
   @variable(Fmodel, x[1:nvar])
   JuMP._init_NLP(Fmodel)
-  Fmodel.nlp_model.expressions = cmodel.nlp_model.expressions
-  Fmodel.nlp_model.operators = cmodel.nlp_model.operators
-  for (i, Fi) in enumerate(F)
-    if isa(Fi, NonlinearExpression)
-      ci = MOI.Nonlinear.ConstraintIndex(i)
-      index = Fi.index
-      Fmodel.nlp_model.constraints[ci] = MOI.Nonlinear.Constraint(Fmodel.nlp_model.expressions[index], MOI.EqualTo{Float64}(0.0))
-      Fmodel.nlp_model.last_constraint_index += 1
+  if cmodel.nlp_model ≠ nothing
+    Fmodel.nlp_model.expressions = cmodel.nlp_model.expressions
+    Fmodel.nlp_model.operators = cmodel.nlp_model.operators
+    for (i, Fi) in enumerate(F)
+      if isa(Fi, NonlinearExpression)
+        ci = MOI.Nonlinear.ConstraintIndex(i)
+        index = Fi.index
+        Fmodel.nlp_model.constraints[ci] = MOI.Nonlinear.Constraint(Fmodel.nlp_model.expressions[index], MOI.EqualTo{Float64}(0.0))
+        Fmodel.nlp_model.last_constraint_index += 1
+      end
     end
   end
 
