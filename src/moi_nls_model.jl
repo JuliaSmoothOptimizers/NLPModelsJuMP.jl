@@ -25,10 +25,12 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
   nvar, lvar, uvar, x0 = parser_JuMP(cmodel)
 
   lls, linequ, nlinequ = parser_linear_expression(cmodel, nvar, F)
-  ceval, Feval, nlequ, nnlnequ = parser_nonlinear_expression(cmodel, nvar, F, hessian = hessian)
+  Feval, nlequ, nnlnequ = parser_nonlinear_expression(cmodel, nvar, F, hessian = hessian)
 
   moimodel = backend(cmodel)
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
+
+  ceval = NLPEvaluator(cmodel)
   nnln, nlcon, nl_lcon, nl_ucon = parser_NL(cmodel, ceval, hessian=hessian)
 
   nequ = nlinequ + nnlnequ
