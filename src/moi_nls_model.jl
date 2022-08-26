@@ -31,7 +31,7 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
 
   ceval = NLPEvaluator(cmodel)
-  nnln, nlcon, nl_lcon, nl_ucon = parser_NL(cmodel, ceval, hessian=hessian)
+  nnln, nlcon, nl_lcon, nl_ucon = parser_NL(cmodel, ceval, hessian = hessian)
 
   nequ = nlinequ + nnlnequ
   Fnnzj = linequ.nnzj + nlequ.nnzj
@@ -104,8 +104,8 @@ function NLPModels.jac_structure_residual!(
     view(cols, 1:(nls.linequ.nnzj)) .= nls.linequ.jacobian.cols
   end
   if nls.nls_meta.nnln > 0
-    view(rows, nls.linequ.nnzj+1:nls.nls_meta.nnzj) .= nls.nlequ.jac_rows .+ nls.nls_meta.nlin
-    view(cols, nls.linequ.nnzj+1:nls.nls_meta.nnzj) .= nls.nlequ.jac_cols
+    view(rows, (nls.linequ.nnzj + 1):(nls.nls_meta.nnzj)) .= nls.nlequ.jac_rows .+ nls.nls_meta.nlin
+    view(cols, (nls.linequ.nnzj + 1):(nls.nls_meta.nnzj)) .= nls.nlequ.jac_cols
     jac_struct_residual = MOI.jacobian_structure(nls.Feval)
   end
   return rows, cols
@@ -178,8 +178,8 @@ function NLPModels.hess_structure_residual!(
   cols::AbstractVector{<:Integer},
 )
   if nls.nls_meta.nnln > 0
-    view(rows, 1:nls.nls_meta.nnzh) .= nls.nlequ.hess_rows
-    view(cols, 1:nls.nls_meta.nnzh) .= nls.nlequ.hess_cols
+    view(rows, 1:(nls.nls_meta.nnzh)) .= nls.nlequ.hess_rows
+    view(cols, 1:(nls.nls_meta.nnzh)) .= nls.nlequ.hess_cols
   end
   return rows, cols
 end
@@ -353,8 +353,8 @@ function NLPModels.hess_structure!(
     view(cols, 1:(nls.lls.nnzh)) .= nls.lls.hessian.cols
   end
   if nls.nls_meta.nnln > 0
-    view(rows, nls.lls.nnzh+1:nls.meta.nnzh) .= nls.nlcon.hess_rows
-    view(cols, nls.lls.nnzh+1:nls.meta.nnzh) .= nls.nlcon.hess_cols
+    view(rows, (nls.lls.nnzh + 1):(nls.meta.nnzh)) .= nls.nlcon.hess_rows
+    view(cols, (nls.lls.nnzh + 1):(nls.meta.nnzh)) .= nls.nlcon.hess_cols
   end
   return rows, cols
 end
