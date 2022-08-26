@@ -431,7 +431,7 @@ function add_constraint_model(Fmodel, Fi::NonlinearExpression)
   return nothing
 end
 
-function add_constraint_model(Fmodel, Fi::GenericAffExpr)
+function add_constraint_model(Fmodel, Fi::Union{GenericAffExpr,VariableRef})
   return nothing
 end
 
