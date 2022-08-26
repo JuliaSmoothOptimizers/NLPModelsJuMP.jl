@@ -418,6 +418,33 @@ function parser_linear_expression(cmodel, nvar, F)
 end
 
 """
+    add_constraint_model(Fmodel, i, Fi)
+
+Add the constraint the `i`-th nonlinear constraint `Fi` to the model `Fmodel`.
+If `Fi` is an Array, then we iterate over each component.
+Return the number of current constraints.
+"""
+function add_constraint_model(Fmodel, i, Fi::NonlinearExpression)
+  ci = MOI.Nonlinear.ConstraintIndex(i)
+  index = Fi.index
+  Fmodel.nlp_model.constraints[ci] = MOI.Nonlinear.Constraint(Fmodel.nlp_model.expressions[index], MOI.EqualTo{Float64}(0.0))
+  Fmodel.nlp_model.last_constraint_index += 1
+  return i + 1
+end
+
+function add_constraint_model(Fmodel, i, Fi)
+  return i + 1
+end
+
+function add_constraint_model(Fmodel, i, Fi::AbstractArray)
+  ncon = i
+  for (j, Fj) in enumerate(Fi)
+    ncon = add_constraint_model(Fmodel, ncon + j, Fj)
+  end
+  return ncon
+end
+
+"""
     parser_nonlinear_expression(cmodel, nvar, F)
 
 Parse nonlinear expressions of type `NonlinearExpression`.
@@ -441,7 +468,6 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
       @NLobjective(cmodel, Min, 0.5 * sum(Fi^2 for Fi in F if isa(Fi, NonlinearExpression)))
     end
   end
-  println(nnlnequ)
 
   Fmodel = JuMP.Model()
   @variable(Fmodel, x[1:nvar])
@@ -449,13 +475,9 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
   if cmodel.nlp_model ≠ nothing
     Fmodel.nlp_model.expressions = cmodel.nlp_model.expressions
     Fmodel.nlp_model.operators = cmodel.nlp_model.operators
+    ncon = 0
     for (i, Fi) in enumerate(F)
-      if isa(Fi, NonlinearExpression)
-        ci = MOI.Nonlinear.ConstraintIndex(i)
-        index = Fi.index
-        Fmodel.nlp_model.constraints[ci] = MOI.Nonlinear.Constraint(Fmodel.nlp_model.expressions[index], MOI.EqualTo{Float64}(0.0))
-        Fmodel.nlp_model.last_constraint_index += 1
-      end
+      ncon = add_constraint_model(Fmodel, ncon + i, Fi)
     end
   end
 
