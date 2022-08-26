@@ -23,7 +23,7 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
 
   eval = NLPEvaluator(jmodel)
-  nnln, nlcon, nl_lcon, nl_ucon = parser_NL(jmodel, eval, hessian=hessian)
+  nnln, nlcon, nl_lcon, nl_ucon = parser_NL(jmodel, eval, hessian = hessian)
 
   if jmodel.nlp_model.objective !== nothing
     obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
@@ -201,8 +201,8 @@ function NLPModels.hess_structure!(
     view(cols, 1:(nlp.obj.nnzh)) .= nlp.obj.hessian.cols
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > 0)
-    view(rows, nlp.obj.nnzh+1:nlp.meta.nnzh) .= nlp.nlcon.hess_rows
-    view(cols, nlp.obj.nnzh+1:nlp.meta.nnzh) .= nlp.nlcon.hess_cols
+    view(rows, (nlp.obj.nnzh + 1):(nlp.meta.nnzh)) .= nlp.nlcon.hess_rows
+    view(cols, (nlp.obj.nnzh + 1):(nlp.meta.nnzh)) .= nlp.nlcon.hess_cols
   end
   return rows, cols
 end

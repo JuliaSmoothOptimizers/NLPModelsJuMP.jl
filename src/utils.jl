@@ -238,7 +238,6 @@ end
 Parse nonlinear constraints of a `MOI.Nonlinear.Evaluator`.
 """
 function parser_NL(jmodel, eval; hessian::Bool = true)
-
   nnln = num_nonlinear_constraints(jmodel)
   nl_lcon = fill(-Inf, nnln)
   nl_ucon = fill(Inf, nnln)
@@ -427,11 +426,12 @@ function add_constraint_model(Fmodel, Fi::NonlinearExpression)
   Fmodel.nlp_model.last_constraint_index += 1
   ci = MOI.Nonlinear.ConstraintIndex(Fmodel.nlp_model.last_constraint_index)
   index = Fi.index
-  Fmodel.nlp_model.constraints[ci] = MOI.Nonlinear.Constraint(Fmodel.nlp_model.expressions[index], MOI.EqualTo{Float64}(0.0))
+  Fmodel.nlp_model.constraints[ci] =
+    MOI.Nonlinear.Constraint(Fmodel.nlp_model.expressions[index], MOI.EqualTo{Float64}(0.0))
   return nothing
 end
 
-function add_constraint_model(Fmodel, Fi::Union{GenericAffExpr,VariableRef})
+function add_constraint_model(Fmodel, Fi::Union{GenericAffExpr, VariableRef})
   return nothing
 end
 
@@ -484,7 +484,7 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
   Feval = NLPEvaluator(Fmodel)
   MOI.initialize(Feval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec])
 
-  Fjac = Feval ≠ nothing ? MOI.jacobian_structure(Feval) : Tuple{Int,Int}[]
+  Fjac = Feval ≠ nothing ? MOI.jacobian_structure(Feval) : Tuple{Int, Int}[]
   Fjac_rows = Feval ≠ nothing ? getindex.(Fjac, 1) : Int[]
   Fjac_cols = Feval ≠ nothing ? getindex.(Fjac, 2) : Int[]
   nl_Fnnzj = length(Fjac)
