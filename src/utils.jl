@@ -435,6 +435,10 @@ function add_constraint_model(Fmodel, Fi::GenericAffExpr)
   return nothing
 end
 
+function add_constraint_model(Fmodel, Fi::GenericQuadExpr)
+  @warn("GenericQuadExpr{Float64, VariableRef} are not supported.")
+end
+
 function add_constraint_model(Fmodel, Fi::AbstractArray)
   for Fj in Fi
     add_constraint_model(Fmodel, Fj)
