@@ -418,30 +418,27 @@ function parser_linear_expression(cmodel, nvar, F)
 end
 
 """
-    add_constraint_model(Fmodel, i, Fi)
+    add_constraint_model(Fmodel, Fi)
 
-Add the constraint the `i`-th nonlinear constraint `Fi` to the model `Fmodel`.
+Add the nonlinear constraint `Fi == 0` to the model `Fmodel`.
 If `Fi` is an Array, then we iterate over each component.
-Return the number of current constraints.
 """
-function add_constraint_model(Fmodel, i, Fi::NonlinearExpression)
-  ci = MOI.Nonlinear.ConstraintIndex(i)
+function add_constraint_model(Fmodel, Fi::NonlinearExpression)
+  Fmodel.nlp_model.last_constraint_index += 1
+  ci = MOI.Nonlinear.ConstraintIndex(Fmodel.nlp_model.last_constraint_index)
   index = Fi.index
   Fmodel.nlp_model.constraints[ci] = MOI.Nonlinear.Constraint(Fmodel.nlp_model.expressions[index], MOI.EqualTo{Float64}(0.0))
-  Fmodel.nlp_model.last_constraint_index += 1
-  return i + 1
+  return nothing
 end
 
-function add_constraint_model(Fmodel, i, Fi)
-  return i + 1
+function add_constraint_model(Fmodel, Fi::GenericAffExpr)
+  return nothing
 end
 
-function add_constraint_model(Fmodel, i, Fi::AbstractArray)
-  ncon = i
-  for (j, Fj) in enumerate(Fi)
-    ncon = add_constraint_model(Fmodel, ncon + j, Fj)
+function add_constraint_model(Fmodel, Fi::AbstractArray)
+  for Fj in Fi
+    add_constraint_model(Fmodel, Fj)
   end
-  return ncon
 end
 
 """
@@ -475,9 +472,8 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
   if cmodel.nlp_model ≠ nothing
     Fmodel.nlp_model.expressions = cmodel.nlp_model.expressions
     Fmodel.nlp_model.operators = cmodel.nlp_model.operators
-    ncon = 0
-    for (i, Fi) in enumerate(F)
-      ncon = add_constraint_model(Fmodel, ncon + i, Fi)
+    for Fi in F
+      add_constraint_model(Fmodel, Fi)
     end
   end
 
