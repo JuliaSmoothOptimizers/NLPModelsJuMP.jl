@@ -25,6 +25,13 @@ const VI = MOI.VariableIndex
 const SQF = MOI.ScalarQuadraticFunction{Float64}
 const OBJ = Union{VI, SAF, SQF}
 
+# Expressions
+const VF = VariableRef
+const AE = GenericAffExpr{Float64, VariableRef}
+const LE = Union{VF, AE}
+const QE = GenericQuadExpr{Float64, VariableRef}
+const NLE = NonlinearExpression
+
 mutable struct COO
   rows::Vector{Int}
   cols::Vector{Int}
@@ -361,7 +368,7 @@ end
 """
     parser_linear_expression(cmodel, nvar, F)
 
-Parse linear expressions of type `GenericAffExpr{Float64,VariableRef}`.
+Parse linear expressions of type `VariableRef` and `GenericAffExpr{Float64,VariableRef}`.
 """
 function parser_linear_expression(cmodel, nvar, F)
 
@@ -380,10 +387,10 @@ function parser_linear_expression(cmodel, nvar, F)
       Min,
       0.0 +
       0.5 *
-      sum(sum(Fi^2 for Fi in FF if typeof(Fi) == GenericAffExpr{Float64, VariableRef}) for FF in F)
+      sum(sum(Fi^2 for Fi in FF if isa(Fi, LE)) for FF in F)
     )
     for FF in F, expr in FF
-      if typeof(expr) == GenericAffExpr{Float64, VariableRef}
+      if isa(expr, AE)
         nlinequ += 1
         for (i, key) in enumerate(expr.terms.keys)
           push!(rows, nlinequ)
@@ -392,15 +399,22 @@ function parser_linear_expression(cmodel, nvar, F)
         end
         push!(constants, expr.constant)
       end
+      if isa(expr, VF)
+        nlinequ += 1
+        push!(rows, nlinequ)
+        push!(cols, expr.index.value)
+        push!(vals, 1.0)
+        push!(constants, 0.0)
+      end
     end
   else
     @objective(
       cmodel,
       Min,
-      0.0 + 0.5 * sum(Fi^2 for Fi in F if typeof(Fi) == GenericAffExpr{Float64, VariableRef})
+      0.0 + 0.5 * sum(Fi^2 for Fi in F if isa(Fi, LE))
     )
     for expr in F
-      if typeof(expr) == GenericAffExpr{Float64, VariableRef}
+      if isa(expr, AE)
         nlinequ += 1
         for (i, key) in enumerate(expr.terms.keys)
           push!(rows, nlinequ)
@@ -408,6 +422,13 @@ function parser_linear_expression(cmodel, nvar, F)
           push!(vals, expr.terms.vals[i])
         end
         push!(constants, expr.constant)
+      end
+      if isa(expr, VF)
+        nlinequ += 1
+        push!(rows, nlinequ)
+        push!(cols, expr.index.value)
+        push!(vals, 1.0)
+        push!(constants, 0.0)
       end
     end
   end
@@ -422,7 +443,7 @@ end
 Add the nonlinear constraint `Fi == 0` to the model `Fmodel`.
 If `Fi` is an Array, then we iterate over each component.
 """
-function add_constraint_model(Fmodel, Fi::NonlinearExpression)
+function add_constraint_model(Fmodel, Fi::NLE)
   Fmodel.nlp_model.last_constraint_index += 1
   ci = MOI.Nonlinear.ConstraintIndex(Fmodel.nlp_model.last_constraint_index)
   index = Fi.index
@@ -431,11 +452,11 @@ function add_constraint_model(Fmodel, Fi::NonlinearExpression)
   return nothing
 end
 
-function add_constraint_model(Fmodel, Fi::Union{GenericAffExpr, VariableRef})
+function add_constraint_model(Fmodel, Fi::LE)
   return nothing
 end
 
-function add_constraint_model(Fmodel, Fi::GenericQuadExpr)
+function add_constraint_model(Fmodel, Fi::QE)
   @warn("GenericQuadExpr{Float64, VariableRef} are not supported.")
 end
 
@@ -455,18 +476,18 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
   # Nonlinear least squares model
   F_is_array_of_containers = F isa Array{<:AbstractArray}
   if F_is_array_of_containers
-    nnlnequ = sum(sum(isa(Fi, NonlinearExpression) for Fi in FF) for FF in F)
+    nnlnequ = sum(sum(isa(Fi, NLE) for Fi in FF) for FF in F)
     if nnlnequ > 0
       @NLobjective(
         cmodel,
         Min,
-        0.5 * sum(sum(Fi^2 for Fi in FF if isa(Fi, NonlinearExpression)) for FF in F)
+        0.5 * sum(sum(Fi^2 for Fi in FF if isa(Fi, NLE)) for FF in F)
       )
     end
   else
-    nnlnequ = sum(isa(Fi, NonlinearExpression) for Fi in F)
+    nnlnequ = sum(isa(Fi, NLE) for Fi in F)
     if nnlnequ > 0
-      @NLobjective(cmodel, Min, 0.5 * sum(Fi^2 for Fi in F if isa(Fi, NonlinearExpression)))
+      @NLobjective(cmodel, Min, 0.5 * sum(Fi^2 for Fi in F if isa(Fi, NLE)))
     end
   end
 
