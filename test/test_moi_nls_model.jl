@@ -45,7 +45,7 @@ println("Testing Dense JuMP container on NLS")
 # Linear expressions
 model = Model()
 @variable(model, x[1:4])
-@expression(model, F[i = 1:2, j = 1:2], x[i+j])
+@expression(model, F[i = 1:2, j = 1:2], x[i + j])
 @test F isa Array{VariableRef}
 nls = MathOptNLSModel(model, F)
 @test residual(nls, ones(4)) == [1.0; 1.0; 1.0; 1.0]

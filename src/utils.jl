@@ -382,13 +382,7 @@ function parser_linear_expression(cmodel, nvar, F)
   nlinequ = 0
   F_is_array_of_containers = F isa Array{<:AbstractArray}
   if F_is_array_of_containers
-    @objective(
-      cmodel,
-      Min,
-      0.0 +
-      0.5 *
-      sum(sum(Fi^2 for Fi in FF if isa(Fi, LE)) for FF in F)
-    )
+    @objective(cmodel, Min, 0.0 + 0.5 * sum(sum(Fi^2 for Fi in FF if isa(Fi, LE)) for FF in F))
     for FF in F, expr in FF
       if isa(expr, AE)
         nlinequ += 1
@@ -408,11 +402,7 @@ function parser_linear_expression(cmodel, nvar, F)
       end
     end
   else
-    @objective(
-      cmodel,
-      Min,
-      0.0 + 0.5 * sum(Fi^2 for Fi in F if isa(Fi, LE))
-    )
+    @objective(cmodel, Min, 0.0 + 0.5 * sum(Fi^2 for Fi in F if isa(Fi, LE)))
     for expr in F
       if isa(expr, AE)
         nlinequ += 1
@@ -478,11 +468,7 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
   if F_is_array_of_containers
     nnlnequ = sum(sum(isa(Fi, NLE) for Fi in FF) for FF in F)
     if nnlnequ > 0
-      @NLobjective(
-        cmodel,
-        Min,
-        0.5 * sum(sum(Fi^2 for Fi in FF if isa(Fi, NLE)) for FF in F)
-      )
+      @NLobjective(cmodel, Min, 0.5 * sum(sum(Fi^2 for Fi in FF if isa(Fi, NLE)) for FF in F))
     end
   else
     nnlnequ = sum(isa(Fi, NLE) for Fi in F)
