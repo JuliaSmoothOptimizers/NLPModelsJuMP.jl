@@ -384,6 +384,7 @@ function parser_linear_expression(cmodel, nvar, F)
   if F_is_array_of_containers
     @objective(cmodel, Min, 0.0 + 0.5 * sum(sum(Fi^2 for Fi in FF if isa(Fi, LE)) for FF in F))
     for FF in F, expr in FF
+      isa(expr, QE) && @warn("GenericQuadExpr{Float64, VariableRef} are not supported.")
       if isa(expr, AE)
         nlinequ += 1
         for (i, key) in enumerate(expr.terms.keys)
@@ -404,6 +405,7 @@ function parser_linear_expression(cmodel, nvar, F)
   else
     @objective(cmodel, Min, 0.0 + 0.5 * sum(Fi^2 for Fi in F if isa(Fi, LE)))
     for expr in F
+      isa(expr, QE) && @warn("GenericQuadExpr{Float64, VariableRef} are not supported.")
       if isa(expr, AE)
         nlinequ += 1
         for (i, key) in enumerate(expr.terms.keys)
