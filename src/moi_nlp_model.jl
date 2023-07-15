@@ -17,9 +17,9 @@ Construct a `MathOptNLPModel` from a `JuMP` model.
 `hessian` should be set to `false` for multivariate user-defined functions registered without hessian.
 """
 function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String = "Generic")
-  nvar, lvar, uvar, x0 = parser_JuMP(jmodel)
-
   moimodel = backend(jmodel)
+
+  nvar, lvar, uvar, x0 = parser_variables(moimodel)
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
 
   eval = NLPEvaluator(jmodel)

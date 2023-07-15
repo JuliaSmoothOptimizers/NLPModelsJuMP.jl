@@ -281,29 +281,27 @@ function parser_NL(jmodel, eval; hessian::Bool = true)
 end
 
 """
-    parser_JuMP(jmodel)
+    parser_variables(model)
 
-Parse variables informations of a `JuMP.Model`.
+Parse variables informations of a `MOI.ModelLike`.
 """
-function parser_JuMP(jmodel)
+function parser_variables(model::MOI.ModelLike)
 
   # Number of variables and bounds constraints
-  nvar = Int(num_variables(jmodel))
-  vars = all_variables(jmodel)
-  lvar = map(
-    var -> is_fixed(var) ? fix_value(var) : (has_lower_bound(var) ? lower_bound(var) : -Inf),
-    vars,
-  )
-  uvar = map(
-    var -> is_fixed(var) ? fix_value(var) : (has_upper_bound(var) ? upper_bound(var) : Inf),
-    vars,
-  )
-
+  vars = MOI.get(model, MOI.ListOfVariableIndices())
+  nvar = length(vars)
+  lvar = zeros(nvar)
+  uvar = zeros(nvar)
   # Initial solution
   x0 = zeros(nvar)
-  for (i, val) ∈ enumerate(start_value.(vars))
-    if val !== nothing
-      x0[i] = val
+  has_start = MOI.VariablePrimalStart() in MOI.get(model, MOI.ListOfVariableAttributesSet())
+  for (i, vi) in enumerate(vars)
+    lvar[i], uvar[i] = MOI.Utilities.get_bounds(model, Float64, vi)
+    if has_start
+      val = MOI.get(model, MOI.VariablePrimalStart(), vi)
+      if val !== nothing
+        x0[i] = val
+      end
     end
   end
 
