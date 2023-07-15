@@ -22,12 +22,12 @@ Construct a `MathOptNLSModel` from a `JuMP` model and a container of JuMP
 `hessian` should be set to `false` for multivariate user-defined functions registered without hessian.
 """
 function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::String = "Generic")
-  nvar, lvar, uvar, x0 = parser_JuMP(cmodel)
+  moimodel = backend(cmodel)
+  nvar, lvar, uvar, x0 = parser_variables(moimodel)
 
   lls, linequ, nlinequ = parser_linear_expression(cmodel, nvar, F)
   Feval, nlequ, nnlnequ = parser_nonlinear_expression(cmodel, nvar, F, hessian = hessian)
 
-  moimodel = backend(cmodel)
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
 
   ceval = NLPEvaluator(cmodel)
