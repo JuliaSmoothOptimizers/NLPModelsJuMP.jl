@@ -28,10 +28,12 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
   lls, linequ, nlinequ = parser_linear_expression(cmodel, nvar, F)
   Feval, nlequ, nnlnequ = parser_nonlinear_expression(cmodel, nvar, F, hessian = hessian)
 
+  _nlp_sync!(cmodel)
+  moimodel = backend(cmodel)
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
 
-  ceval = NLPEvaluator(cmodel)
-  nnln, nlcon, nl_lcon, nl_ucon = parser_NL(cmodel, ceval, hessian = hessian)
+  nlp_data = MOI.get(moimodel, MOI.NLPBlock())
+  nnln, nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
 
   nequ = nlinequ + nnlnequ
   Fnnzj = linequ.nnzj + nlequ.nnzj
@@ -66,7 +68,7 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
     meta,
     NLSMeta(nequ, nvar, nnzj = Fnnzj, nnzh = Fnnzh, lin = collect(1:nlinequ)),
     Feval,
-    ceval,
+    nlp_data.evaluator,
     lls,
     linequ,
     nlequ,

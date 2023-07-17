@@ -244,27 +244,12 @@ end
 
 Parse nonlinear constraints of a `MOI.Nonlinear.Evaluator`.
 """
-function parser_NL(jmodel, eval; hessian::Bool = true)
-  nnln = num_nonlinear_constraints(jmodel)
-  nl_lcon = fill(-Inf, nnln)
-  nl_ucon = fill(Inf, nnln)
-  for (i, (_, nl_constraint)) in enumerate(jmodel.nlp_model.constraints)
-    rhs = nl_constraint.set
-    if rhs isa MOI.EqualTo
-      nl_lcon[i] = rhs.value
-      nl_ucon[i] = rhs.value
-    elseif rhs isa MOI.GreaterThan
-      nl_lcon[i] = rhs.lower
-    elseif rhs isa MOI.LessThan
-      nl_ucon[i] = rhs.upper
-    elseif rhs isa MOI.Interval
-      nl_lcon[i] = rhs.lower
-      nl_ucon[i] = rhs.upper
-    else
-      error("Unexpected constraint type: $(typeof(rhs))")
-    end
-  end
+function parser_NL(nlp_data; hessian::Bool = true)
+  nnln = length(nlp_data.constraint_bounds)
+  nl_lcon = Float64[bounds.lower for bounds in nlp_data.constraint_bounds]
+  nl_ucon = Float64[bounds.upper for bounds in nlp_data.constraint_bounds]
 
+  eval = nlp_data.evaluator
   MOI.initialize(eval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec])
 
   jac = MOI.jacobian_structure(eval)
@@ -504,4 +489,15 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
   nlequ = NonLinearStructure(Fjac_rows, Fjac_cols, nl_Fnnzj, Fhess_rows, Fhess_cols, nl_Fnnzh)
 
   return Feval, nlequ, nnlnequ
+end
+
+function _nlp_sync!(model::JuMP.Model)
+  # The nlp model of the backend is not kept in sync, so re-set it here as in `JuMP.optimize!`
+  evaluator = MOI.Nonlinear.Evaluator(
+      # `force = true` is needed if there is not NL objective or constraint
+      JuMP.nonlinear_model(model, force = true),
+      MOI.Nonlinear.SparseReverseMode(),
+      JuMP.index.(JuMP.all_variables(model)),
+  )
+  MOI.set(model, MOI.NLPBlock(), MOI.NLPBlockData(evaluator))
 end

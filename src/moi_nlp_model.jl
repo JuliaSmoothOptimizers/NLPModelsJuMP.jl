@@ -16,16 +16,19 @@ Construct a `MathOptNLPModel` from a `JuMP` model.
 
 `hessian` should be set to `false` for multivariate user-defined functions registered without hessian.
 """
-function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String = "Generic")
-  moimodel = backend(jmodel)
+function MathOptNLPModel(jmodel::JuMP.Model; kws...)
+  _nlp_sync!(jmodel)
+  return MathOptNLPModel(backend(jmodel); kws...)
+end
 
+function MathOptNLPModel(moimodel::MOI.ModelLike; hessian::Bool = true, name::String = "Generic")
   nvar, lvar, uvar, x0 = parser_variables(moimodel)
   nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel)
 
-  eval = NLPEvaluator(jmodel)
-  nnln, nlcon, nl_lcon, nl_ucon = parser_NL(jmodel, eval, hessian = hessian)
+  nlp_data = MOI.get(moimodel, MOI.NLPBlock())
+  nnln, nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
 
-  if jmodel.nlp_model.objective !== nothing
+  if nlp_data.has_objective
     obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
   else
     obj = parser_objective_MOI(moimodel, nvar)
@@ -51,12 +54,12 @@ function MathOptNLPModel(jmodel::JuMP.Model; hessian::Bool = true, name::String 
     lin = collect(1:nlin),
     lin_nnzj = lincon.nnzj,
     nln_nnzj = nlcon.nnzj,
-    minimize = objective_sense(jmodel) == MOI.MIN_SENSE,
+    minimize = MOI.get(moimodel, MOI.ObjectiveSense()) == MOI.MIN_SENSE,
     islp = (obj.type == "LINEAR") && (nnln == 0),
     name = name,
   )
 
-  return MathOptNLPModel(meta, eval, lincon, nlcon, obj, Counters())
+  return MathOptNLPModel(meta, nlp_data.evaluator, lincon, nlcon, obj, Counters())
 end
 
 function NLPModels.obj(nlp::MathOptNLPModel, x::AbstractVector)
