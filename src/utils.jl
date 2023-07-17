@@ -494,10 +494,10 @@ end
 function _nlp_sync!(model::JuMP.Model)
   # The nlp model of the backend is not kept in sync, so re-set it here as in `JuMP.optimize!`
   evaluator = MOI.Nonlinear.Evaluator(
-      # `force = true` is needed if there is not NL objective or constraint
-      JuMP.nonlinear_model(model, force = true),
-      MOI.Nonlinear.SparseReverseMode(),
-      JuMP.index.(JuMP.all_variables(model)),
+    # `force = true` is needed if there is not NL objective or constraint
+    JuMP.nonlinear_model(model, force = true),
+    MOI.Nonlinear.SparseReverseMode(),
+    JuMP.index.(JuMP.all_variables(model)),
   )
   MOI.set(model, MOI.NLPBlock(), MOI.NLPBlockData(evaluator))
 end
