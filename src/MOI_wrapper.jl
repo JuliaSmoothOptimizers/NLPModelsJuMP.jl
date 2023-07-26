@@ -103,7 +103,7 @@ function MOI.optimize!(model::Optimizer)
     if model.silent
         options[:verbose] = 0
     end
-    model.stats = SolverCore.solve!(model.solver, model.nlp; options...)
+    SolverCore.solve!(model.solver, model.nlp, model.stats; options...)
     return
 end
 
