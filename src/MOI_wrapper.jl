@@ -5,12 +5,15 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
     silent::Bool
     solver
     nlp::Union{Nothing,MathOptNLPModel}
-    stats::Union{
-        Nothing,
-        SolverCore.GenericExecutionStats{Float64,Vector{Float64},Vector{Float64},Any},
-    }
+    stats::SolverCore.GenericExecutionStats{Float64,Vector{Float64},Vector{Float64},Any}
     function Optimizer()
-        return new(Dict{String,Any}(), false, nothing, nothing, nothing)
+        return new(
+            Dict{String,Any}(),
+            false,
+            nothing,
+            nothing,
+            SolverCore.GenericExecutionStats{Float64,Vector{Float64},Vector{Float64},Any}(),
+        )
     end
 end
 
@@ -22,7 +25,7 @@ MOI.is_empty(optimizer::Optimizer) = isnothing(optimizer.solver) && isnothing(op
 function MOI.empty!(optimizer::Optimizer)
     optimizer.solver = nothing
     optimizer.nlp = nothing
-    optimizer.stats = nothing
+    # TODO how to I reset `stats` ?
     return
 end
 
@@ -103,7 +106,7 @@ function MOI.optimize!(model::Optimizer)
     if model.silent
         options[:verbose] = 0
     else
-      options[:verbose] = 1
+        options[:verbose] = 1
     end
     SolverCore.solve!(model.solver, model.nlp, model.stats; options...)
     return
