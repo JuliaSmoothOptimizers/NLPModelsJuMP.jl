@@ -102,6 +102,8 @@ function MOI.optimize!(model::Optimizer)
     )
     if model.silent
         options[:verbose] = 0
+    else
+      options[:verbose] = 1
     end
     SolverCore.solve!(model.solver, model.nlp, model.stats; options...)
     return
