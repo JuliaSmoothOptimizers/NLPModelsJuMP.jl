@@ -25,7 +25,7 @@ MOI.is_empty(optimizer::Optimizer) = isnothing(optimizer.solver) && isnothing(op
 function MOI.empty!(optimizer::Optimizer)
     optimizer.solver = nothing
     optimizer.nlp = nothing
-    # TODO how to I reset `stats` ?
+    reset!(stats)
     return
 end
 
