@@ -138,17 +138,18 @@ function coo_sym_dot(
 end
 
 """
-    parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
+    parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
 
 Parse a `ScalarAffineFunction` fun with its associated set.
 `linrows`, `lincols`, `linvals`, `lin_lcon` and `lin_ucon` are updated.
 """
-function parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
+function parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
+  _index(v::MOI.VariableIndex) = index_map[v].value
 
   # Parse a ScalarAffineTerm{Float64}(coefficient, variable)
   for term in fun.terms
     push!(linrows, nlin + 1)
-    push!(lincols, term.variable.value)
+    push!(lincols, _index(term.variable))
     push!(linvals, term.coefficient)
   end
 
@@ -170,17 +171,18 @@ function parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_uco
 end
 
 """
-    parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
+    parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
 
 Parse a `VectorAffineFunction` fun with its associated set.
 `linrows`, `lincols`, `linvals`, `lin_lcon` and `lin_ucon` are updated.
 """
-function parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
+function parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
+  _index(v::MOI.VariableIndex) = index_map[v].value
 
   # Parse a VectorAffineTerm{Float64}(output_index, scalar_term)
   for term in fun.terms
     push!(linrows, nlin + term.output_index)
-    push!(lincols, term.scalar_term.variable.value)
+    push!(lincols, _index(term.scalar_term.variable))
     push!(linvals, term.scalar_term.coefficient)
   end
 
@@ -198,11 +200,11 @@ function parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_uco
 end
 
 """
-    parser_MOI(moimodel)
+    parser_MOI(moimodel, index_map)
 
 Parse linear constraints of a `MOI.ModelLike`.
 """
-function parser_MOI(moimodel)
+function parser_MOI(moimodel, index_map)
 
   # Variables associated to linear constraints
   nlin = 0
@@ -214,20 +216,25 @@ function parser_MOI(moimodel)
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
-    F == VI && continue
-    F <: AF || @warn("Function $F is not supported.")
+    F <: AF || F == VI || @warn("Function $F is not supported.")
     S <: LS || @warn("Set $S is not supported.")
 
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
     for cidx in conindices
       fun = MOI.get(moimodel, MOI.ConstraintFunction(), cidx)
+      if F == VI
+        index_map[cidx] = MOI.ConstraintIndex{F,S}(fun.value)
+        continue
+      else
+        index_map[cidx] = MOI.ConstraintIndex{F,S}(nlin)
+      end
       set = MOI.get(moimodel, MOI.ConstraintSet(), cidx)
       if typeof(fun) <: SAF
-        parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
+        parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
         nlin += 1
       end
       if typeof(fun) <: VAF
-        parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
+        parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
         nlin += set.dimension
       end
     end
@@ -237,6 +244,19 @@ function parser_MOI(moimodel)
   lincon = LinearConstraints(coo, nnzj)
 
   return nlin, lincon, lin_lcon, lin_ucon
+end
+
+function _nlp_block(model::MOI.ModelLike)
+  nlp_data = MOI.get(model, MOI.NLPBlock())
+  if isnothing(nlp_data)
+    evaluator = MOI.Nonlinear.Evaluator(
+        MOI.Nonlinear.Model(),
+        MOI.Nonlinear.SparseReverseMode(),
+        MOI.get(model, MOI.ListOfVariableIndices()),
+    )
+    nlp_data = MOI.NLPBlockData(evaluator)
+  end
+  return nlp_data
 end
 
 """
@@ -271,7 +291,6 @@ end
 Parse variables informations of a `MOI.ModelLike`.
 """
 function parser_variables(model::MOI.ModelLike)
-
   # Number of variables and bounds constraints
   vars = MOI.get(model, MOI.ListOfVariableIndices())
   nvar = length(vars)
@@ -280,6 +299,12 @@ function parser_variables(model::MOI.ModelLike)
   # Initial solution
   x0 = zeros(nvar)
   has_start = MOI.VariablePrimalStart() in MOI.get(model, MOI.ListOfVariableAttributesSet())
+
+  index_map = MOI.Utilities.IndexMap()
+  for (i, vi) in enumerate(vars)
+      index_map[vi] = MOI.VariableIndex(i)
+  end
+
   for (i, vi) in enumerate(vars)
     lvar[i], uvar[i] = MOI.Utilities.get_bounds(model, Float64, vi)
     if has_start
@@ -290,7 +315,7 @@ function parser_variables(model::MOI.ModelLike)
     end
   end
 
-  return nvar, lvar, uvar, x0
+  return index_map, nvar, lvar, uvar, x0
 end
 
 """
@@ -298,7 +323,8 @@ end
 
 Parse linear and quadratic objective of a `MOI.ModelLike`.
 """
-function parser_objective_MOI(moimodel, nvar)
+function parser_objective_MOI(moimodel, nvar, index_map)
+  _index(v::MOI.VariableIndex) = index_map[v].value
 
   # Variables associated to linear and quadratic objective
   type = "UNKNOWN"
@@ -313,7 +339,7 @@ function parser_objective_MOI(moimodel, nvar)
   # Single Variable
   if typeof(fobj) == VI
     type = "LINEAR"
-    vect[fobj.value] = 1.0
+    vect[_index(fobj)] = 1.0
   end
 
   # Linear objective
@@ -321,7 +347,7 @@ function parser_objective_MOI(moimodel, nvar)
     type = "LINEAR"
     constant = fobj.constant
     for term in fobj.terms
-      vect[term.variable.value] = term.coefficient
+      vect[_index(term.variable)] += term.coefficient
     end
   end
 
@@ -330,11 +356,11 @@ function parser_objective_MOI(moimodel, nvar)
     type = "QUADRATIC"
     constant = fobj.constant
     for term in fobj.affine_terms
-      vect[term.variable.value] = term.coefficient
+      vect[_index(term.variable)] += term.coefficient
     end
     for term in fobj.quadratic_terms
-      i = term.variable_1.value
-      j = term.variable_2.value
+      i = _index(term.variable_1)
+      j = _index(term.variable_2)
       if i ≥ j
         push!(rows, i)
         push!(cols, j)
@@ -353,7 +379,7 @@ end
 
 Parse linear expressions of type `VariableRef` and `GenericAffExpr{Float64,VariableRef}`.
 """
-function parser_linear_expression(cmodel, nvar, F)
+function parser_linear_expression(cmodel, nvar, index_map, F)
 
   # Variables associated to linear expressions
   rows = Int[]
@@ -408,7 +434,7 @@ function parser_linear_expression(cmodel, nvar, F)
     end
   end
   moimodel = backend(cmodel)
-  lls = parser_objective_MOI(moimodel, nvar)
+  lls = parser_objective_MOI(moimodel, nvar, index_map)
   return lls, LinearEquations(COO(rows, cols, vals), constants, length(vals)), nlinequ
 end
 
