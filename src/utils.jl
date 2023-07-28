@@ -223,10 +223,10 @@ function parser_MOI(moimodel, index_map)
     for cidx in conindices
       fun = MOI.get(moimodel, MOI.ConstraintFunction(), cidx)
       if F == VI
-        index_map[cidx] = MOI.ConstraintIndex{F,S}(fun.value)
+        index_map[cidx] = MOI.ConstraintIndex{F, S}(fun.value)
         continue
       else
-        index_map[cidx] = MOI.ConstraintIndex{F,S}(nlin)
+        index_map[cidx] = MOI.ConstraintIndex{F, S}(nlin)
       end
       set = MOI.get(moimodel, MOI.ConstraintSet(), cidx)
       if typeof(fun) <: SAF
@@ -250,9 +250,9 @@ function _nlp_block(model::MOI.ModelLike)
   nlp_data = MOI.get(model, MOI.NLPBlock())
   if isnothing(nlp_data)
     evaluator = MOI.Nonlinear.Evaluator(
-        MOI.Nonlinear.Model(),
-        MOI.Nonlinear.SparseReverseMode(),
-        MOI.get(model, MOI.ListOfVariableIndices()),
+      MOI.Nonlinear.Model(),
+      MOI.Nonlinear.SparseReverseMode(),
+      MOI.get(model, MOI.ListOfVariableIndices()),
     )
     nlp_data = MOI.NLPBlockData(evaluator)
   end
@@ -302,7 +302,7 @@ function parser_variables(model::MOI.ModelLike)
 
   index_map = MOI.Utilities.IndexMap()
   for (i, vi) in enumerate(vars)
-      index_map[vi] = MOI.VariableIndex(i)
+    index_map[vi] = MOI.VariableIndex(i)
   end
 
   for (i, vi) in enumerate(vars)
