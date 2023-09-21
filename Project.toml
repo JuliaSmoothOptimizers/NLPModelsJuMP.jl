@@ -12,7 +12,7 @@ SolverCore = "ff4d7338-4cf1-434d-91df-b86cb86fb843"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-JuMP = "^1.2"
+JuMP = "1.2 - 1.14.1"
 MathOptInterface = "^1.7"
 NLPModels = "0.18, 0.19, 0.20"
 SolverCore = "0.3"
