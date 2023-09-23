@@ -4,7 +4,7 @@ makedocs(
   modules = [NLPModelsJuMP],
   checkdocs = :exports,
   doctest = true,
-  strict = true,
+  linkcheck = true,
   format = Documenter.HTML(
     prettyurls = get(ENV, "CI", nothing) == "true",
     ansicolor = true,
