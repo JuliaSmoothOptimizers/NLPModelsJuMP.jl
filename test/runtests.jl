@@ -19,3 +19,5 @@ include("test_moi_nls_model.jl")
 
 include("nlp_consistency.jl")
 include("nls_consistency.jl")
+
+include("MOI_wrapper.jl")
