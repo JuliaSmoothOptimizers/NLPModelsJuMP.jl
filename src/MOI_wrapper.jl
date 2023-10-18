@@ -5,15 +5,12 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
   silent::Bool
   solver
   nlp::Union{Nothing, MathOptNLPModel}
-  stats::Union{Nothing,SolverCore.GenericExecutionStats{Float64, Vector{Float64}, Vector{Float64}, Any}}
+  stats::Union{
+    Nothing,
+    SolverCore.GenericExecutionStats{Float64, Vector{Float64}, Vector{Float64}, Any},
+  }
   function Optimizer()
-    return new(
-      Dict{String, Any}(),
-      false,
-      nothing,
-      nothing,
-      nothing,
-    )
+    return new(Dict{String, Any}(), false, nothing, nothing, nothing)
   end
 end
 
