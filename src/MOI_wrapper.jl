@@ -5,14 +5,14 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
   silent::Bool
   solver
   nlp::Union{Nothing, MathOptNLPModel}
-  stats::SolverCore.GenericExecutionStats{Float64, Vector{Float64}, Vector{Float64}, Any}
+  stats::Union{Nothing,SolverCore.GenericExecutionStats{Float64, Vector{Float64}, Vector{Float64}, Any}}
   function Optimizer()
     return new(
       Dict{String, Any}(),
       false,
       nothing,
       nothing,
-      SolverCore.GenericExecutionStats{Float64, Vector{Float64}, Vector{Float64}, Any}(),
+      nothing,
     )
   end
 end
@@ -25,7 +25,7 @@ MOI.is_empty(optimizer::Optimizer) = isnothing(optimizer.solver) && isnothing(op
 function MOI.empty!(optimizer::Optimizer)
   optimizer.solver = nothing
   optimizer.nlp = nothing
-  reset!(stats)
+  optimizer.stats = nothing
   return
 end
 
@@ -101,6 +101,7 @@ function MOI.optimize!(model::Optimizer)
   else
     options[:verbose] = 1
   end
+  model.stats = SolverCore.GenericExecutionStats(model.nlp)
   SolverCore.solve!(model.solver, model.nlp, model.stats; options...)
   return
 end
