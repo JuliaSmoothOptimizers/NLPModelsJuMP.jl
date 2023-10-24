@@ -57,7 +57,11 @@ MOI.get(optimizer::Optimizer, ::MOI.Silent) = optimizer.silent
 
 function MOI.supports(
   ::Optimizer,
-  ::Union{MOI.ObjectiveSense, MOI.ObjectiveFunction{<:OBJ}, MOI.NLPBlock},
+  ::Union{
+    MOI.ObjectiveSense,
+    MOI.ObjectiveFunction{<:Union{LinQuad,MOI.ScalarNonlinearFunction}},
+    MOI.NLPBlock,
+},
 )
   return true
 end
@@ -76,6 +80,7 @@ end
 
 MOI.supports_constraint(::Optimizer, ::Type{VI}, ::Type{<:ALS}) = true
 MOI.supports_constraint(::Optimizer, ::Type{SAF}, ::Type{<:ALS}) = true
+MOI.supports_constraint(::Optimizer, ::Type{MOI.ScalarNonlinearFunction}, ::Type{<:ALS}) = true
 MOI.supports_constraint(::Optimizer, ::Type{VAF}, ::Type{<:VLS}) = true
 
 function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
