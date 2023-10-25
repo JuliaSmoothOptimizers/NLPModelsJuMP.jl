@@ -272,7 +272,7 @@ end
 function _nlp_model(model::MOI.ModelLike)
   nlp_model = nothing
   for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
-    nlp_model = _nlp_model!(model, F, S)
+    nlp_model = _nlp_model(model, F, S)
   end
   F = MOI.get(model, MOI.ObjectiveFunctionType())
   if F <: MOI.ScalarNonlinearFunction
