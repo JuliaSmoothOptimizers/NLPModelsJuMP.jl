@@ -588,6 +588,6 @@ function _nlp_sync!(model::JuMP.Model)
       MOI.Nonlinear.SparseReverseMode(),
       JuMP.index.(JuMP.all_variables(model)),
     )
+    MOI.set(model, MOI.NLPBlock(), MOI.NLPBlockData(evaluator))
   end
-  MOI.set(model, MOI.NLPBlock(), MOI.NLPBlockData(evaluator))
 end
