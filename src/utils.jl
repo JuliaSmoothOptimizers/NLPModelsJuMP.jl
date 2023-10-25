@@ -216,7 +216,7 @@ function parser_MOI(moimodel, index_map)
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
-    F <: AF || F == VI || @warn("Function $F is not supported.")
+    F <: AF || F == MOI.ScalarNonlinearFunction || F == VI || @warn("Function $F is not supported.")
     S <: LS || @warn("Set $S is not supported.")
 
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
@@ -247,19 +247,19 @@ function parser_MOI(moimodel, index_map)
 end
 
 # Affine or quadratic, nothing to do
-function _nlp_model(::Union{Nothing,MOI.ModelLike}, ::MOI.ModelLike, ::Type, ::Type) end
+function _nlp_model(::Union{Nothing,MOI.Nonlinear.Model}, ::MOI.ModelLike, ::Type, ::Type) end
 
 function _nlp_model(
-  dest::Union{Nothing,MOI.ModelLike},
+  dest::Union{Nothing,MOI.Nonlinear.Model},
   src::MOI.ModelLike,
   F::Type{<:Union{MOI.ScalarNonlinearFunction,MOI.VectorNonlinearFunction}},
   S::Type,
 )
-  for ci in MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
+  for ci in MOI.get(src, MOI.ListOfConstraintIndices{F,S}())
     if isnothing(dest)
       dest = MOI.Nonlinear.Model()
     end
-    MOI.add_constraint(
+    MOI.Nonlinear.add_constraint(
       dest,
       MOI.get(src, MOI.ConstraintFunction(), ci),
       MOI.get(src, MOI.ConstraintSet(), ci),
@@ -272,7 +272,7 @@ end
 function _nlp_model(model::MOI.ModelLike)
   nlp_model = nothing
   for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
-    nlp_model = _nlp_model(model, F, S)
+    nlp_model = _nlp_model(nlp_model, model, F, S)
   end
   F = MOI.get(model, MOI.ObjectiveFunctionType())
   if F <: MOI.ScalarNonlinearFunction
@@ -280,7 +280,7 @@ function _nlp_model(model::MOI.ModelLike)
       nlp_model = MOI.Nonlinear.Model()
     end
     attr = MOI.ObjectiveFunction{F}()
-    MOI.set(nlp_model, attr, MOI.get(model, attr))
+    MOI.Nonlinear.set_objective(nlp_model, MOI.get(model, attr))
   end
   return nlp_model
 end
