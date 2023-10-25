@@ -125,7 +125,7 @@ function test_runtests()
       r"test_nonlinear_expression_hs071_epigraph$",
       # FIXME Segfault
       r"test_linear_integration_delete_variables$",
-      # Bug in bridge
+      # https://github.com/jump-dev/MathOptInterface.jl/issues/2323
       r"test_basic_VectorNonlinearFunction_NormInfinityCone$",
       r"test_basic_VectorNonlinearFunction_NormOneCone$",
     ],
