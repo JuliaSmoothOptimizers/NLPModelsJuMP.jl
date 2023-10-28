@@ -102,8 +102,32 @@ function test_runtests()
       r"test_linear_transform$",
       r"test_linear_variable_open_intervals$",
       r"test_linear_integration_modification$",
+      r"test_quadratic_SecondOrderCone_basic$",
+      r"test_quadratic_constraint_GreaterThan$",
+      r"test_quadratic_constraint_LessThan$",
+      r"test_quadratic_constraint_basic$",
+      r"test_quadratic_constraint_integration$",
+      r"test_quadratic_constraint_minimize$",
+      r"test_quadratic_integration$",
+      r"test_quadratic_nonconvex_constraint_basic$",
+      r"test_quadratic_nonconvex_constraint_integration$",
+      r"test_basic_VectorNonlinearFunction_HyperRectangle$",
+      r"test_basic_VectorNonlinearFunction_Nonnegatives$",
+      r"test_basic_VectorNonlinearFunction_Nonpositives$",
+      r"test_basic_VectorNonlinearFunction_Zeros$",
+      r"test_constraint_qcp_duplicate_off_diagonal$",
+      r"test_nonlinear_expression_hs071$",
+      r"test_nonlinear_expression_hs109$",
+      r"test_nonlinear_expression_overrides_objective$",
+      # ITERATION_LIMIT
+      r"test_quadratic_constraint_LessThan$",
+      r"test_quadratic_constraint_GreaterThan$",
+      r"test_nonlinear_expression_hs071_epigraph$",
       # FIXME Segfault
       r"test_linear_integration_delete_variables$",
+      # https://github.com/jump-dev/MathOptInterface.jl/issues/2323
+      r"test_basic_VectorNonlinearFunction_NormInfinityCone$",
+      r"test_basic_VectorNonlinearFunction_NormOneCone$",
     ],
   )
   return

@@ -23,7 +23,7 @@ const LS = Union{ALS, VLS}
 
 const VI = MOI.VariableIndex
 const SQF = MOI.ScalarQuadraticFunction{Float64}
-const OBJ = Union{VI, SAF, SQF}
+const LinQuad = Union{VI, SAF, SQF}
 
 # Expressions
 const VF = VariableRef
@@ -216,7 +216,7 @@ function parser_MOI(moimodel, index_map)
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
-    F <: AF || F == VI || @warn("Function $F is not supported.")
+    F <: AF || F == MOI.ScalarNonlinearFunction || F == VI || @warn("Function $F is not supported.")
     S <: LS || @warn("Set $S is not supported.")
 
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
@@ -246,15 +246,73 @@ function parser_MOI(moimodel, index_map)
   return nlin, lincon, lin_lcon, lin_ucon
 end
 
-function _nlp_block(model::MOI.ModelLike)
-  nlp_data = MOI.get(model, MOI.NLPBlock())
-  if isnothing(nlp_data)
-    evaluator = MOI.Nonlinear.Evaluator(
-      MOI.Nonlinear.Model(),
-      MOI.Nonlinear.SparseReverseMode(),
-      MOI.get(model, MOI.ListOfVariableIndices()),
+# Affine or quadratic, nothing to do
+function _nlp_model(::Union{Nothing,MOI.Nonlinear.Model}, ::MOI.ModelLike, ::Type, ::Type) end
+
+function _nlp_model(
+  dest::Union{Nothing,MOI.Nonlinear.Model},
+  src::MOI.ModelLike,
+  F::Type{<:Union{MOI.ScalarNonlinearFunction,MOI.VectorNonlinearFunction}},
+  S::Type,
+)
+  for ci in MOI.get(src, MOI.ListOfConstraintIndices{F,S}())
+    if isnothing(dest)
+      dest = MOI.Nonlinear.Model()
+    end
+    MOI.Nonlinear.add_constraint(
+      dest,
+      MOI.get(src, MOI.ConstraintFunction(), ci),
+      MOI.get(src, MOI.ConstraintSet(), ci),
     )
-    nlp_data = MOI.NLPBlockData(evaluator)
+  end
+  return dest
+end
+
+
+function _nlp_model(model::MOI.ModelLike)
+  nlp_model = nothing
+  for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
+    nlp_model = _nlp_model(nlp_model, model, F, S)
+  end
+  F = MOI.get(model, MOI.ObjectiveFunctionType())
+  if F <: MOI.ScalarNonlinearFunction
+    if isnothing(nlp_model)
+      nlp_model = MOI.Nonlinear.Model()
+    end
+    attr = MOI.ObjectiveFunction{F}()
+    MOI.Nonlinear.set_objective(nlp_model, MOI.get(model, attr))
+  end
+  return nlp_model
+end
+
+function _nlp_block(model::MOI.ModelLike)
+  # Old interface with `@NL...`
+  nlp_data = MOI.get(model, MOI.NLPBlock())
+  # New interface with `@constraint` and `@objective`
+  nlp_model = _nlp_model(model)
+  vars = MOI.get(model, MOI.ListOfVariableIndices())
+  if isnothing(nlp_data)
+    if isnothing(nlp_model)
+      evaluator = MOI.Nonlinear.Evaluator(
+        MOI.Nonlinear.Model(),
+        MOI.Nonlinear.SparseReverseMode(),
+        vars,
+      )
+      nlp_data = MOI.NLPBlockData(evaluator)
+    else
+      backend = MOI.Nonlinear.SparseReverseMode()
+      evaluator = MOI.Nonlinear.Evaluator(nlp_model, backend, vars)
+      nlp_data = MOI.NLPBlockData(evaluator)
+    end
+  else
+    if !isnothing(nlp_model)
+      error(
+        "Cannot optimize a model which contains the features from " *
+        "both the legacy (macros beginning with `@NL`) and new " *
+        "(`NonlinearExpr`) nonlinear interfaces. You must use one or " *
+        "the other.",
+      )
+    end
   end
   return nlp_data
 end
@@ -334,7 +392,7 @@ function parser_objective_MOI(moimodel, nvar, index_map)
   cols = Int[]
   vals = Float64[]
 
-  fobj = MOI.get(moimodel, MOI.ObjectiveFunction{OBJ}())
+  fobj = MOI.get(moimodel, MOI.ObjectiveFunction{LinQuad}())
 
   # Single Variable
   if typeof(fobj) == VI
@@ -518,12 +576,18 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
 end
 
 function _nlp_sync!(model::JuMP.Model)
-  # The nlp model of the backend is not kept in sync, so re-set it here as in `JuMP.optimize!`
-  evaluator = MOI.Nonlinear.Evaluator(
-    # `force = true` is needed if there is not NL objective or constraint
-    JuMP.nonlinear_model(model, force = true),
-    MOI.Nonlinear.SparseReverseMode(),
-    JuMP.index.(JuMP.all_variables(model)),
-  )
-  MOI.set(model, MOI.NLPBlock(), MOI.NLPBlockData(evaluator))
+  # With the old `@NL...` macros, the nlp model of the backend is not kept in
+  # sync, so re-set it here as in `JuMP.optimize!`
+  # If only the new nonlinear interface using `@constraint` and `@objective` is
+  # used, `nlp` is `nothing` and we don't have to do anything
+  nlp = JuMP.nonlinear_model(model)
+  if !isnothing(nlp)
+    evaluator = MOI.Nonlinear.Evaluator(
+      # `force = true` is needed if there is not NL objective or constraint
+      nlp,
+      MOI.Nonlinear.SparseReverseMode(),
+      JuMP.index.(JuMP.all_variables(model)),
+    )
+    MOI.set(model, MOI.NLPBlock(), MOI.NLPBlockData(evaluator))
+  end
 end
