@@ -59,9 +59,9 @@ function MOI.supports(
   ::Optimizer,
   ::Union{
     MOI.ObjectiveSense,
-    MOI.ObjectiveFunction{<:Union{LinQuad,MOI.ScalarNonlinearFunction}},
+    MOI.ObjectiveFunction{<:Union{LinQuad, MOI.ScalarNonlinearFunction}},
     MOI.NLPBlock,
-},
+  },
 )
   return true
 end
