@@ -247,15 +247,15 @@ function parser_MOI(moimodel, index_map)
 end
 
 # Affine or quadratic, nothing to do
-function _nlp_model(::Union{Nothing,MOI.Nonlinear.Model}, ::MOI.ModelLike, ::Type, ::Type) end
+function _nlp_model(::Union{Nothing, MOI.Nonlinear.Model}, ::MOI.ModelLike, ::Type, ::Type) end
 
 function _nlp_model(
-  dest::Union{Nothing,MOI.Nonlinear.Model},
+  dest::Union{Nothing, MOI.Nonlinear.Model},
   src::MOI.ModelLike,
-  F::Type{<:Union{MOI.ScalarNonlinearFunction,MOI.VectorNonlinearFunction}},
+  F::Type{<:Union{MOI.ScalarNonlinearFunction, MOI.VectorNonlinearFunction}},
   S::Type,
 )
-  for ci in MOI.get(src, MOI.ListOfConstraintIndices{F,S}())
+  for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
     if isnothing(dest)
       dest = MOI.Nonlinear.Model()
     end
@@ -267,7 +267,6 @@ function _nlp_model(
   end
   return dest
 end
-
 
 function _nlp_model(model::MOI.ModelLike)
   nlp_model = nothing
@@ -293,11 +292,8 @@ function _nlp_block(model::MOI.ModelLike)
   vars = MOI.get(model, MOI.ListOfVariableIndices())
   if isnothing(nlp_data)
     if isnothing(nlp_model)
-      evaluator = MOI.Nonlinear.Evaluator(
-        MOI.Nonlinear.Model(),
-        MOI.Nonlinear.SparseReverseMode(),
-        vars,
-      )
+      evaluator =
+        MOI.Nonlinear.Evaluator(MOI.Nonlinear.Model(), MOI.Nonlinear.SparseReverseMode(), vars)
       nlp_data = MOI.NLPBlockData(evaluator)
     else
       backend = MOI.Nonlinear.SparseReverseMode()
