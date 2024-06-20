@@ -33,7 +33,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
 
   nlp_data = _nlp_block(moimodel)
   nnln, nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
-  λ = zeros(nnln - quadcon.nquad)  # Lagrange multipliers for hess_coord! and hprod! without y
+  λ = zeros(nnln)  # Lagrange multipliers for hess_coord! and hprod! without y
 
   if nlp_data.has_objective
     obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)

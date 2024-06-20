@@ -36,7 +36,7 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
 
   nlp_data = _nlp_block(moimodel)
   nnln, nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
-  λ = zeros(nnln - quadcon.nquad)  # Lagrange multipliers for hess_coord! and hprod! without y
+  λ = zeros(nnln)  # Lagrange multipliers for hess_coord! and hprod! without y
 
   nequ = nlinequ + nnlnequ
   Fnnzj = linequ.nnzj + nlequ.nnzj
