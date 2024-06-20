@@ -299,7 +299,14 @@ function NLPModels.hprod!(
   end
   if nlp.obj.type == "QUADRATIC"
     hv .= 0.0
-    coo_sym_add_mul!(nlp.obj.hessian.rows, nlp.obj.hessian.cols, nlp.obj.hessian.vals, v, hv, obj_weight)
+    coo_sym_add_mul!(
+      nlp.obj.hessian.rows,
+      nlp.obj.hessian.cols,
+      nlp.obj.hessian.vals,
+      v,
+      hv,
+      obj_weight,
+    )
   end
   if nlp.obj.type == "NONLINEAR"
     MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, zeros(nlp.meta.nnln))
