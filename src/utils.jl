@@ -6,10 +6,18 @@ import NLPModels.increment!, NLPModels.decrement!
 using JuMP, MathOptInterface
 const MOI = MathOptInterface
 
+# VariableIndex
+const VI = MOI.VariableIndex  # VariableIndex(value)
+
 # ScalarAffineFunctions and VectorAffineFunctions
-const SAF = MOI.ScalarAffineFunction{Float64}
-const VAF = MOI.VectorAffineFunction{Float64}
-const AF = Union{SAF, VAF}
+const SAF = MOI.ScalarAffineFunction{Float64}  # ScalarAffineFunction{T}(terms, constant)
+const VAF = MOI.VectorAffineFunction{Float64}  # VectorAffineFunction{T}(terms, constants)
+const AF  = Union{SAF, VAF}
+
+# ScalarQuadraticFunctions and VectorQuadraticFunctions
+const SQF = MOI.ScalarQuadraticFunction{Float64}  # ScalarQuadraticFunction{T}(affine_terms, quadratic_terms, constant)
+const VQF = MOI.VectorQuadraticFunction{Float64}  # VectorQuadraticFunction{T}(affine_terms, quadratic_terms, constants)
+const QF  = Union{SQF, VQF}
 
 # AffLinSets and VecLinSets
 const ALS = Union{
@@ -21,10 +29,6 @@ const ALS = Union{
 const VLS = Union{MOI.Nonnegatives, MOI.Nonpositives, MOI.Zeros}
 const LS = Union{ALS, VLS}
 
-const VI = MOI.VariableIndex
-const SQF = MOI.ScalarQuadraticFunction{Float64}
-const LinQuad = Union{VI, SAF, SQF}
-
 # Expressions
 const VF = VariableRef
 const AE = GenericAffExpr{Float64, VariableRef}
@@ -32,6 +36,9 @@ const LE = Union{VF, AE}
 const QE = GenericQuadExpr{Float64, VariableRef}
 const NLE = NonlinearExpression
 
+const LinQuad = Union{VI, SAF, SQF}
+
+# Sparse matrix in coordinate format
 mutable struct COO
   rows::Vector{Int}
   cols::Vector{Int}
@@ -43,6 +50,23 @@ COO() = COO(Int[], Int[], Float64[])
 mutable struct LinearConstraints
   jacobian::COO
   nnzj::Int
+end
+
+# xᵀAx + bᵀx
+mutable struct QuadraticConstraint
+  A::COO
+  b::SparseVector{Float64}
+  g::Vector{Int}
+  dg::Dict{Int,Int}
+  nnzg::Int
+  nnzh::Int
+end
+
+mutable struct QuadraticConstraints
+  nquad::Int
+  constraints::Vector{QuadraticConstraint}
+  nnzj::Int
+  nnzh::Int
 end
 
 mutable struct NonLinearStructure
@@ -200,11 +224,69 @@ function parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_uco
 end
 
 """
-    parser_MOI(moimodel, index_map)
+    parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
+
+Parse a `ScalarQuadraticFunction` fun with its associated set.
+`qcons`, `quad_lcon`, `quad_ucon` are updated.
+"""
+function parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
+  _index(v::MOI.VariableIndex) = index_map[v].value
+
+  b = spzeros(Float64, nvar)
+  rows = Int[]
+  cols = Int[]
+  vals = Float64[]
+
+  # Parse a ScalarAffineTerm{Float64}(coefficient, variable_index)
+  for term in fun.affine_terms
+    b[_index(term.variable)] = term.coefficient
+  end
+
+  # Parse a ScalarQuadraticTerm{Float64}(coefficient, variable_index_1, variable_index_2)
+  for term in fun.quadratic_terms
+    i = _index(term.variable_1)
+    j = _index(term.variable_2)
+    if i ≥ j
+      push!(rows, i)
+      push!(cols, j)
+    else
+      push!(rows, j)
+      push!(cols, i)
+    end
+    push!(vals, term.coefficient)
+  end
+
+  if typeof(set) in (MOI.Interval{Float64}, MOI.GreaterThan{Float64})
+    push!(quad_lcon, -fun.constant + set.lower)
+  elseif typeof(set) == MOI.EqualTo{Float64}
+    push!(quad_lcon, -fun.constant + set.value)
+  else
+    push!(quad_lcon, -Inf)
+  end
+
+  if typeof(set) in (MOI.Interval{Float64}, MOI.LessThan{Float64})
+    push!(quad_ucon, -fun.constant + set.upper)
+  elseif typeof(set) == MOI.EqualTo{Float64}
+    push!(quad_ucon, -fun.constant + set.value)
+  else
+    push!(quad_ucon, Inf)
+  end
+
+  A = COO(rows, cols, vals)
+  g = unique(vcat(rows, b.nzind))  # sparsity pattern of Ax + b
+  nnzg = length(g)
+  dg = Dict{Int,Int}(g[i] => i for i = 1:nnzg)
+  nnzh = length(vals)
+  qcon = QuadraticConstraint(A, b, g, dg, nnzg, nnzh)
+  push!(qcons, qcon)
+end
+
+"""
+    parser_MOI(moimodel, index_map, nvar)
 
 Parse linear constraints of a `MOI.ModelLike`.
 """
-function parser_MOI(moimodel, index_map)
+function parser_MOI(moimodel, index_map, nvar)
 
   # Variables associated to linear constraints
   nlin = 0
@@ -214,9 +296,16 @@ function parser_MOI(moimodel, index_map)
   lin_lcon = Float64[]
   lin_ucon = Float64[]
 
+  # Variables associated to quadratic constraints
+  nquad = 0
+  qcons = QuadraticConstraint[]
+  quad_lcon = Float64[]
+  quad_ucon = Float64[]
+
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
-    F <: AF || F == MOI.ScalarNonlinearFunction || F == VI || @warn("Function $F is not supported.")
+    F <: AF || F <: SQF || F == MOI.ScalarNonlinearFunction || F == VI || @warn("Function $F is not supported.")
+    # F <: AF || F <: QF || F == MOI.ScalarNonlinearFunction || F == VI || @warn("Function $F is not supported.")
     S <: LS || @warn("Set $S is not supported.")
 
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
@@ -237,13 +326,25 @@ function parser_MOI(moimodel, index_map)
         parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
         nlin += set.dimension
       end
+      if typeof(fun) <: SQF
+        parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
+        nquad += 1
+      end
+      # if typeof(fun) <: VQF
+      #   parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
+      #   nquad += set.dimension
+      # end
     end
   end
   coo = COO(linrows, lincols, linvals)
-  nnzj = length(linvals)
-  lincon = LinearConstraints(coo, nnzj)
+  lin_nnzj = length(linvals)
+  lincon = LinearConstraints(coo, lin_nnzj)
 
-  return nlin, lincon, lin_lcon, lin_ucon
+  quad_nnzj = sum(qcons[i].nnzg for i = 1:nquad, init=0)
+  quad_nnzh = sum(qcons[i].nnzh for i = 1:nquad, init=0)
+  quadcon = QuadraticConstraints(nquad, qcons, quad_nnzj, quad_nnzh)
+
+  return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon
 end
 
 # Affine or quadratic, nothing to do
@@ -419,8 +520,8 @@ function parser_objective_MOI(moimodel, nvar, index_map)
         push!(rows, i)
         push!(cols, j)
       else
-        push!(cols, j)
-        push!(rows, i)
+        push!(rows, j)
+        push!(cols, i)
       end
       push!(vals, term.coefficient)
     end

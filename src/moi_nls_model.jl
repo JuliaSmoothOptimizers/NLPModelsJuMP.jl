@@ -30,7 +30,7 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
 
   _nlp_sync!(cmodel)
   moimodel = backend(cmodel)
-  nlin, lincon, lin_lcon, lin_ucon = parser_MOI(moimodel, index_map)
+  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon = parser_MOI(moimodel, index_map, nvar)
 
   nlp_data = _nlp_block(moimodel)
   nnln, nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
