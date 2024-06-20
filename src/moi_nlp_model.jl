@@ -132,8 +132,8 @@ function NLPModels.jac_nln_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
-  index = 0
   if nlp.quadcon.nquad > 0
+    index = 0
     for i = 1:(nlp.quadcon.nquad)
       qcon = nlp.quadcon.constraints[i]
       view(rows, index+1:index+qcon.nnzg) .= i
@@ -157,8 +157,8 @@ end
 
 function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::AbstractVector)
   increment!(nlp, :neval_jac_nln)
-  index = 0
   if nlp.quadcon.nquad > 0
+    index = 0
     view(vals, 1:nlp.quadcon.nnzj) .= 0.0
     for i = 1:(nlp.quadcon.nquad)
       qcon = nlp.quadcon.constraints[i]
@@ -307,7 +307,7 @@ function NLPModels.hess_coord!(
       view(vals, (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.meta.nnzh)),
       x,
       obj_weight,
-      view(y, (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.nnln))
+      view(y, (nlp.meta.nlin + nlp.quadcon.nquad + 1)::(nlp.meta.ncon))
     )
   end
   if nlp.quadcon.nquad > 0
