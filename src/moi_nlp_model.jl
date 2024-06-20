@@ -303,11 +303,12 @@ function NLPModels.hess_coord!(
     view(vals, 1:(nlp.obj.nnzh)) .= obj_weight .* nlp.obj.hessian.vals
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
+    λ = view(y, (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon))
     MOI.eval_hessian_lagrangian(nlp.eval,
       view(vals, (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.meta.nnzh)),
       x,
       obj_weight,
-      view(y, (nlp.meta.nlin + nlp.quadcon.nquad + 1)::(nlp.meta.ncon))
+      λ
     )
   end
   if nlp.quadcon.nquad > 0
