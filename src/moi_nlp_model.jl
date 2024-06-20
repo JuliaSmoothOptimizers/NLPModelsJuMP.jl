@@ -212,7 +212,7 @@ function NLPModels.jprod_nln!(
 )
   increment!(nlp, :neval_jprod_nln)
   if nlp.meta.nnln > nlp.quadcon.nquad
-    ind_nnln = (nlp.quadcon.nnzj + 1):(nlp.quadcon.nnzj + nlp.nlcon.nnzj)
+    ind_nnln = (nlp.quadcon.nquad + 1):(nlp.meta.nnln)
     MOI.eval_constraint_jacobian_product(nlp.eval, view(Jv, ind_nnln), x, v)
   end
   (nlp.meta.nnln == nlp.quadcon.nquad) && (Jv .= 0.0)
@@ -251,7 +251,7 @@ function NLPModels.jtprod_nln!(
 )
   increment!(nlp, :neval_jtprod_nln)
   if nlp.meta.nnln > nlp.quadcon.nquad
-    ind_nnln = (nlp.quadcon.nnzj + 1):(nlp.quadcon.nnzj + nlp.nlcon.nnzj)
+    ind_nnln = (nlp.quadcon.nquad + 1):(nlp.meta.nnln)
     MOI.eval_constraint_jacobian_transpose_product(nlp.eval, Jtv, x, view(v, ind_nnln))
   end
   (nlp.meta.nnln == nlp.quadcon.nquad) && (Jtv .= 0.0)
