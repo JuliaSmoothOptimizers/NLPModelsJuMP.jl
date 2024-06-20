@@ -340,8 +340,12 @@ function parser_MOI(moimodel, index_map, nvar)
   lin_nnzj = length(linvals)
   lincon = LinearConstraints(coo, lin_nnzj)
 
-  quad_nnzj = sum(qcons[i].nnzg for i = 1:nquad, init=0)
-  quad_nnzh = sum(qcons[i].nnzh for i = 1:nquad, init=0)
+  quad_nnzj = 0
+  quad_nnzh = 0
+  for i = 1:nquad
+    quad_nnzj += qcons[i].nnzg
+    quad_nnzh += qcons[i].nnzh
+  end
   quadcon = QuadraticConstraints(nquad, qcons, quad_nnzj, quad_nnzh)
 
   return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon
