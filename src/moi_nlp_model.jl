@@ -89,8 +89,8 @@ function NLPModels.grad!(nlp::MathOptNLPModel, x::AbstractVector, g::AbstractVec
     g .= nlp.obj.gradient
   end
   if nlp.obj.type == "QUADRATIC"
-    coo_sym_prod!(nlp.obj.hessian.rows, nlp.obj.hessian.cols, nlp.obj.hessian.vals, x, g)
-    g .+= nlp.obj.gradient
+    g .= nlp.obj.gradient
+    coo_sym_add_mul!(nlp.obj.hessian.rows, nlp.obj.hessian.cols, nlp.obj.hessian.vals, x, g, 1.0)
   end
   if nlp.obj.type == "NONLINEAR"
     MOI.eval_objective_gradient(nlp.eval, g, x)
@@ -298,8 +298,8 @@ function NLPModels.hprod!(
     hv .= 0.0
   end
   if nlp.obj.type == "QUADRATIC"
-    coo_sym_prod!(nlp.obj.hessian.rows, nlp.obj.hessian.cols, nlp.obj.hessian.vals, v, hv)
-    hv .*= obj_weight
+    hv .= 0.0
+    coo_sym_add_mul!(nlp.obj.hessian.rows, nlp.obj.hessian.cols, nlp.obj.hessian.vals, v, hv, obj_weight)
   end
   if nlp.obj.type == "NONLINEAR"
     MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, zeros(nlp.meta.nnln))
