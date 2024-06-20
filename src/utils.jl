@@ -367,8 +367,8 @@ function parser_MOI(moimodel, index_map, nvar)
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
-    F <: AF || F <: QF || F == MOI.ScalarNonlinearFunction || F == VI || @warn("Function $F is not supported.")
-    S <: LS || @warn("Set $S is not supported.")
+    F <: AF || F <: QF || F == MOI.ScalarNonlinearFunction || F == VI || error("Function $F is not supported.")
+    S <: LS || error("Set $S is not supported.")
 
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
     for cidx in conindices
