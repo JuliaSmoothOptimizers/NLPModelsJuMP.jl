@@ -423,9 +423,9 @@ function NLPModels.hess_structure!(
     view(rows, 1:(nls.lls.nnzh)) .= nls.lls.hessian.rows
     view(cols, 1:(nls.lls.nnzh)) .= nls.lls.hessian.cols
   end
-  if (nls.nls_meta.nnln > 0) || (nlp.meta.nnln > nlp.quadcon.nquad)
-    view(rows, (nls.lls.nnzh + nlp.quadcon.nnzh + 1):(nls.meta.nnzh)) .= nls.nlcon.hess_rows
-    view(cols, (nls.lls.nnzh + nlp.quadcon.nnzh + 1):(nls.meta.nnzh)) .= nls.nlcon.hess_cols
+  if (nls.nls_meta.nnln > 0) || (nls.meta.nnln > nls.quadcon.nquad)
+    view(rows, (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.meta.nnzh)) .= nls.nlcon.hess_rows
+    view(cols, (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.meta.nnzh)) .= nls.nlcon.hess_cols
   end
   if nls.quadcon.nquad > 0
     index = nls.lls.nnzh
@@ -483,7 +483,7 @@ function NLPModels.hess_coord!(
   end
   view(vals, (nls.lls.nnzh + 1):(nls.lls.nnzh + nls.quadcon.nnzh)) .= 0.0
   if nls.nls_meta.nnln > 0
-    λ = zeros(nlp.meta.nnln - nlp.quadcon.nquad)  # Should be stored in the structure MathOptNLSModel
+    λ = zeros(nls.meta.nnln - nls.quadcon.nquad)  # Should be stored in the structure MathOptNLSModel
     MOI.eval_hessian_lagrangian(
       nls.ceval,
       view(vals, (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.meta.nnzh)),
