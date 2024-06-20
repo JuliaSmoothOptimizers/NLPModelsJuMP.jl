@@ -282,6 +282,69 @@ function parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
 end
 
 """
+    parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
+
+Parse a `VectorQuadraticFunction` fun with its associated set.
+`qcons`, `quad_lcon`, `quad_ucon` are updated.
+"""
+function parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
+  _index(v::MOI.VariableIndex) = index_map[v].value
+
+  ncon = length(fun.constants)
+  for i = 1:ncon
+    b = spzeros(Float64, nvar)
+    rows = Int[]
+    cols = Int[]
+    vals = Float64[]
+
+    quadratic_terms = fun.quadratic_terms[i]
+    affine_terms = fun.affine_terms[i]
+    constant = fun.constants[i]
+
+    # Parse a VectorAffineTerm{Float64}(output_index, scalar_term)
+    for term in affine_terms
+      @assert term.output_index == i
+      b[_index(term.scalar_term.variable)] = term.scalar_term.coefficient
+    end
+
+    # Parse a VectorQuadraticTerm{Float64}(output_index, scalar_term)
+    for term in quadratic_terms
+      @assert term.output_index == i
+      i = _index(term.scalar_term.variable_1)
+      j = _index(term.scalar_term.variable_2)
+      if i ≥ j
+        push!(rows, i)
+        push!(cols, j)
+      else
+        push!(rows, j)
+        push!(cols, i)
+      end
+      push!(vals, term.scalar_term.coefficient)
+    end
+
+    if typeof(set) in (MOI.Nonnegatives, MOI.Zeros)
+      append!(lin_lcon, constant)
+    else
+      append!(lin_lcon, -Inf)
+    end
+
+    if typeof(set) in (MOI.Nonpositives, MOI.Zeros)
+      append!(lin_ucon, -constant)
+    else
+      append!(lin_ucon, Inf)
+    end
+
+    A = COO(rows, cols, vals)
+    g = unique(vcat(rows, b.nzind))  # sparsity pattern of Ax + b
+    nnzg = length(g)
+    dg = Dict{Int,Int}(g[i] => i for i = 1:nnzg)
+    nnzh = length(vals)
+    qcon = QuadraticConstraint(A, b, g, dg, nnzg, nnzh)
+    push!(qcons, qcon)
+  end
+end
+
+"""
     parser_MOI(moimodel, index_map, nvar)
 
 Parse linear constraints of a `MOI.ModelLike`.
@@ -304,8 +367,7 @@ function parser_MOI(moimodel, index_map, nvar)
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
-    F <: AF || F <: SQF || F == MOI.ScalarNonlinearFunction || F == VI || @warn("Function $F is not supported.")
-    # F <: AF || F <: QF || F == MOI.ScalarNonlinearFunction || F == VI || @warn("Function $F is not supported.")
+    F <: AF || F <: QF || F == MOI.ScalarNonlinearFunction || F == VI || @warn("Function $F is not supported.")
     S <: LS || @warn("Set $S is not supported.")
 
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
@@ -330,10 +392,10 @@ function parser_MOI(moimodel, index_map, nvar)
         parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
         nquad += 1
       end
-      # if typeof(fun) <: VQF
-      #   parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
-      #   nquad += set.dimension
-      # end
+      if typeof(fun) <: VQF
+        parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
+        nquad += set.dimension
+      end
     end
   end
   coo = COO(linrows, lincols, linvals)
