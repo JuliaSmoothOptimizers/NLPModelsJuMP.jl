@@ -354,7 +354,7 @@ function NLPModels.hess_structure!(
     view(rows, 1:(nls.lls.nnzh)) .= nls.lls.hessian.rows
     view(cols, 1:(nls.lls.nnzh)) .= nls.lls.hessian.cols
   end
-  if nls.nls_meta.nnln > 0
+  if (nls.nls_meta.nnln > 0) || (nls.meta.nnln > 0)
     view(rows, (nls.lls.nnzh + 1):(nls.meta.nnzh)) .= nls.nlcon.hess_rows
     view(cols, (nls.lls.nnzh + 1):(nls.meta.nnzh)) .= nls.nlcon.hess_cols
   end
