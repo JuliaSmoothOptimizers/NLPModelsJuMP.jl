@@ -108,7 +108,7 @@ end
 function NLPModels.cons_nln!(nlp::MathOptNLPModel, x::AbstractVector, c::AbstractVector)
   increment!(nlp, :neval_cons_nln)
   for i = 1:(nlp.quadcon.nquad)
-    qcon = nlp.quadcon.constaints[i]
+    qcon = nlp.quadcon.constraints[i]
     c[i] = 0.5 * coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, x) + dot(qcon.b, x)
   end
   if nlp.meta.nnln > nlp.quadcon.nquad
