@@ -11,6 +11,7 @@ mutable struct MathOptNLSModel <: AbstractNLSModel{Float64, Vector{Float64}}
   lincon::LinearConstraints
   quadcon::QuadraticConstraints
   nlcon::NonLinearStructure
+  λ::Vector{Float64}
   counters::NLSCounters
 end
 
@@ -35,6 +36,7 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
 
   nlp_data = _nlp_block(moimodel)
   nnln, nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
+  λ = zeros(nnln - quadcon.nquad)  # Lagrange multipliers for hess_coord! and hprod! without y
 
   nequ = nlinequ + nnlnequ
   Fnnzj = linequ.nnzj + nlequ.nnzj
@@ -76,6 +78,7 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
     lincon,
     quadcon,
     nlcon,
+    λ,
     NLSCounters(),
   )
 end
@@ -483,13 +486,12 @@ function NLPModels.hess_coord!(
   end
   view(vals, (nls.lls.nnzh + 1):(nls.lls.nnzh + nls.quadcon.nnzh)) .= 0.0
   if nls.nls_meta.nnln > 0
-    λ = zeros(nls.meta.nnln - nls.quadcon.nquad)  # Should be stored in the structure MathOptNLSModel
     MOI.eval_hessian_lagrangian(
       nls.ceval,
       view(vals, (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.meta.nnzh)),
       x,
       obj_weight,
-      λ,
+      nls.λ,
     )
   else
     view(vals, (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.meta.nnzh)) .= 0.0
@@ -539,8 +541,7 @@ function NLPModels.hprod!(
 )
   increment!(nls, :neval_hprod)
   if nls.nls_meta.nnln > 0
-    λ = zeros(nls.meta.nnln - nls.quadcon.nquad)  # Should be stored in the structure MathOptNLSModel
-    MOI.eval_hessian_lagrangian_product(nls.ceval, hv, x, v, obj_weight, λ)
+    MOI.eval_hessian_lagrangian_product(nls.ceval, hv, x, v, obj_weight, nls.λ)
   end
   if nls.nls_meta.nlin > 0
     (nls.nls_meta.nnln == 0) && (hv .= 0.0)

@@ -6,6 +6,7 @@ mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
   lincon::LinearConstraints
   quadcon::QuadraticConstraints
   nlcon::NonLinearStructure
+  λ::Vector{Float64}
   obj::Objective
   counters::Counters
 end
@@ -32,6 +33,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
 
   nlp_data = _nlp_block(moimodel)
   nnln, nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
+  λ = zeros(nnln - quadcon.nquad)  # Lagrange multipliers for hess_coord! and hprod! without y
 
   if nlp_data.has_objective
     obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
@@ -64,7 +66,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     name = name,
   )
 
-  return MathOptNLPModel(meta, nlp_data.evaluator, lincon, quadcon, nlcon, obj, Counters()), index_map
+  return MathOptNLPModel(meta, nlp_data.evaluator, lincon, quadcon, nlcon, λ, obj, Counters()), index_map
 end
 
 function NLPModels.obj(nlp::MathOptNLPModel, x::AbstractVector)
@@ -337,8 +339,7 @@ function NLPModels.hess_coord!(
     view(vals, (nlp.obj.nnzh + 1):(nlp.meta.nnzh)) .= 0.0
   end
   if nlp.obj.type == "NONLINEAR"
-    λ = zeros(nlp.meta.nnln - nlp.quadcon.nquad)  # Should be stored in the structure MathOptNLPModel
-    MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, λ)
+    MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, nlp.λ)
   end
   return vals
 end
@@ -389,8 +390,7 @@ function NLPModels.hprod!(
     coo_sym_add_mul!(nlp.obj.hessian.rows, nlp.obj.hessian.cols, nlp.obj.hessian.vals, v, hv, obj_weight)
   end
   if nlp.obj.type == "NONLINEAR"
-    λ = zeros(nlp.meta.nnln - nlp.quadcon.nquad)  # Should be stored in the structure MathOptNLPModel
-    MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, λ)
+    MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, nlp.λ)
   end
   return hv
 end
