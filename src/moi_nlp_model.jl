@@ -145,7 +145,7 @@ function NLPModels.jac_nln_structure!(
   end
   if nlp.meta.nnln > nlp.quadcon.nquad
     ind_nnln = (nlp.quadcon.nnzj + 1):(nlp.quadcon.nnzj + nlp.nlcon.nnzj)
-    view(rows, ind_nnln) .= nlp.nlcon.jac_rows
+    view(rows, ind_nnln) .= nlp.quadcon.nquad .+ nlp.nlcon.jac_rows
     view(cols, ind_nnln) .= nlp.nlcon.jac_cols
   end
   return rows, cols
@@ -222,7 +222,7 @@ function NLPModels.jprod_nln!(
     for i = 1:(nlp.quadcon.nquad)
       # Jv[i] = (Aᵢ * x + bᵢ)ᵀ * v
       qcon = nlp.quadcon.constraints[i]
-      v[i] += coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, v) + dot(qcon.b, v)
+      Jv[i] += coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, v) + dot(qcon.b, v)
     end
   end
   return Jv
@@ -261,7 +261,7 @@ function NLPModels.jtprod_nln!(
     for i = 1:(nlp.quadcon.nquad)
       # Jtv += v[i] * (Aᵢ * x + bᵢ)
       qcon = nlp.quadcon.constraints[i]
-      coo_sym_add_mul!(rows, cols, vals, x, Jtv, v[i])
+      coo_sym_add_mul!(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, Jtv, v[i])
       Jtv .+= v[i] .* qcon.b
     end
   end
@@ -317,7 +317,7 @@ function NLPModels.hess_coord!(
     index = nlp.obj.nnzh
     for i = 1:(nlp.quadcon.nquad)
       qcon = nlp.quadcon.constraints[i]
-      view(vals, (index + 1):(index + qcon.nnzh)) .= y[i] .* qcon.A.vals
+      view(vals, (index + 1):(index + qcon.nnzh)) .= y[nlp.meta.nlin + i] .* qcon.A.vals
       index += qcon.nnzh
     end
   end
@@ -339,7 +339,9 @@ function NLPModels.hess_coord!(
     view(vals, (nlp.obj.nnzh + 1):(nlp.meta.nnzh)) .= 0.0
   end
   if nlp.obj.type == "NONLINEAR"
-    MOI.eval_hessian_lagrangian(nlp.eval, vals, x, obj_weight, nlp.λ)
+    view(vals, 1:(nlp.obj.nnzh + nlp.quadcon.nnzh)) .= 0.0
+    ind_nnln = (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.meta.nnzh)
+    MOI.eval_hessian_lagrangian(nlp.eval, view(vals, ind_nnln), x, obj_weight, nlp.λ)
   end
   return vals
 end
