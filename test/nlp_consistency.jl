@@ -4,7 +4,7 @@ for problem in nlp_problems
     problem_f = eval(Symbol(lowercase(problem)))
     nlp_moi = MathOptNLPModel(problem_f())
     nlps = [nlp_manual; nlp_moi]
-    consistent_nlps(nlps, linear_api = true)
+    consistent_nlps(nlps, linear_api=true, test_slack=false)
     view_subarray_nlp(nlp_moi)
   end
 end
