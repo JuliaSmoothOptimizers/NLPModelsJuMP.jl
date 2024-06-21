@@ -294,7 +294,7 @@ function NLPModels.jac_nln_structure!(
   end
   if nls.meta.nnln > nls.quadcon.nquad
     ind_nnln = (nls.quadcon.nnzj + 1):(nls.quadcon.nnzj + nls.nlcon.nnzj)
-    view(rows, ind_nnln) .= nlp.quadcon.nquad .+ nls.nlcon.jac_rows
+    view(rows, ind_nnln) .= nls.quadcon.nquad .+ nls.nlcon.jac_rows
     view(cols, ind_nnln) .= nls.nlcon.jac_cols
   end
   return rows, cols
