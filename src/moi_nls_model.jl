@@ -32,7 +32,8 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
 
   _nlp_sync!(cmodel)
   moimodel = backend(cmodel)
-  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon = parser_MOI(moimodel, index_map, nvar)
+  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon =
+    parser_MOI(moimodel, index_map, nvar)
 
   nlp_data = _nlp_block(moimodel)
   nnln, nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
@@ -287,8 +288,8 @@ function NLPModels.jac_nln_structure!(
     index = 0
     for i = 1:(nls.quadcon.nquad)
       qcon = nls.quadcon.constraints[i]
-      view(rows, index+1:index+qcon.nnzg) .= i
-      view(cols, index+1:index+qcon.nnzg) .= qcon.g
+      view(rows, (index + 1):(index + qcon.nnzg)) .= i
+      view(cols, (index + 1):(index + qcon.nnzg)) .= qcon.g
       index += qcon.nnzg
     end
   end
@@ -310,22 +311,22 @@ function NLPModels.jac_nln_coord!(nls::MathOptNLSModel, x::AbstractVector, vals:
   increment!(nls, :neval_jac_nln)
   if nls.quadcon.nquad > 0
     index = 0
-    view(vals, 1:nls.quadcon.nnzj) .= 0.0
+    view(vals, 1:(nls.quadcon.nnzj)) .= 0.0
     for i = 1:(nls.quadcon.nquad)
       qcon = nls.quadcon.constraints[i]
       for (j, ind) in enumerate(qcon.b.nzind)
         k = qcon.dg[ind]
-        vals[index+k] += qcon.b.nzval[j]
+        vals[index + k] += qcon.b.nzval[j]
       end
-      for j = 1:qcon.nnzh
+      for j = 1:(qcon.nnzh)
         row = qcon.A.rows[j]
         col = qcon.A.cols[j]
         val = qcon.A.vals[j]
         k1 = qcon.dg[row]
-        vals[index+k1] += val * x[col]
+        vals[index + k1] += val * x[col]
         if row != col
           k2 = qcon.dg[col]
-          vals[index+k2] += val * x[row]
+          vals[index + k2] += val * x[row]
         end
       end
       index += qcon.nnzg
@@ -460,7 +461,7 @@ function NLPModels.hess_coord!(
       view(vals, (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.meta.nnzh)),
       x,
       obj_weight,
-      λ
+      λ,
     )
   end
   if nls.quadcon.nquad > 0

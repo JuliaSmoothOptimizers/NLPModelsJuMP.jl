@@ -8,7 +8,7 @@ for problem in nls_problems
     if isdefined(Main, Symbol(spc))
       push!(nlss, eval(Meta.parse(spc))())
     end
-    consistent_nlss(nlss, linear_api=true, test_slack=false)
+    consistent_nlss(nlss, linear_api = true, test_slack = false)
     view_subarray_nls(nls_moi)
   end
 end

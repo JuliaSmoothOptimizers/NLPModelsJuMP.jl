@@ -29,7 +29,8 @@ end
 
 function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String = "Generic")
   index_map, nvar, lvar, uvar, x0 = parser_variables(moimodel)
-  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon = parser_MOI(moimodel, index_map, nvar)
+  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon =
+    parser_MOI(moimodel, index_map, nvar)
 
   nlp_data = _nlp_block(moimodel)
   nnln, nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
@@ -66,7 +67,8 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     name = name,
   )
 
-  return MathOptNLPModel(meta, nlp_data.evaluator, lincon, quadcon, nlcon, λ, obj, Counters()), index_map
+  return MathOptNLPModel(meta, nlp_data.evaluator, lincon, quadcon, nlcon, λ, obj, Counters()),
+  index_map
 end
 
 function NLPModels.obj(nlp::MathOptNLPModel, x::AbstractVector)
@@ -138,8 +140,8 @@ function NLPModels.jac_nln_structure!(
     index = 0
     for i = 1:(nlp.quadcon.nquad)
       qcon = nlp.quadcon.constraints[i]
-      view(rows, index+1:index+qcon.nnzg) .= i
-      view(cols, index+1:index+qcon.nnzg) .= qcon.g
+      view(rows, (index + 1):(index + qcon.nnzg)) .= i
+      view(cols, (index + 1):(index + qcon.nnzg)) .= qcon.g
       index += qcon.nnzg
     end
   end
@@ -161,22 +163,22 @@ function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals:
   increment!(nlp, :neval_jac_nln)
   if nlp.quadcon.nquad > 0
     index = 0
-    view(vals, 1:nlp.quadcon.nnzj) .= 0.0
+    view(vals, 1:(nlp.quadcon.nnzj)) .= 0.0
     for i = 1:(nlp.quadcon.nquad)
       qcon = nlp.quadcon.constraints[i]
       for (j, ind) in enumerate(qcon.b.nzind)
         k = qcon.dg[ind]
-        vals[index+k] += qcon.b.nzval[j]
+        vals[index + k] += qcon.b.nzval[j]
       end
-      for j = 1:qcon.nnzh
+      for j = 1:(qcon.nnzh)
         row = qcon.A.rows[j]
         col = qcon.A.cols[j]
         val = qcon.A.vals[j]
         k1 = qcon.dg[row]
-        vals[index+k1] += val * x[col]
+        vals[index + k1] += val * x[col]
         if row != col
           k2 = qcon.dg[col]
-          vals[index+k2] += val * x[row]
+          vals[index + k2] += val * x[row]
         end
       end
       index += qcon.nnzg
@@ -306,11 +308,12 @@ function NLPModels.hess_coord!(
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
     λ = view(y, (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon))
-    MOI.eval_hessian_lagrangian(nlp.eval,
+    MOI.eval_hessian_lagrangian(
+      nlp.eval,
       view(vals, (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.meta.nnzh)),
       x,
       obj_weight,
-      λ
+      λ,
     )
   end
   if nlp.quadcon.nquad > 0
@@ -364,7 +367,14 @@ function NLPModels.hprod!(
   end
   if nlp.obj.type == "QUADRATIC"
     (nlp.meta.nnln == nlp.quadcon.nquad) && (hv .= 0.0)
-    coo_sym_add_mul!(nlp.obj.hessian.rows, nlp.obj.hessian.cols, nlp.obj.hessian.vals, v, hv, obj_weight)
+    coo_sym_add_mul!(
+      nlp.obj.hessian.rows,
+      nlp.obj.hessian.cols,
+      nlp.obj.hessian.vals,
+      v,
+      hv,
+      obj_weight,
+    )
   end
   if nlp.quadcon.nquad > 0
     (nlp.obj.type == "LINEAR") && (hv .= 0.0)
@@ -389,7 +399,14 @@ function NLPModels.hprod!(
   end
   if nlp.obj.type == "QUADRATIC"
     hv .= 0.0
-    coo_sym_add_mul!(nlp.obj.hessian.rows, nlp.obj.hessian.cols, nlp.obj.hessian.vals, v, hv, obj_weight)
+    coo_sym_add_mul!(
+      nlp.obj.hessian.rows,
+      nlp.obj.hessian.cols,
+      nlp.obj.hessian.vals,
+      v,
+      hv,
+      obj_weight,
+    )
   end
   if nlp.obj.type == "NONLINEAR"
     MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, nlp.λ)

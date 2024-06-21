@@ -12,12 +12,12 @@ const VI = MOI.VariableIndex  # VariableIndex(value)
 # ScalarAffineFunctions and VectorAffineFunctions
 const SAF = MOI.ScalarAffineFunction{Float64}  # ScalarAffineFunction{T}(terms, constant)
 const VAF = MOI.VectorAffineFunction{Float64}  # VectorAffineFunction{T}(terms, constants)
-const AF  = Union{SAF, VAF}
+const AF = Union{SAF, VAF}
 
 # ScalarQuadraticFunctions and VectorQuadraticFunctions
 const SQF = MOI.ScalarQuadraticFunction{Float64}  # ScalarQuadraticFunction{T}(affine_terms, quadratic_terms, constant)
 const VQF = MOI.VectorQuadraticFunction{Float64}  # VectorQuadraticFunction{T}(affine_terms, quadratic_terms, constants)
-const QF  = Union{SQF, VQF}
+const QF = Union{SQF, VQF}
 
 # AffLinSets and VecLinSets
 const ALS = Union{
@@ -57,7 +57,7 @@ mutable struct QuadraticConstraint
   A::COO
   b::SparseVector{Float64}
   g::Vector{Int}
-  dg::Dict{Int,Int}
+  dg::Dict{Int, Int}
   nnzg::Int
   nnzh::Int
 end
@@ -279,7 +279,7 @@ function parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
   # - The key `r` specifies a row index in the vector Ax + b.
   # - The value `dg[r]` is a position in the vector (of length nnzg)
   # where the non-zero entries of the Jacobian for row `r` are stored.
-  dg = Dict{Int,Int}(g[p] => p for p = 1:nnzg)
+  dg = Dict{Int, Int}(g[p] => p for p = 1:nnzg)
   nnzh = length(vals)
   qcon = QuadraticConstraint(A, b, g, dg, nnzg, nnzh)
   push!(qcons, qcon)
@@ -345,7 +345,7 @@ function parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
     # - The key `r` specifies a row index in the vector Ax + b.
     # - The value `dg[r]` is a position in the vector (of length nnzg)
     # where the non-zero entries of the Jacobian for row `r` are stored.
-    dg = Dict{Int,Int}(g[p] => p for p = 1:nnzg)
+    dg = Dict{Int, Int}(g[p] => p for p = 1:nnzg)
     nnzh = length(vals)
     qcon = QuadraticConstraint(A, b, g, dg, nnzg, nnzh)
     push!(qcons, qcon)
@@ -375,7 +375,11 @@ function parser_MOI(moimodel, index_map, nvar)
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
-    F <: AF || F <: QF || F == MOI.ScalarNonlinearFunction || F == VI || error("Function $F is not supported.")
+    F <: AF ||
+      F <: QF ||
+      F == MOI.ScalarNonlinearFunction ||
+      F == VI ||
+      error("Function $F is not supported.")
     S <: LS || error("Set $S is not supported.")
 
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
