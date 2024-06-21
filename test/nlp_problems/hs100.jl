@@ -5,7 +5,7 @@ function hs100(args...; kwargs...)
 
   @NLconstraint(nlp, 127 - 2 * x[1]^2 - 3 * x[2]^4 - x[3] - 4 * x[4]^2 - 5 * x[5] ≥ 0)
   @constraint(nlp, 282 - 7 * x[1] - 3 * x[2] - 10 * x[3]^2 - x[4] + x[5] ≥ 0)
-  @constraint(nlp, 196 - 23 * x[1] - x[2]^2 - 6 * x[6]^2 + 8 * x[7] ≥ 0)
+  @constraint(nlp, -196 + 23 * x[1] + x[2]^2 + 6 * x[6]^2 - 8 * x[7] ≤ 0)
   @constraint(nlp, -4 * x[1]^2 - x[2]^2 + 3 * x[1] * x[2] - 2 * x[3]^2 - 5 * x[6] + 11 * x[7] ≥ 0)
 
   @NLobjective(
