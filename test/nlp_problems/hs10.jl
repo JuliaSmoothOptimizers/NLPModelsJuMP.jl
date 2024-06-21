@@ -8,7 +8,7 @@ function hs10()
 
   @objective(nlp, Min, x[1] - x[2])
 
-  @NLconstraint(nlp, -3 * x[1]^2 + 2 * x[1] * x[2] - x[2]^2 ≥ -1)
+  @constraint(nlp, -3 * x[1]^2 + 2 * x[1] * x[2] - x[2]^2 ≥ -1)
 
   return nlp
 end

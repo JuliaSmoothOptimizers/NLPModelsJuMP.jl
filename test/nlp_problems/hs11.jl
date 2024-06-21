@@ -8,7 +8,7 @@ function hs11()
 
   @objective(nlp, Min, (x[1] - 5)^2 + x[2]^2 - 25)
 
-  @NLconstraint(nlp, -x[1]^2 + x[2] ≥ 0)
+  @constraint(nlp, -x[1]^2 + x[2] ≥ 0)
 
   return nlp
 end
