@@ -273,9 +273,13 @@ function parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
   end
 
   A = COO(rows, cols, vals)
-  g = unique(vcat(rows, b.nzind))  # sparsity pattern of Ax + b
+  g = unique(vcat(rows, cols, b.nzind))  # sparsity pattern of Ax + b
   nnzg = length(g)
-  dg = Dict{Int,Int}(g[i] => i for i = 1:nnzg)
+  # dg is a dictionary where:
+  # - The key `r` specifies a row index in the vector Ax + b.
+  # - The value `dg[r]` is a position in the vector (of length nnzg)
+  # where the non-zero entries of the Jacobian for row `r` are stored.
+  dg = Dict{Int,Int}(g[p] => p for p = 1:nnzg)
   nnzh = length(vals)
   qcon = QuadraticConstraint(A, b, g, dg, nnzg, nnzh)
   push!(qcons, qcon)
@@ -335,9 +339,13 @@ function parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
     end
 
     A = COO(rows, cols, vals)
-    g = unique(vcat(rows, b.nzind))  # sparsity pattern of Ax + b
+    g = unique(vcat(rows, cols, b.nzind))  # sparsity pattern of Ax + b
     nnzg = length(g)
-    dg = Dict{Int,Int}(g[p] => p for p=1:nnzg)
+    # dg is a dictionary where:
+    # - The key `r` specifies a row index in the vector Ax + b.
+    # - The value `dg[r]` is a position in the vector (of length nnzg)
+    # where the non-zero entries of the Jacobian for row `r` are stored.
+    dg = Dict{Int,Int}(g[p] => p for p = 1:nnzg)
     nnzh = length(vals)
     qcon = QuadraticConstraint(A, b, g, dg, nnzg, nnzh)
     push!(qcons, qcon)
@@ -481,9 +489,9 @@ function _nlp_block(model::MOI.ModelLike)
 end
 
 """
-    parser_NL(jmodel, moimodel)
+    parser_NL(nlp_data; hessian)
 
-Parse nonlinear constraints of a `MOI.Nonlinear.Evaluator`.
+Parse nonlinear constraints of an `nlp_data`.
 """
 function parser_NL(nlp_data; hessian::Bool = true)
   nnln = length(nlp_data.constraint_bounds)
@@ -540,7 +548,7 @@ function parser_variables(model::MOI.ModelLike)
 end
 
 """
-    parser_objective_MOI(moimodel, nvar)
+    parser_objective_MOI(moimodel, nvar, index_map)
 
 Parse linear and quadratic objective of a `MOI.ModelLike`.
 """
@@ -596,7 +604,7 @@ function parser_objective_MOI(moimodel, nvar, index_map)
 end
 
 """
-    parser_linear_expression(cmodel, nvar, F)
+    parser_linear_expression(cmodel, nvar, index_map, F)
 
 Parse linear expressions of type `VariableRef` and `GenericAffExpr{Float64,VariableRef}`.
 """
@@ -689,7 +697,7 @@ function add_constraint_model(Fmodel, Fi::AbstractArray)
 end
 
 """
-    parser_nonlinear_expression(cmodel, nvar, F)
+    parser_nonlinear_expression(cmodel, nvar, F; hessian)
 
 Parse nonlinear expressions of type `NonlinearExpression`.
 """
