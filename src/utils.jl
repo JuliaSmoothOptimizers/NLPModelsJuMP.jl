@@ -426,7 +426,9 @@ function parser_MOI(moimodel, index_map, nvar)
 end
 
 # Affine or quadratic, nothing to do
-function _nlp_model(::Union{Nothing, MOI.Nonlinear.Model}, ::MOI.ModelLike, ::Type, ::Type) end
+function _nlp_model(model::Union{Nothing, MOI.Nonlinear.Model}, ::MOI.ModelLike, ::Type, ::Type)
+  return model
+end
 
 function _nlp_model(
   dest::Union{Nothing, MOI.Nonlinear.Model},
