@@ -82,6 +82,8 @@ MOI.supports_constraint(::Optimizer, ::Type{VI}, ::Type{<:ALS}) = true
 MOI.supports_constraint(::Optimizer, ::Type{SAF}, ::Type{<:ALS}) = true
 MOI.supports_constraint(::Optimizer, ::Type{MOI.ScalarNonlinearFunction}, ::Type{<:ALS}) = true
 MOI.supports_constraint(::Optimizer, ::Type{VAF}, ::Type{<:VLS}) = true
+MOI.supports_constraint(::Optimizer, ::Type{SQF}, ::Type{<:ALS}) = true
+MOI.supports_constraint(::Optimizer, ::Type{VQF}, ::Type{<:VLS}) = true
 
 function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
   if !haskey(dest.options, "solver")
