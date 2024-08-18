@@ -349,6 +349,38 @@ function NLPModels.hess_coord!(
   return vals
 end
 
+function NLPModels.jth_hess_coord!(
+  nlp::MathOptNLPModel,
+  x::AbstractVector,
+  j::Integer,
+  vals::AbstractVector,
+)
+  increment!(nlp, :neval_jhess)
+  vals .= 0.0
+  if nlp.meta.nlin + 1 ≤ j ≤ nlp.meta.nlin + nlp.quadcon.nquad
+    index = nlp.obj.nnzh
+    for i = 1:(nlp.quadcon.nquad)
+      qcon = nlp.quadcon.constraints[i]
+      if j == nlp.meta.nlin + i
+        view(vals, (index + 1):(index + qcon.nnzh)) .= qcon.A.vals
+      end
+      index += qcon.nnzh
+    end
+  end
+  if nlp.meta.nlin + nlp.quadcon.nquad + 1 ≤ j ≤ nlp.meta.ncon
+    nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 1.0
+    MOI.eval_hessian_lagrangian(
+      nlp.eval,
+      view(vals, (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.meta.nnzh)),
+      x,
+      0.0,
+      λ,
+    )
+    nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 0.0
+  end
+  return vals
+end
+
 function NLPModels.hprod!(
   nlp::MathOptNLPModel,
   x::AbstractVector,
@@ -412,4 +444,49 @@ function NLPModels.hprod!(
     MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, nlp.λ)
   end
   return hv
+end
+
+function NLPModels.jth_hprod!(
+  nlp::MathOptNLPModel,
+  x::AbstractVector,
+  v::AbstractVector,
+  j::Integer,
+  hv::AbstractVector,
+)
+  increment!(nlp, :neval_jhprod)
+  hv .= 0.0
+  if nlp.meta.nlin + 1 ≤ j ≤ nlp.meta.nlin + nlp.quadcon.nquad
+    qcon = nlp.quadcon.constraints[j - nlp.meta.nlin]
+    coo_sym_add_mul!(qcon.A.rows, qcon.A.cols, qcon.A.vals, v, hv, 1.0)
+  end
+  if nlp.meta.nlin + nlp.quadcon.nquad + 1 ≤ j ≤ nlp.meta.ncon
+    nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 1.0
+    MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, 0.0, nlp.λ)
+    nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 0.0
+  end
+  return hv
+end
+
+function NLPModels.ghjvprod!(
+  nlp::MathOptNLPModel,
+  x::AbstractVector,
+  g::AbstractVector,
+  v::AbstractVector,
+  ghv::AbstractVector,
+)
+  # Don't we have a counter :neval_ghjvprod?
+  ghv .= 0.0
+  for i in nlp.meta.nlin + 1 : nlp.meta.nlin + nlp.quadcon.nquad
+    qcon = nlp.quadcon.constraints[i - nlp.meta.nlin]
+    ghv[i] = coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, g, v)
+  end
+  if nlp.meta.nnln > 0
+    # we could store hv in the MathOptNLPModel
+    hv = zeros(Float64, nlp.meta.nvar)
+    for i in nlp.meta.nlin + nlp.quadcon.nquad + 1 : nlp.meta.ncon
+      jth_hprod!(nlp, x, v, i, hv)
+      ghv[i] = dot(g, hv)
+    end
+  end
+  return ghv
 end
