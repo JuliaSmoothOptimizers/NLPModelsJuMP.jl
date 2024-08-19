@@ -374,7 +374,7 @@ function NLPModels.jth_hess_coord!(
       view(vals, (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.meta.nnzh)),
       x,
       0.0,
-      λ,
+      nlp.λ,
     )
     nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 0.0
   end
