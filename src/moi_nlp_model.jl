@@ -7,6 +7,7 @@ mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
   quadcon::QuadraticConstraints
   nlcon::NonLinearStructure
   λ::Vector{Float64}
+  hv::Vector{Float64}
   obj::Objective
   counters::Counters
 end
@@ -34,7 +35,8 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
 
   nlp_data = _nlp_block(moimodel)
   nnln, nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
-  λ = zeros(nnln)  # Lagrange multipliers for hess_coord! and hprod! without y
+  λ = zeros(Float64, nnln)  # Lagrange multipliers for hess_coord! and hprod! without y
+  hv = zeros(Float64, nvar)  # workspace for ghjvprod!
 
   if nlp_data.has_objective
     obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
@@ -67,7 +69,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     name = name,
   )
 
-  return MathOptNLPModel(meta, nlp_data.evaluator, lincon, quadcon, nlcon, λ, obj, Counters()),
+  return MathOptNLPModel(meta, nlp_data.evaluator, lincon, quadcon, nlcon, λ, hv, obj, Counters()),
   index_map
 end
 
@@ -367,7 +369,8 @@ function NLPModels.jth_hess_coord!(
       end
       index += qcon.nnzh
     end
-  else
+  end
+  if nlp.meta.nlin + nlp.quadcon.nquad + 1 ≤ j ≤ nlp.meta.ncon
     nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 1.0
     MOI.eval_hessian_lagrangian(
       nlp.eval,
@@ -459,7 +462,8 @@ function NLPModels.jth_hprod!(
   if nlp.meta.nlin + 1 ≤ j ≤ nlp.meta.nlin + nlp.quadcon.nquad
     qcon = nlp.quadcon.constraints[j - nlp.meta.nlin]
     coo_sym_add_mul!(qcon.A.rows, qcon.A.cols, qcon.A.vals, v, hv, 1.0)
-  else
+  end
+  if nlp.meta.nlin + nlp.quadcon.nquad + 1 ≤ j ≤ nlp.meta.ncon
     nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 1.0
     MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, 0.0, nlp.λ)
     nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 0.0
@@ -480,13 +484,9 @@ function NLPModels.ghjvprod!(
     qcon = nlp.quadcon.constraints[i - nlp.meta.nlin]
     ghv[i] = coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, g, v)
   end
-  if nlp.meta.nnln > 0
-    # we could store hv in the MathOptNLPModel
-    hv = zeros(Float64, nlp.meta.nvar)
-    for i in nlp.meta.nlin + nlp.quadcon.nquad + 1 : nlp.meta.ncon
-      jth_hprod!(nlp, x, v, i, hv)
-      ghv[i] = dot(g, hv)
-    end
+  for i in nlp.meta.nlin + nlp.quadcon.nquad + 1 : nlp.meta.ncon
+    jth_hprod!(nlp, x, v, i, nlp.hv)
+    ghv[i] = dot(g, nlp.hv)
   end
   return ghv
 end
