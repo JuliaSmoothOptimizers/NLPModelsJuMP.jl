@@ -369,8 +369,7 @@ function NLPModels.jth_hess_coord!(
       end
       index += qcon.nnzh
     end
-  end
-  if nlp.meta.nlin + nlp.quadcon.nquad + 1 ≤ j ≤ nlp.meta.ncon
+  elseif nlp.meta.nlin + nlp.quadcon.nquad + 1 ≤ j ≤ nlp.meta.ncon
     nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 1.0
     MOI.eval_hessian_lagrangian(
       nlp.eval,
@@ -462,8 +461,7 @@ function NLPModels.jth_hprod!(
   if nlp.meta.nlin + 1 ≤ j ≤ nlp.meta.nlin + nlp.quadcon.nquad
     qcon = nlp.quadcon.constraints[j - nlp.meta.nlin]
     coo_sym_add_mul!(qcon.A.rows, qcon.A.cols, qcon.A.vals, v, hv, 1.0)
-  end
-  if nlp.meta.nlin + nlp.quadcon.nquad + 1 ≤ j ≤ nlp.meta.ncon
+  elseif nlp.meta.nlin + nlp.quadcon.nquad + 1 ≤ j ≤ nlp.meta.ncon
     nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 1.0
     MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, 0.0, nlp.λ)
     nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 0.0
