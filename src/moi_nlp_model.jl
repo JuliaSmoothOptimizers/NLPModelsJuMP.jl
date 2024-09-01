@@ -484,6 +484,7 @@ function NLPModels.ghjvprod!(
   end
   for i in nlp.meta.nlin + nlp.quadcon.nquad + 1 : nlp.meta.ncon
     jth_hprod!(nlp, x, v, i, nlp.hv)
+    decrement!(nlp, :neval_jhprod)
     ghv[i] = dot(g, nlp.hv)
   end
   return ghv
