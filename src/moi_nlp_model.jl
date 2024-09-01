@@ -478,11 +478,11 @@ function NLPModels.ghjvprod!(
 )
   increment!(nlp, :neval_hprod)
   ghv .= 0.0
-  for i in nlp.meta.nlin + 1 : nlp.meta.nlin + nlp.quadcon.nquad
+  for i = (nlp.meta.nlin + 1):(nlp.meta.nlin + nlp.quadcon.nquad)
     qcon = nlp.quadcon.constraints[i - nlp.meta.nlin]
     ghv[i] = coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, g, v)
   end
-  for i in nlp.meta.nlin + nlp.quadcon.nquad + 1 : nlp.meta.ncon
+  for i = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon)
     jth_hprod!(nlp, x, v, i, nlp.hv)
     decrement!(nlp, :neval_jhprod)
     ghv[i] = dot(g, nlp.hv)
