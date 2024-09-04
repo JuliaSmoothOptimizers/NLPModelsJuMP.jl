@@ -61,6 +61,7 @@ function MOI.supports(
     MOI.ObjectiveSense,
     MOI.ObjectiveFunction{<:Union{LinQuad, MOI.ScalarNonlinearFunction}},
     MOI.NLPBlock,
+    MOI.UserDefinedFunction,
   },
 )
   return true
