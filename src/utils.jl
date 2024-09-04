@@ -451,6 +451,12 @@ end
 
 function _nlp_model(model::MOI.ModelLike)
   nlp_model = nothing
+  for op in MOI.get(model, MOI.ListOfSupportedNonlinearOperators())
+    if isnothing(nlp_model)
+      nlp_model = MOI.Nonlinear.Model()
+    end
+    MOI.Nonlinear.register_operator(nlp_model, op.name, op.arity)
+  end
   for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
     nlp_model = _nlp_model(nlp_model, model, F, S)
   end
