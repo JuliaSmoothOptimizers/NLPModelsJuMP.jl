@@ -426,47 +426,46 @@ function parser_MOI(moimodel, index_map, nvar)
 end
 
 # Affine or quadratic, nothing to do
-function _nlp_model(model::Union{Nothing, MOI.Nonlinear.Model}, ::MOI.ModelLike, ::Type, ::Type)
-  return model
-end
+_nlp_model(::MOI.Nonlinear.Model, ::MOI.ModelLike, ::Type, ::Type) = false
 
 function _nlp_model(
-  dest::Union{Nothing, MOI.Nonlinear.Model},
+  dest::MOI.Nonlinear.Model,
   src::MOI.ModelLike,
   F::Type{<:Union{MOI.ScalarNonlinearFunction, MOI.VectorNonlinearFunction}},
   S::Type,
 )
+  has_nonlinear = false
   for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
-    if isnothing(dest)
-      dest = MOI.Nonlinear.Model()
-    end
     MOI.Nonlinear.add_constraint(
       dest,
       MOI.get(src, MOI.ConstraintFunction(), ci),
       MOI.get(src, MOI.ConstraintSet(), ci),
     )
+    has_nonlinear = true
   end
-  return dest
+  return has_nonlinear
 end
 
-function _nlp_model(model::MOI.ModelLike)
-  nlp_model = nothing
-  for op in MOI.get(model, MOI.ListOfSupportedNonlinearOperators())
-    if isnothing(nlp_model)
-      nlp_model = MOI.Nonlinear.Model()
+function _nlp_model(model::MOI.ModelLike)::Union{Nothing,MOI.Nonlinear.Model}
+  nlp_model = MOI.Nonlinear.Model()
+  has_nonlinear = false
+  for attr in MOI.get(model, MOI.ListOfModelAttributesSet())
+    if attr isa MOI.UserDefinedFunction
+      has_nonlinear = true
+      args = MOI.get(model, attr)
+      MOI.Nonlinear.register_operator(nlp_model, attr.name, attr.arity, args...)
     end
-    MOI.Nonlinear.register_operator(nlp_model, op.name, op.arity)
   end
   for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
-    nlp_model = _nlp_model(nlp_model, model, F, S)
+    has_nonlinear |= _nlp_model(nlp_model, model, F, S)
   end
   F = MOI.get(model, MOI.ObjectiveFunctionType())
   if F <: MOI.ScalarNonlinearFunction
-    if isnothing(nlp_model)
-      nlp_model = MOI.Nonlinear.Model()
-    end
-    attr = MOI.ObjectiveFunction{F}()
-    MOI.Nonlinear.set_objective(nlp_model, MOI.get(model, attr))
+    MOI.Nonlinear.set_objective(nlp_model, MOI.get(model, MOI.ObjectiveFunction{F}()))
+    has_nonlinear = true
+  end
+  if !has_nonlinear
+    return nothing
   end
   return nlp_model
 end
