@@ -42,6 +42,8 @@ function test_runtests()
       r"test_nonlinear_hs071_no_hessian$",
       r"test_nonlinear_hs071_hessian_vector_product$",
       r"test_nonlinear_hs071$",
+      # Require hessian = false in the constructor of MathOptNLPModel
+      r"test_nonlinear_expression_multivariate_function$",
       # FIXME We should look over all attributes set and error
       #       for unknown ones instead of just getting the ones we know we support
       #       and ignoring the rest
