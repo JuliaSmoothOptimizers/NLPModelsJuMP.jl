@@ -446,7 +446,7 @@ function _nlp_model(
   return has_nonlinear
 end
 
-function _nlp_model(model::MOI.ModelLike)::Union{Nothing,MOI.Nonlinear.Model}
+function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
   nlp_model = MOI.Nonlinear.Model()
   has_nonlinear = false
   for attr in MOI.get(model, MOI.ListOfModelAttributesSet())
