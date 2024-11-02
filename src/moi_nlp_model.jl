@@ -12,19 +12,6 @@ mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
   counters::Counters
 end
 
-MOI.supports(model::Optimizer, ::MOI.UserDefinedFunction) = true
-
-function MOI.set(model::Optimizer, attr::MOI.UserDefinedFunction, args)
-    _init_nlp_model(model)
-    MOI.Nonlinear.register_operator(
-        model.nlp_model,
-        attr.name,
-        attr.arity,
-        args...,
-    )
-    return
-end
-
 """
     MathOptNLPModel(model, hessian=true, name="Generic")
 
