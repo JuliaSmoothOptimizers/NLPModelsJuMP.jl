@@ -1,0 +1,8 @@
+PackageName: "NLPModelsJuMP"
+PackageOwner: "JuliaSmoothOptimizers"
+PackageUUID: "792afdf1-32c1-5681-94e0-d7bf7a5df49e"
+_src_path: "https://github.com/JuliaSmoothOptimizers/JSOBestieTemplate.jl"
+_commit: "v0.13.0"
+AddBreakage: true
+AddBenchmark: false
+AddBenchmarkCI: true
