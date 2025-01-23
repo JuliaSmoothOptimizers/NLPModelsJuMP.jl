@@ -79,7 +79,7 @@ end
 ### `supports_constraint`
 ###
 
-MOI.supports_constraint(::Optimizer, ::Type{VI} , ::Type{<:ALS}) = true
+MOI.supports_constraint(::Optimizer, ::Type{VI}, ::Type{<:ALS}) = true
 MOI.supports_constraint(::Optimizer, ::Type{SAF}, ::Type{<:ALS}) = true
 MOI.supports_constraint(::Optimizer, ::Type{VAF}, ::Type{<:VLS}) = true
 MOI.supports_constraint(::Optimizer, ::Type{SQF}, ::Type{<:ALS}) = true
