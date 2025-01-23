@@ -19,6 +19,11 @@ const SQF = MOI.ScalarQuadraticFunction{Float64}  # ScalarQuadraticFunction{T}(a
 const VQF = MOI.VectorQuadraticFunction{Float64}  # VectorQuadraticFunction{T}(affine_terms, quadratic_terms, constants)
 const QF = Union{SQF, VQF}
 
+# ScalarNonlinearFunction and VectorNonlinearFunction
+const SNF = MOI.ScalarNonlinearFunction
+const VNF = MOI.VectorNonlinearFunction
+const NF = Union{SNF, VNF}
+
 # AffLinSets and VecLinSets
 const ALS = Union{
   MOI.EqualTo{Float64},
@@ -375,11 +380,7 @@ function parser_MOI(moimodel, index_map, nvar)
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
-    F <: AF ||
-      F <: QF ||
-      F == MOI.ScalarNonlinearFunction ||
-      F == VI ||
-      error("Function $F is not supported.")
+    F <: AF || F <: QF || F == NF || F == VI || error("Function $F is not supported.")
     S <: LS || error("Set $S is not supported.")
 
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
@@ -431,7 +432,7 @@ _nlp_model(::MOI.Nonlinear.Model, ::MOI.ModelLike, ::Type, ::Type) = false
 function _nlp_model(
   dest::MOI.Nonlinear.Model,
   src::MOI.ModelLike,
-  F::Type{<:Union{MOI.ScalarNonlinearFunction, MOI.VectorNonlinearFunction}},
+  F::Type{<:NF},
   S::Type,
 )
   has_nonlinear = false
@@ -460,7 +461,7 @@ function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
     has_nonlinear |= _nlp_model(nlp_model, model, F, S)
   end
   F = MOI.get(model, MOI.ObjectiveFunctionType())
-  if F <: MOI.ScalarNonlinearFunction
+  if F <: SNF
     MOI.Nonlinear.set_objective(nlp_model, MOI.get(model, MOI.ObjectiveFunction{F}()))
     has_nonlinear = true
   end
