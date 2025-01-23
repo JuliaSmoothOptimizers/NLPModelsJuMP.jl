@@ -380,7 +380,7 @@ function parser_MOI(moimodel, index_map, nvar)
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
-    (F == VNF) && error("The function $F is not supported. Please use `.<=`, `.==`, and `.>=` in your constraints to ensure compatibility with ScalarAffineFunction.")
+    (F == VNF) && error("The function $F is not supported. Please use `.<=`, `.==`, and `.>=` in your constraints to ensure compatibility with ScalarNonlinearFunction.")
     F <: AF || F <: QF || F == SNF || F == VI || error("Function $F is not supported.")
     S <: LS || error("Set $S is not supported.")
 
