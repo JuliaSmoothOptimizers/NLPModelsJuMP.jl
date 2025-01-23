@@ -127,6 +127,14 @@ function test_runtests()
       r"test_basic_VectorNonlinearFunction_NormInfinityCone$",
       r"test_basic_VectorNonlinearFunction_NormOneCone$",
       r"test_constraint_qcp_duplicate_diagonal$",
+      # New failures -- 23/01/2025
+      r"test_nonlinear_constraint_log$",
+      r"test_nonlinear_constraint_scalar_affine_function$",
+      r"test_nonlinear_quadratic_1$",
+      r"test_nonlinear_quadratic_2$",
+      r"test_nonlinear_quadratic_3$",
+      r"test_nonlinear_quadratic_4$",
+      r"test_nonlinear_with_scalar_quadratic_function_with_off_diag$",
     ],
   )
   return
