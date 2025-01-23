@@ -5,7 +5,7 @@ using Test, Printf
 nlp_problems = setdiff(NLPModelsTest.nlp_problems, ["MGH01Feas"])
 nls_problems = NLPModelsTest.nls_problems
 
-extra_nlp_problems = ["nohesspb", "hs61", "hs100", "hs219", "quadcon", "operatorspb"]
+extra_nlp_problems = ["nohesspb", "hs61", "hs100", "hs219", "quadcon", "operatorspb", "nf"]
 extra_nls_problems = ["nlsnohesspb", "HS30", "HS43", "MGH07", "nlsqc"]
 
 for problem in lowercase.(nlp_problems ∪ extra_nlp_problems)
