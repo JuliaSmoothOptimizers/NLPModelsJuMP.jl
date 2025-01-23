@@ -4,7 +4,7 @@ function nf()
   h(x::Vector{VariableRef}) = sum(x.^4)
   nlp = Model()
   @variable(nlp, x[1:2])
-  @constraint(nlp, f(x) .- g(x) in MOI.Nonnegatives(2))
+  @constraint(nlp, f(x) .- g(x) .>= 0)
   @objective(nlp, Max, h(x))
   return nlp
 end
