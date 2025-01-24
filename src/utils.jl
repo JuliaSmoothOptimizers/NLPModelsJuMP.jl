@@ -380,7 +380,9 @@ function parser_MOI(moimodel, index_map, nvar)
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
-    (F == VNF) && error("The function $F is not supported. Please use `.<=`, `.==`, and `.>=` in your constraints to ensure compatibility with ScalarNonlinearFunction.")
+    (F == VNF) && error(
+      "The function $F is not supported. Please use `.<=`, `.==`, and `.>=` in your constraints to ensure compatibility with ScalarNonlinearFunction.",
+    )
     F <: AF || F <: QF || F == SNF || F == VI || error("Function $F is not supported.")
     S <: LS || error("Set $S is not supported.")
 
@@ -430,12 +432,7 @@ end
 # Affine or quadratic, nothing to do
 _nlp_model(::MOI.Nonlinear.Model, ::MOI.ModelLike, ::Type, ::Type) = false
 
-function _nlp_model(
-  dest::MOI.Nonlinear.Model,
-  src::MOI.ModelLike,
-  F::Type{SNF},
-  S::Type,
-)
+function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF}, S::Type)
   has_nonlinear = false
   for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
     MOI.Nonlinear.add_constraint(
