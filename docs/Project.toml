@@ -6,6 +6,6 @@ OptimizationProblems = "5049e819-d29b-5fba-b941-0eee7e64c1c6"
 
 [compat]
 Documenter = "1.0"
-JuMP = "1.2 - 1.14.1"
-NLPModels = "0.20"
-OptimizationProblems = "0.7"
+JuMP = "1.25"
+NLPModels = "0.21.5"
+OptimizationProblems = "0.9"
