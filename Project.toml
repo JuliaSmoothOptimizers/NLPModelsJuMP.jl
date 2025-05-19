@@ -16,9 +16,12 @@ JuMP = "1.25"
 LinearAlgebra = "1.10"
 MathOptInterface = "1.40"
 NLPModels = "0.21.5"
+NLPModelsTest = "0.10.2"
+Percival = "0.7.3"
 Printf = "1.10"
 SolverCore = "0.3"
 SparseArrays = "1.10"
+Test = "1.10"
 julia = "1.10"
 
 [extras]
