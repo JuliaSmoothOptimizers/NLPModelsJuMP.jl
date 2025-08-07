@@ -117,6 +117,7 @@ function test_runtests()
       r"test_basic_VectorNonlinearFunction_Zeros$",
       r"test_constraint_qcp_duplicate_off_diagonal$",
       r"test_nonlinear_expression_hs109$",
+      r"test_nonlinear_expression_hs110$",
       r"test_nonlinear_expression_overrides_objective$",
       # ITERATION_LIMIT
       r"test_quadratic_constraint_LessThan$",
