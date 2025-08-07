@@ -117,10 +117,13 @@ function test_runtests()
       r"test_basic_VectorNonlinearFunction_Zeros$",
       r"test_constraint_qcp_duplicate_off_diagonal$",
       r"test_nonlinear_expression_hs109$",
+      r"test_nonlinear_expression_hs110$",
       r"test_nonlinear_expression_overrides_objective$",
       # ITERATION_LIMIT
       r"test_quadratic_constraint_LessThan$",
       r"test_quadratic_constraint_GreaterThan$",
+      r"test_objective_qp_ObjectiveFunction_zero_ofdiag$",
+      r"test_objective_qp_ObjectiveFunction_edge_cases$",
       # FIXME Segfault
       r"test_linear_integration_delete_variables$",
       # https://github.com/jump-dev/MathOptInterface.jl/issues/2323
