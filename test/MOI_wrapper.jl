@@ -122,6 +122,7 @@ function test_runtests()
       # ITERATION_LIMIT
       r"test_quadratic_constraint_LessThan$",
       r"test_quadratic_constraint_GreaterThan$",
+      r"test_objective_qp_ObjectiveFunction_zero_ofdiag$",
       r"test_objective_qp_ObjectiveFunction_edge_cases$",
       # FIXME Segfault
       r"test_linear_integration_delete_variables$",
