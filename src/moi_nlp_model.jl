@@ -134,7 +134,8 @@ function NLPModels.cons!(nlp::MathOptNLPModel, x::AbstractVector, c::AbstractVec
     if nlp.quadcon.nquad > 0
       for i = 1:(nlp.quadcon.nquad)
         qcon = nlp.quadcon.constraints[i]
-        c[nlp.meta.nlin + i] = 0.5 * coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, x) + dot(qcon.b, x)
+        c[nlp.meta.nlin + i] =
+          0.5 * coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, x) + dot(qcon.b, x)
       end
     end
     if nlp.meta.nnln > nlp.quadcon.nquad
@@ -339,13 +340,22 @@ function NLPModels.jprod!(
   if nlp.meta.nlin > 0
     view(Jv, nlp.meta.lin) .= 0.0
     transpose = false
-    coo_unsym_add_mul!(transpose, nlp.lincon.jacobian.rows, nlp.lincon.jacobian.cols, nlp.lincon.jacobian.vals, v, Jv, 1.0)
+    coo_unsym_add_mul!(
+      transpose,
+      nlp.lincon.jacobian.rows,
+      nlp.lincon.jacobian.cols,
+      nlp.lincon.jacobian.vals,
+      v,
+      Jv,
+      1.0,
+    )
   end
   if nlp.quadcon.nquad > 0
     for i = 1:(nlp.quadcon.nquad)
       # Jv[i] = (Aᵢ * x + bᵢ)ᵀ * v
       qcon = nlp.quadcon.constraints[i]
-      Jv[nlp.meta.nlin + i] = coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, v) + dot(qcon.b, v)
+      Jv[nlp.meta.nlin + i] =
+        coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, v) + dot(qcon.b, v)
     end
   end
   if nlp.meta.nnln > nlp.quadcon.nquad
@@ -410,7 +420,15 @@ function NLPModels.jtprod!(
   (nlp.quadcon.nquad == nlp.meta.nnln) && (Jtv .= 0.0)
   if nlp.meta.nlin > 0
     transpose = true
-    coo_unsym_add_mul!(transpose, nlp.lincon.jacobian.rows, nlp.lincon.jacobian.cols, nlp.lincon.jacobian.vals, v, Jtv, 1.0)
+    coo_unsym_add_mul!(
+      transpose,
+      nlp.lincon.jacobian.rows,
+      nlp.lincon.jacobian.cols,
+      nlp.lincon.jacobian.vals,
+      v,
+      Jtv,
+      1.0,
+    )
   end
   if nlp.quadcon.nquad > 0
     for i = 1:(nlp.quadcon.nquad)
