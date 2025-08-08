@@ -117,9 +117,36 @@ function replace!(ex, x)
 end
 
 """
+    coo_unsym_add_mul!(transpose, rows, cols, vals, x, y, α)
+
+Performs the update `y ← y + α * op(A) * x`, where `A` is an unsymmetric matrix in COO format given by `(rows, cols, vals)`.
+If `transpose == true`, then `op(A) = Aᵀ`; otherwise, `op(A) = A`.
+"""
+function coo_unsym_add_mul!(
+  transpose::Bool,
+  rows::AbstractVector{<:Integer},
+  cols::AbstractVector{<:Integer},
+  vals::AbstractVector,
+  x::AbstractVector,
+  y::AbstractVector,
+  α::Float64,
+)
+  nnz = length(vals)
+  @inbounds for k = 1:nnz
+    i, j, c = rows[k], cols[k], vals[k]
+    if transpose
+      y[j] += α * c * x[i]
+    else
+      y[i] += α * c * x[j]
+    end
+  end
+  return y
+end
+
+"""
     coo_sym_add_mul!(rows, cols, vals, x, y, α)
 
-Update of the form `y ← y + αAx` where `A` is a symmetric matrix given by `(rows, cols, vals)`.
+Perform the update `y ← y + α * A * x` where `A` is a symmetric matrix in COO format given by `(rows, cols, vals)`.
 Only one triangle of `A` should be passed.
 """
 function coo_sym_add_mul!(
