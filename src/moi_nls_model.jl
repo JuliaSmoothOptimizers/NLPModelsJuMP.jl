@@ -259,9 +259,11 @@ end
 
 function NLPModels.cons_nln!(nls::MathOptNLSModel, x::AbstractVector, c::AbstractVector)
   increment!(nls, :neval_cons_nln)
-  for i = 1:(nls.quadcon.nquad)
-    qcon = nls.quadcon.constraints[i]
-    c[i] = 0.5 * coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, x) + dot(qcon.b, x)
+  if nls.quadcon.nquad > 0
+    for i = 1:(nls.quadcon.nquad)
+      qcon = nls.quadcon.constraints[i]
+      c[i] = 0.5 * coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, x) + dot(qcon.b, x)
+    end
   end
   if nls.meta.nnln > nls.quadcon.nquad
     MOI.eval_constraint(nls.ceval, view(c, (nls.quadcon.nquad + 1):(nls.meta.nnln)), x)
@@ -345,6 +347,7 @@ function NLPModels.jprod_lin!(
   v::AbstractVector,
   Jv::AbstractVector,
 )
+  increment!(nls, :neval_jprod_lin)
   jprod_lin!(
     nls,
     nls.lincon.jacobian.rows,
@@ -384,6 +387,7 @@ function NLPModels.jtprod_lin!(
   v::AbstractVector,
   Jtv::AbstractVector,
 )
+  increment!(nls, :neval_jtprod_lin)
   jtprod_lin!(
     nls,
     nls.lincon.jacobian.rows,
