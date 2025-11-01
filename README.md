@@ -4,7 +4,7 @@ NLPModelsJuMP.jl provides conversion from [JuMP.jl](https://github.com/jump-dev/
 
 ## How to Cite
 
-If you use NLPModelsJuMP.jl in your work, please cite using the format given in [`CITATION.bib`](https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl/blob/main/CITATION.bib).
+If you use NLPModelsJuMP.jl in your work, please cite using the format given in [`CITATION.cff`](https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl/blob/main/CITATION.cff).
 
 | **Documentation** | **Linux/macOS/Windows/FreeBSD** | **Coverage** | **DOI** |
 |:-----------------:|:----------------------------------------------:|:------------:|:-------:|
