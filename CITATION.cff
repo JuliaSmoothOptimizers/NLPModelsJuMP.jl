@@ -1,17 +1,37 @@
-cff-version: "1.2.0"
-message: "If you use this software, please cite it as below."
-title: "NLPModelsJuMP.jl: Conversion from JuMP models to NLPModels"
-version: "0.13.3"
-date-released: "2020-08-01"
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: >-
+  NLPModelsJuMP.jl: Conversion from JuMP models to NLPModels
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
 authors:
-  - given-names: "Abel Soares"
-    family-names: "Siqueira"
-    affiliation: "Federal University of Paraná - UFPR"
-  - given-names: "Dominique"
-    family-names: "Orban"
-    affiliation: "École Polytechnique/GERAD - Montréal"
-  - given-names: "Alexis"
-    family-names: "Montoison"
-    affiliation: "École Polytechnique/GERAD - Montréal"
-doi: "10.5281/zenodo.2574162"
-url: "https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl"
+  - given-names: Alexis
+    family-names: Montoison
+    affiliation: >-
+      École Polytechnique/GERAD - Montréal
+  - given-names: Abel
+    family-names: Soares Siqueira
+    affiliation: Federal University of Paraná - UFPR
+  - given-names: Dominique
+    family-names: Orban
+    affiliation: >-
+      École Polytechnique/GERAD - Montréal
+identifiers:
+  - description: Zenodo archive
+    type: doi
+    value: 10.5281/zenodo.2574162
+keywords:
+  - JuMP
+  - NLPModels
+  - Nonlinear Optimization
+  - Julia
+license: MPL-2.0
+version: 0.13.3
+date-released: '2020-08-01'
+repository-code: >-
+  https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl
+---
