@@ -3,7 +3,7 @@
 
 cff-version: 1.2.0
 title: >-
-  NLPModelsJuMP.jl: Conversion from JuMP models to NLPModels
+  NLPModelsJuMP.jl : conversion from JuMP.jl / MathOptInterface.jl models to NLPModels.
 message: >-
   If you use this software, please cite it using the
   metadata from this file.
@@ -11,15 +11,26 @@ type: software
 authors:
   - given-names: Alexis
     family-names: Montoison
+    email: alexis.montoison@polymtl.ca
     affiliation: >-
-      École Polytechnique/GERAD - Montréal
-  - given-names: Abel
-    family-names: Soares Siqueira
-    affiliation: Federal University of Paraná - UFPR
+      GERAD and Department of Mathematics and
+      Industrial Engineering, Polytechnique Montréal,
+      QC, Canada.
+    orcid: 'https://orcid.org/0000-0002-3403-5450'
   - given-names: Dominique
     family-names: Orban
+    email: dominique.orban@gerad.ca
+    orcid: 'https://orcid.org/0000-0002-8017-7687'
     affiliation: >-
-      École Polytechnique/GERAD - Montréal
+      GERAD and Department of Mathematics and
+      Industrial Engineering, Polytechnique Montréal,
+      QC, Canada
+  - affiliation: 'Netherlands eScience Center, Amsterdam, NL'
+    orcid: 'https://orcid.org/0000-0003-4451-281X'
+    email: abel.s.siqueira@gmail.com
+    given-names: Abel
+    family-names: Soares Siqueira
+  - given-names: contributors
 identifiers:
   - description: Zenodo archive
     type: doi
@@ -28,10 +39,11 @@ keywords:
   - JuMP
   - NLPModels
   - Nonlinear Optimization
+  - Model conversion
   - Julia
+  - Nonlinear Programming
 license: MPL-2.0
 version: 0.13.3
-date-released: '2020-08-01'
+date-released: '2025-08-08'
 repository-code: >-
   https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl
----
