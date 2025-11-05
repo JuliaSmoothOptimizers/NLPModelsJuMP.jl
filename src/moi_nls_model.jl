@@ -256,10 +256,18 @@ end
 function NLPModels.cons_lin!(nls::MathOptNLSModel, x::AbstractVector, c::AbstractVector)
   increment!(nls, :neval_cons_lin)
   NLPModels.@lencheck nls.meta.nvar x
-  if length(c) < nls.nls_meta.nlin
-    throw(ArgumentError("length(c) = $(length(c)) but expected at least $(nls.nls_meta.nlin)"))
+  if (nls.nls_meta.nlin > 0) && (length(c) >= nls.nls_meta.nlin)
+    coo_prod!(nls.linequ.jacobian.rows, nls.linequ.jacobian.cols, nls.linequ.jacobian.vals, x, c)
+    if !isempty(nls.linequ.constants)
+      view(c, 1:length(nls.linequ.constants)) .+= nls.linequ.constants
+    end
+    return c
+  elseif length(c) >= nls.meta.nlin
+    coo_prod!(nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, x, c)
+    return c
+  else
+    throw(ArgumentError("length(c) = $(length(c)) but expected at least $(min(nls.nls_meta.nlin, nls.meta.nlin))"))
   end
-  coo_prod!(nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, x, c)
   return c
 end
 
