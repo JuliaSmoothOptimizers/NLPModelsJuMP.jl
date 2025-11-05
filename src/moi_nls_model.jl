@@ -86,6 +86,8 @@ end
 
 function NLPModels.residual!(nls::MathOptNLSModel, x::AbstractVector, Fx::AbstractVector)
   increment!(nls, :neval_residual)
+  NLPModels.@lencheck nls.meta.nvar x
+  NLPModels.@lencheck nls.nls_meta.nequ Fx
   if nls.nls_meta.nlin > 0
     coo_prod!(
       nls.linequ.jacobian.rows,
@@ -253,12 +255,16 @@ end
 
 function NLPModels.cons_lin!(nls::MathOptNLSModel, x::AbstractVector, c::AbstractVector)
   increment!(nls, :neval_cons_lin)
+  NLPModels.@lencheck nls.meta.nvar x
+  NLPModels.@lencheck nls.nls_meta.nlin c
   coo_prod!(nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, x, c)
   return c
 end
 
 function NLPModels.cons_nln!(nls::MathOptNLSModel, x::AbstractVector, c::AbstractVector)
   increment!(nls, :neval_cons_nln)
+  NLPModels.@lencheck nls.meta.nvar x
+  NLPModels.@lencheck nls.meta.nnln c
   if nls.quadcon.nquad > 0
     for i = 1:(nls.quadcon.nquad)
       qcon = nls.quadcon.constraints[i]
@@ -273,6 +279,8 @@ end
 
 function NLPModels.cons!(nls::MathOptNLSModel, x::AbstractVector, c::AbstractVector)
   increment!(nls, :neval_cons)
+  NLPModels.@lencheck nls.meta.nvar x
+  NLPModels.@lencheck nls.meta.ncon c
   if nls.meta.nlin > 0
     coo_prod!(nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, x, c)
   end
