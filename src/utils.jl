@@ -6,24 +6,6 @@ import NLPModels.increment!, NLPModels.decrement!
 using JuMP, MathOptInterface
 const MOI = MathOptInterface
 
-"""
-    @lencheck expected expr
-
-Macro to check that `length(expr) == expected` at runtime.
-Throws an ArgumentError with a helpful message when the lengths mismatch.
-Example:
-    @lencheck nlp.meta.nvar x
-"""
-macro lencheck(expected, var)
-  return esc(:(begin
-    _len_expected = $(expected)
-    _len_var = length($(var))
-    if _len_var != _len_expected
-      throw(ArgumentError("length($(QuoteNode(var))) = $( _len_var ) but expected $( _len_expected )"))
-    end
-  end))
-end
-
 # VariableIndex
 const VI = MOI.VariableIndex  # VariableIndex(value)
 
