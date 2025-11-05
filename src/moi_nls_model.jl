@@ -256,7 +256,9 @@ end
 function NLPModels.cons_lin!(nls::MathOptNLSModel, x::AbstractVector, c::AbstractVector)
   increment!(nls, :neval_cons_lin)
   NLPModels.@lencheck nls.meta.nvar x
-  NLPModels.@lencheck nls.nls_meta.nlin c
+  if length(c) < nls.nls_meta.nlin
+    throw(ArgumentError("length(c) = $(length(c)) but expected at least $(nls.nls_meta.nlin)"))
+  end
   coo_prod!(nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, x, c)
   return c
 end
@@ -264,7 +266,9 @@ end
 function NLPModels.cons_nln!(nls::MathOptNLSModel, x::AbstractVector, c::AbstractVector)
   increment!(nls, :neval_cons_nln)
   NLPModels.@lencheck nls.meta.nvar x
-  NLPModels.@lencheck nls.meta.nnln c
+  if length(c) < nls.meta.nnln
+    throw(ArgumentError("length(c) = $(length(c)) but expected at least $(nls.meta.nnln)"))
+  end
   if nls.quadcon.nquad > 0
     for i = 1:(nls.quadcon.nquad)
       qcon = nls.quadcon.constraints[i]
@@ -280,7 +284,9 @@ end
 function NLPModels.cons!(nls::MathOptNLSModel, x::AbstractVector, c::AbstractVector)
   increment!(nls, :neval_cons)
   NLPModels.@lencheck nls.meta.nvar x
-  NLPModels.@lencheck nls.meta.ncon c
+  if length(c) < nls.meta.ncon
+    throw(ArgumentError("length(c) = $(length(c)) but expected at least $(nls.meta.ncon)"))
+  end
   if nls.meta.nlin > 0
     coo_prod!(nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, x, c)
   end
