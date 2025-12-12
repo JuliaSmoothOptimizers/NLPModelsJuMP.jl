@@ -84,6 +84,17 @@ mutable struct QuadraticConstraints
   nnzh::Int
 end
 
+"""
+    NonLinearStructure
+
+Structure containing Jacobian and Hessian structures of nonlinear constraints:
+- jac_rows: row indices of the Jacobian in Coordinate format (COO) format
+- jac_cols: column indices of the Jacobian in COO format
+- nnzj: number of non-zero entries in the Jacobian
+- hess_rows: row indices of the Hessian in COO format
+- hess_cols: column indices of the Hessian in COO format
+- nnzh: number of non-zero entries in the Hessian
+"""
 mutable struct NonLinearStructure
   jac_rows::Vector{Int}
   jac_cols::Vector{Int}
@@ -417,6 +428,10 @@ function parser_MOI(moimodel, index_map, nvar)
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
+    # Ignore VectorNonlinearOracle here, we'll parse it separately
+    if F == MOI.VectorOfVariables && S <: MOI.VectorNonlinearOracle{Float64}
+        continue
+    end
     (F == VNF) && error(
       "The function $F is not supported. Please use `.<=`, `.==`, and `.>=` in your constraints to ensure compatibility with ScalarNonlinearFunction.",
     )
@@ -538,6 +553,12 @@ end
     parser_NL(nlp_data; hessian)
 
 Parse nonlinear constraints of an `nlp_data`.
+
+Returns:
+- nnln: number of nonlinear constraints
+- nlcon: NonLinearStructure containing Jacobian and Hessian structures
+- nl_lcon: lower bounds of nonlinear constraints
+- nl_ucon: upper bounds of nonlinear constraints
 """
 function parser_NL(nlp_data; hessian::Bool = true)
   nnln = length(nlp_data.constraint_bounds)
