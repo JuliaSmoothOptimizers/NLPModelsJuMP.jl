@@ -205,14 +205,24 @@ function NLPModels.jac_nln_structure!(
   end
   if nlp.meta.nnln > nlp.quadcon.nquad
     offset = nlp.quadcon.nnzj
-    # for (f, s) in nlp.oracles
-    #     for (i, j) in s.set.jacobian_structure
-    #       ...
-    #       offset += 1
-    #     end
-    # end
-    ind_nnln = (offset + 1):(nlp.quadcon.nnzj + nlp.nlcon.nnzj)
-    view(rows, ind_nnln) .= nlp.quadcon.nquad .+ nlp.nlcon.jac_rows
+    # structure of oracle Jacobians
+    for (k, (f, s)) in enumerate(nlp.oracles)
+        # Shift row index by quadcon.nquad
+        # plus previous oracle outputs.
+        row_offset = nlp.quadcon.nquad
+        for i in 1:(k - 1)
+            row_offset += nlp.oracles[i][2].set.output_dimension
+        end
+
+        for (r, c) in s.set.jacobian_structure
+            offset += 1
+            rows[offset] = row_offset + r
+            cols[offset] = f.variables[c].value
+        end
+    end
+    # non-oracle nonlinear constraints
+    ind_nnln = (offset + 1):(offset + nlp.nlcon.nnzj)
+    view(rows, ind_nnln) .= nlp.quadcon.nquad .+ sum(s.set.output_dimension for (_, s) in nlp.oracles) .+ nlp.nlcon.jac_rows
     view(cols, ind_nnln) .= nlp.nlcon.jac_cols
   end
   return rows, cols
