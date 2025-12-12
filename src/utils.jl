@@ -582,6 +582,47 @@ function parser_NL(nlp_data; hessian::Bool = true)
 end
 
 """
+    parser_oracles(moimodel, index_map)
+
+Parse nonlinear oracles of a `MOI.ModelLike`.
+"""
+function parser_oracles(moimodel, index_map)
+    oracles = Tuple{MOI.VectorOfVariables,_VectorNonlinearOracleCache}[]
+    l_oracle = Float64[]
+    u_oracle = Float64[]
+
+    # We know this pair exists from ListOfConstraintTypesPresent
+    for ci in MOI.get(
+        moimodel,
+        MOI.ListOfConstraintIndices{MOI.VectorOfVariables, MOI.VectorNonlinearOracle{Float64}}(),
+    )
+        f   = MOI.get(moimodel, MOI.ConstraintFunction(), ci)  # ::MOI.VectorOfVariables
+        set = MOI.get(moimodel, MOI.ConstraintSet(), ci)       # ::MOI.VectorNonlinearOracle{Float64}
+
+        cache = _VectorNonlinearOracleCache(set)
+        push!(oracles, (f, cache))
+
+        # Bounds: MOI.VectorNonlinearOracle stores them internally (l, u)
+        append!(l_oracle, set.l)
+        append!(u_oracle, set.u)
+    end
+
+    # Sizes: number of scalar constraints represented by all oracles
+    noracle = length(l_oracle)
+
+    # Sparsity:
+    nnzj_oracle = 0
+    nnzh_oracle = 0
+    for (_, cache) in oracles
+        nnzj_oracle += length(cache.set.jacobian_structure)
+        # there may or may not be Hessian info
+        nnzh_oracle += length(cache.set.hessian_lagrangian_structure)
+    end
+
+    return oracles, noracle, l_oracle, u_oracle, nnzj_oracle, nnzh_oracle
+end
+
+"""
     parser_variables(model)
 
 Parse variables informations of a `MOI.ModelLike`.
