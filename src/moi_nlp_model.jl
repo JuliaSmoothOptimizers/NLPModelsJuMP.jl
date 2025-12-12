@@ -348,14 +348,14 @@ function NLPModels.jac_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::Abs
     end
     if nlp.meta.nnln > nlp.quadcon.nquad
       offset = nlp.lincon.nnzj + nlp.quadcon.nnzj
-      # for (f, s) in nlp.oracles
-      #   for i in 1:s.set.input_dimension
-      #     s.x[i] = x[f.variables[i].value]
-      #   end
-      #   nnz_oracle = length(s.set.jacobian_structure)
-      #   s.set.eval_jacobian(view(values, (offset + 1):(oracle + nnz_oracle)), s.x)
-      #   offset += nnz_oracle
-      # end
+      for (f, s) in nlp.oracles
+        for i in 1:s.set.input_dimension
+          s.x[i] = x[f.variables[i].value]
+        end
+        nnz_oracle = length(s.set.jacobian_structure)
+        s.set.eval_jacobian(view(values, (offset + 1):(offset + nnz_oracle)), s.x)
+        offset += nnz_oracle
+      end
       ind_nnln = (offset + 1):(nlp.meta.nnzj)
       MOI.eval_constraint_jacobian(nlp.eval, view(vals, ind_nnln), x)
     end
