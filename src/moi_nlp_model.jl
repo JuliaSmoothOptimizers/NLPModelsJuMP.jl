@@ -36,6 +36,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
 
   nlp_data = _nlp_block(moimodel)
   nnln, nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
+  oracles, noracle, oracle_lcon, oracle_ucon, nnzj_oracle, nnzh_oracle = parser_oracles(moimodel, index_map)
   oracles = Tuple{MOI.VectorOfVariables,_VectorNonlinearOracleCache}[]
   counters = Counters()
   λ = zeros(Float64, nnln)  # Lagrange multipliers for hess_coord! and hprod! without y
@@ -47,12 +48,12 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     obj = parser_objective_MOI(moimodel, nvar, index_map)
   end
 
-  # Update ncon, lcon, ucon, nnzj and nnzh for the oracles
-  ncon = nlin + quadcon.nquad + nnln
-  lcon = vcat(lin_lcon, quad_lcon, nl_lcon)
-  ucon = vcat(lin_ucon, quad_ucon, nl_ucon)
-  nnzj = lincon.nnzj + quadcon.nnzj + nlcon.nnzj
-  nnzh = obj.nnzh + quadcon.nnzh + nlcon.nnzh
+  # Total counts
+  ncon = nlin + quadcon.nquad + nnln + noracle
+  lcon = vcat(lin_lcon, quad_lcon, nl_lcon, oracle_lcon)
+  ucon = vcat(lin_ucon, quad_ucon, nl_ucon, oracle_ucon)
+  nnzj = lincon.nnzj + quadcon.nnzj + nlcon.nnzj + nnzj_oracle
+  nnzh = obj.nnzh + quadcon.nnzh + nlcon.nnzh + nnzh_oracle
 
   meta = NLPModelMeta(
     nvar,
@@ -67,7 +68,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     nnzh = nnzh,
     lin = collect(1:nlin),
     lin_nnzj = lincon.nnzj,
-    nln_nnzj = quadcon.nnzj + nlcon.nnzj,
+    nln_nnzj = quadcon.nnzj + nlcon.nnzj + nnzj_oracle,
     minimize = MOI.get(moimodel, MOI.ObjectiveSense()) == MOI.MIN_SENSE,
     islp = (obj.type == "LINEAR") && (nnln == 0) && (quadcon.nquad == 0),
     name = name,
