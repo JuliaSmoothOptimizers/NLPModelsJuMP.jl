@@ -527,12 +527,8 @@ function NLPModels.hess_structure!(
     view(rows, 1:(nlp.obj.nnzh)) .= nlp.obj.hessian.rows
     view(cols, 1:(nlp.obj.nnzh)) .= nlp.obj.hessian.cols
   end
-  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
-    view(rows, (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.meta.nnzh)) .= nlp.nlcon.hess_rows
-    view(cols, (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.meta.nnzh)) .= nlp.nlcon.hess_cols
-  end
+  index = nlp.obj.nnzh
   if nlp.quadcon.nquad > 0
-    index = nlp.obj.nnzh
     for i = 1:(nlp.quadcon.nquad)
       qcon = nlp.quadcon.constraints[i]
       view(rows, (index + 1):(index + qcon.nnzh)) .= qcon.A.rows
@@ -540,13 +536,19 @@ function NLPModels.hess_structure!(
       index += qcon.nnzh
     end
   end
-  # if !isempty(nlp.oracles)
-  #   for (f, s) in nlp.oracles
-  #     for (i, j) in s.set.hessian_lagrangian_structure
-  #       ...
-  #     end
-  #   end
-  # end
+  if !isempty(nlp.oracles)
+    for (f, s) in nlp.oracles
+      for (i_local, j_local) in s.set.hessian_lagrangian_structure
+        index += 1
+        rows[index] = f.variables[i_local].value
+        cols[index] = f.variables[j_local].value
+      end
+    end
+  end
+  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
+    view(rows, (index + 1):(index + nlp.nlcon.nnzh)) .= nlp.nlcon.hess_rows
+    view(cols, (index + 1):(index + nlp.nlcon.nnzh)) .= nlp.nlcon.hess_cols
+  end
   return rows, cols
 end
 
