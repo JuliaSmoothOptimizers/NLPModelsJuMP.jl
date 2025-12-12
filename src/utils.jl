@@ -24,6 +24,16 @@ const SNF = MOI.ScalarNonlinearFunction
 const VNF = MOI.VectorNonlinearFunction
 const NF = Union{SNF, VNF}
 
+# Cache of VectorNonlinearOracle
+mutable struct _VectorNonlinearOracleCache
+    set::MOI.VectorNonlinearOracle{Float64}
+    x::Vector{Float64}
+
+    function _VectorNonlinearOracleCache(set::MOI.VectorNonlinearOracle{Float64})
+        return new(set, zeros(set.input_dimension))
+    end
+end
+
 # AffLinSets and VecLinSets
 const ALS = Union{
   MOI.EqualTo{Float64},
@@ -444,7 +454,6 @@ function parser_MOI(moimodel, index_map, nvar)
   coo = COO(linrows, lincols, linvals)
   lin_nnzj = length(linvals)
   lincon = LinearConstraints(coo, lin_nnzj)
-
   quad_nnzj = 0
   quad_nnzh = 0
   for i = 1:nquad
