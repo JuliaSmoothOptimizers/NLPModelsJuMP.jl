@@ -6,7 +6,7 @@ mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
   lincon::LinearConstraints
   quadcon::QuadraticConstraints
   nlcon::NonLinearStructure
-  oracles::Vector{Tuple{MOI.VectorOfVariables,_VectorNonlinearOracleCache}}
+  oracles_data::OraclesData
   λ::Vector{Float64}
   hv::Vector{Float64}
   obj::Objective
@@ -36,8 +36,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
 
   nlp_data = _nlp_block(moimodel)
   nnln, nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
-  oracles, noracle, oracle_lcon, oracle_ucon, nnzj_oracle, nnzh_oracle = parser_oracles(moimodel, index_map)
-  oracles = Tuple{MOI.VectorOfVariables,_VectorNonlinearOracleCache}[]
+  oracles_data = parser_oracles(moimodel)
   counters = Counters()
   λ = zeros(Float64, nnln)  # Lagrange multipliers for hess_coord! and hprod! without y
   hv = zeros(Float64, nvar)  # workspace for ghjvprod!
@@ -49,12 +48,11 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
   end
 
   # Total counts
-  ncon = nlin + quadcon.nquad + nnln + noracle
-  lcon = vcat(lin_lcon, quad_lcon, nl_lcon, oracle_lcon)
-  ucon = vcat(lin_ucon, quad_ucon, nl_ucon, oracle_ucon)
-  nnzj = lincon.nnzj + quadcon.nnzj + nlcon.nnzj + nnzj_oracle
-  nnzh = obj.nnzh + quadcon.nnzh + nlcon.nnzh + nnzh_oracle
-
+  ncon = nlin + quadcon.nquad + nnln + oracles_data.noracle
+  lcon = vcat(lin_lcon, quad_lcon, nl_lcon, oracles_data.l_oracle)
+  ucon = vcat(lin_ucon, quad_ucon, nl_ucon, oracles_data.u_oracle)
+  nnzj = lincon.nnzj + quadcon.nnzj + nlcon.nnzj + oracles_data.nnzj_oracle
+  nnzh = obj.nnzh + quadcon.nnzh + nlcon.nnzh + oracles_data.nnzh_oracle
   meta = NLPModelMeta(
     nvar,
     x0 = x0,
@@ -68,17 +66,17 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     nnzh = nnzh,
     lin = collect(1:nlin),
     lin_nnzj = lincon.nnzj,
-    nln_nnzj = quadcon.nnzj + nlcon.nnzj + nnzj_oracle,
+    nln_nnzj = quadcon.nnzj + nlcon.nnzj + oracles_data.nnzj_oracle,
     minimize = MOI.get(moimodel, MOI.ObjectiveSense()) == MOI.MIN_SENSE,
     islp = (obj.type == "LINEAR") && (nnln == 0) && (quadcon.nquad == 0),
     name = name,
-    jprod_available = isempty(oracles),
-    jtprod_available = isempty(oracles),
-    hprod_available = isempty(oracles) && hessian,
+    jprod_available = isempty(oracles_data.oracles),
+    jtprod_available = isempty(oracles_data.oracles),
+    hprod_available = isempty(oracles_data.oracles) && hessian,
     hess_available = hessian,
   )
 
-  return MathOptNLPModel(meta, nlp_data.evaluator, lincon, quadcon, nlcon, oracles, λ, hv, obj, counters),
+  return MathOptNLPModel(meta, nlp_data.evaluator, lincon, quadcon, nlcon, oracles_data, λ, hv, obj, counters),
   index_map
 end
 
@@ -129,8 +127,9 @@ function NLPModels.cons_nln!(nlp::MathOptNLPModel, x::AbstractVector, c::Abstrac
     end
   end
   if nlp.meta.nnln > nlp.quadcon.nquad
-    offset = nlp.quadcon.nquad
-    for (f, s) in nlp.oracles
+    offset = nlp.quadcon.nquad + nlp.nlcon.nnln
+    MOI.eval_constraint(nlp.eval, view(c, (nlp.quadcon.nquad + 1):(offset)), x)
+    for (f, s) in nlp.oracles_data.oracles
       for i in 1:s.set.input_dimension
         s.x[i] = x[f.variables[i].value]
       end
@@ -139,8 +138,6 @@ function NLPModels.cons_nln!(nlp::MathOptNLPModel, x::AbstractVector, c::Abstrac
       s.set.eval_f(c_oracle, s.x)
       offset += s.set.output_dimension
     end
-    index_nnln = (offset + 1):(nlp.meta.nnln)
-    MOI.eval_constraint(nlp.eval, view(c, index_nnln), x)
   end
   return c
 end
@@ -159,8 +156,9 @@ function NLPModels.cons!(nlp::MathOptNLPModel, x::AbstractVector, c::AbstractVec
       end
     end
     if nlp.meta.nnln > nlp.quadcon.nquad
-      offset = nlp.meta.nlin + nlp.quadcon.nquad
-      for (f, s) in nlp.oracles
+      offset = nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln
+      MOI.eval_constraint(nlp.eval, view(c, (nlp.meta.nlin + nlp.quadcon.nquad + 1):(offset)), x)
+      for (f, s) in nlp.oracles_data.oracles
         for i in 1:s.set.input_dimension
           s.x[i] = x[f.variables[i].value]
         end
@@ -169,8 +167,6 @@ function NLPModels.cons!(nlp::MathOptNLPModel, x::AbstractVector, c::AbstractVec
         s.set.eval_f(c_oracle, s.x)
         offset += s.set.output_dimension
       end
-      index_nnln = (offset + 1):(nlp.meta.ncon)
-      MOI.eval_constraint(nlp.eval, view(c, index_nnln), x)
     end
   end
   return c
@@ -205,13 +201,18 @@ function NLPModels.jac_nln_structure!(
   end
   if nlp.meta.nnln > nlp.quadcon.nquad
     offset = nlp.quadcon.nnzj
+    # non-oracle nonlinear constraints
+    ind_nnln = (offset + 1):(offset + nlp.nlcon.nnzj)
+    view(rows, ind_nnln) .= nlp.quadcon.nquad .+ sum(s.set.output_dimension for (_, s) in nlp.oracles_data.oracles) .+ nlp.nlcon.jac_rows
+    view(cols, ind_nnln) .= nlp.nlcon.jac_cols
+    offset += nlp.nlcon.nnzj
     # structure of oracle Jacobians
-    for (k, (f, s)) in enumerate(nlp.oracles)
+    for (k, (f, s)) in enumerate(nlp.oracles_data.oracles)
         # Shift row index by quadcon.nquad
         # plus previous oracle outputs.
         row_offset = nlp.quadcon.nquad
         for i in 1:(k - 1)
-            row_offset += nlp.oracles[i][2].set.output_dimension
+            row_offset += nlp.oracles_data.oracles[i][2].set.output_dimension
         end
 
         for (r, c) in s.set.jacobian_structure
@@ -220,10 +221,6 @@ function NLPModels.jac_nln_structure!(
             cols[offset] = f.variables[c].value
         end
     end
-    # non-oracle nonlinear constraints
-    ind_nnln = (offset + 1):(offset + nlp.nlcon.nnzj)
-    view(rows, ind_nnln) .= nlp.quadcon.nquad .+ sum(s.set.output_dimension for (_, s) in nlp.oracles) .+ nlp.nlcon.jac_rows
-    view(cols, ind_nnln) .= nlp.nlcon.jac_cols
   end
   return rows, cols
 end
@@ -252,15 +249,16 @@ function NLPModels.jac_structure!(
     end
     if nlp.meta.nnln > nlp.quadcon.nquad
       offset = nlp.lincon.nnzj + nlp.quadcon.nnzj
-      # for (f, s) in nlp.oracles
-      #   for (i, j) in s.set.jacobian_structure
-      #     ...
-      #     offset += 1
-      #   end
-      # end
-      ind_nnln = (offset + 1):(nlp.meta.nnzj)
+      ind_nnln = (offset + 1):(offset + nlp.nlcon.nnzj)
       view(rows, ind_nnln) .= nlp.meta.nlin .+ nlp.quadcon.nquad .+ nlp.nlcon.jac_rows
       view(cols, ind_nnln) .= nlp.nlcon.jac_cols
+      for (f, s) in nlp.oracles_data.oracles
+        for (i, j) in s.set.jacobian_structure
+          offset += 1
+          rows[offset] = nlp.meta.nlin + nlp.quadcon.nquad + s.set.output_dimension + i
+          cols[offset] = f.variables[j].value
+        end
+      end
     end
   end
   return rows, cols
@@ -301,7 +299,10 @@ function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals:
   end
   if nlp.meta.nnln > nlp.quadcon.nquad
     offset = nlp.quadcon.nnzj
-    for (f, s) in nlp.oracles
+    ind_nnln = (offset + 1):(offset + nlp.nlcon.nnzj)
+    MOI.eval_constraint_jacobian(nlp.eval, view(vals, ind_nnln), x)
+    offset += nlp.nlcon.nnzj
+    for (f, s) in nlp.oracles_data.oracles
       for i in 1:s.set.input_dimension
         s.x[i] = x[f.variables[i].value]
       end
@@ -309,8 +310,6 @@ function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals:
       s.set.eval_jacobian(view(values, (offset + 1):(offset + nnz_oracle)), s.x)
       offset += nnz_oracle
     end
-    ind_nnln = (offset + 1):(offset + nlp.nlcon.nnzj)
-    MOI.eval_constraint_jacobian(nlp.eval, view(vals, ind_nnln), x)
   end
   return vals
 end
@@ -348,7 +347,10 @@ function NLPModels.jac_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::Abs
     end
     if nlp.meta.nnln > nlp.quadcon.nquad
       offset = nlp.lincon.nnzj + nlp.quadcon.nnzj
-      for (f, s) in nlp.oracles
+      ind_nnln = (offset + 1):(offset + nlp.nlcon.nnzj)
+      MOI.eval_constraint_jacobian(nlp.eval, view(vals, ind_nnln), x)
+      offset += nlp.nlcon.nnzj
+      for (f, s) in nlp.oracles_data.oracles
         for i in 1:s.set.input_dimension
           s.x[i] = x[f.variables[i].value]
         end
@@ -356,8 +358,6 @@ function NLPModels.jac_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::Abs
         s.set.eval_jacobian(view(values, (offset + 1):(offset + nnz_oracle)), s.x)
         offset += nnz_oracle
       end
-      ind_nnln = (offset + 1):(nlp.meta.nnzj)
-      MOI.eval_constraint_jacobian(nlp.eval, view(vals, ind_nnln), x)
     end
   end
   return vals
@@ -536,18 +536,19 @@ function NLPModels.hess_structure!(
       index += qcon.nnzh
     end
   end
-  if !isempty(nlp.oracles)
-    for (f, s) in nlp.oracles
+  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
+    view(rows, (index + 1):(index + nlp.nlcon.nnzh)) .= nlp.nlcon.hess_rows
+    view(cols, (index + 1):(index + nlp.nlcon.nnzh)) .= nlp.nlcon.hess_cols
+    index += nlp.nlcon.nnzh
+  end
+  if !isempty(nlp.oracles_data.oracles)
+    for (f, s) in nlp.oracles_data.oracles
       for (i_local, j_local) in s.set.hessian_lagrangian_structure
         index += 1
         rows[index] = f.variables[i_local].value
         cols[index] = f.variables[j_local].value
       end
     end
-  end
-  if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
-    view(rows, (index + 1):(index + nlp.nlcon.nnzh)) .= nlp.nlcon.hess_rows
-    view(cols, (index + 1):(index + nlp.nlcon.nnzh)) .= nlp.nlcon.hess_cols
   end
   return rows, cols
 end
