@@ -8,6 +8,8 @@ nls_problems = NLPModelsTest.nls_problems
 extra_nlp_problems = ["nohesspb", "hs61", "hs100", "hs219", "quadcon", "operatorspb", "nf"]
 extra_nls_problems = ["nlsnohesspb", "HS30", "HS43", "MGH07", "nlsqc"]
 
+extra_nlp_oracle_problems = ["hs10_oracle"]
+
 for problem in lowercase.(nlp_problems ∪ extra_nlp_problems)
   include(joinpath("nlp_problems", "$problem.jl"))
 end

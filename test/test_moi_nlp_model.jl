@@ -11,7 +11,7 @@ println("Testing MathOptNLPModel")
   "‖c(x₀)‖"
 )
 # Test that every problem can be instantiated.
-for prob in Symbol.(lowercase.(nlp_problems ∪ extra_nlp_problems))
+for prob in Symbol.(lowercase.(nlp_problems ∪ extra_nlp_problems ∪ extra_nlp_oracle_problems))
   prob_fn = eval(prob)
   nlp = MathOptNLPModel(prob_fn(), hessian = (prob != :nohesspb))
   n = nlp.meta.nvar
