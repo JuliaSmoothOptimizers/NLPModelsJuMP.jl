@@ -203,7 +203,7 @@ function NLPModels.jac_nln_structure!(
     offset = nlp.quadcon.nnzj
     # non-oracle nonlinear constraints
     ind_nnln = (offset + 1):(offset + nlp.nlcon.nnzj)
-    view(rows, ind_nnln) .= nlp.quadcon.nquad .+ sum(s.set.output_dimension for (_, s) in nlp.oracles_data.oracles) .+ nlp.nlcon.jac_rows
+    view(rows, ind_nnln) .= nlp.quadcon.nquad .+ nlp.nlcon.jac_rows
     view(cols, ind_nnln) .= nlp.nlcon.jac_cols
     offset += nlp.nlcon.nnzj
     # structure of oracle Jacobians
@@ -248,16 +248,21 @@ function NLPModels.jac_structure!(
       end
     end
     if nlp.meta.nnln > nlp.quadcon.nquad
+      # non-oracle nonlinear constraints
       offset = nlp.lincon.nnzj + nlp.quadcon.nnzj
       ind_nnln = (offset + 1):(offset + nlp.nlcon.nnzj)
       view(rows, ind_nnln) .= nlp.meta.nlin .+ nlp.quadcon.nquad .+ nlp.nlcon.jac_rows
       view(cols, ind_nnln) .= nlp.nlcon.jac_cols
+      offset += nlp.nlcon.nnzj
+      # structure of oracle Jacobians
+      row_offset = nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln
       for (f, s) in nlp.oracles_data.oracles
         for (i, j) in s.set.jacobian_structure
           offset += 1
-          rows[offset] = nlp.meta.nlin + nlp.quadcon.nquad + s.set.output_dimension + i
+          rows[offset] = row_offset + i
           cols[offset] = f.variables[j].value
         end
+        row_offset += s.set.output_dimension
       end
     end
   end
@@ -360,6 +365,7 @@ function NLPModels.jac_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::Abs
       end
     end
   end
+  @assert offset == nlp.meta.nnzj
   return vals
 end
 
@@ -561,9 +567,16 @@ function NLPModels.hess_coord!(
   obj_weight::Float64 = 1.0,
 )
   increment!(nlp, :neval_hess)
+
+  # Running index over Hessian nonzeros we've filled so far.
+  index = 0
+
+  # Objective Hessian block
   if nlp.obj.type == "QUADRATIC"
     view(vals, 1:(nlp.obj.nnzh)) .= obj_weight .* nlp.obj.hessian.vals
+    index += nlp.obj.nnzh
   end
+  # Nonlinear objective Hessian block
   if (nlp.obj.type == "NONLINEAR") || (nlp.meta.nnln > nlp.quadcon.nquad)
     λ = view(y, (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon))
     MOI.eval_hessian_lagrangian(
@@ -574,23 +587,42 @@ function NLPModels.hess_coord!(
       λ,
     )
   end
+  # Quadratic constraint Hessian blocks
   if nlp.quadcon.nquad > 0
-    index = nlp.obj.nnzh
     for i = 1:(nlp.quadcon.nquad)
       qcon = nlp.quadcon.constraints[i]
       view(vals, (index + 1):(index + qcon.nnzh)) .= y[nlp.meta.nlin + i] .* qcon.A.vals
       index += qcon.nnzh
     end
   end
-  # if !isempty(nlp.oracles)
-  #   for (f, s) in nlp.oracles
-  #     for i in 1:s.set.input_dimension
-  #       s.x[i] = x[f.variables[i].value]
-  #     end
-  #     H_nnz = length(s.set.hessian_lagrangian_structure)
-  #     ...
-  #   end
-  # end
+  # Oracle Hessian blocks
+  if !isempty(nlp.oracles_data.oracles)
+    λ_oracle_all = view(
+      y,
+      (nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln + 1):
+      (nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln + nlp.oracles_data.noracle),
+    )
+
+    λ_offset = 0
+    for (f, s) in nlp.oracles_data.oracles
+      # build local x for this oracle
+      for i in 1:s.set.input_dimension
+        s.x[i] = x[f.variables[i].value]
+      end
+
+      nout = s.set.output_dimension
+      μ = view(λ_oracle_all, (λ_offset + 1):(λ_offset + nout))
+
+      H_nnz = length(s.set.hessian_lagrangian_structure)
+      ind = (index + 1):(index + H_nnz)
+      s.set.eval_hessian_lagrangian(view(vals, ind), s.x, μ)
+
+      index += H_nnz
+      λ_offset += nout
+    end
+  end
+
+  @assert index == nlp.meta.nnzh
   return vals
 end
 
@@ -645,9 +677,55 @@ function NLPModels.jth_hess_coord!(
     )
     nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 0.0
   end
-  # if !isempty(nlp.oracles)
-  #   ...
-  # end
+  # check for oracle constraints
+  if !isempty(nlp.oracles_data.oracles)
+    n_nl = nlp.nlcon.nnln
+    noracle = nlp.oracles_data.noracle
+
+    # check if j is an oracle constraint index
+    first_oracle = nlp.meta.nlin + nlp.quadcon.nquad + n_nl + 1
+    last_oracle  = first_oracle + noracle - 1
+
+    if first_oracle ≤ j ≤ last_oracle
+      # local oracle constraint index k ∈ 1: noracle
+      k = j - (nlp.meta.nlin + nlp.quadcon.nquad + n_nl)
+      
+      # starting  index of this oracle's Hessian block
+      index = nlp.obj.nnzh + nlp.quadcon.nnzh + nlp.nlcon.nnzh
+
+      # walk through oracles to find which one owns component k
+      offset_outputs = 0
+      for (f, s) in nlp.oracles_data.oracles
+        nout = s.set.output_dimension
+        H_nnz = length(s.set.hessian_lagrangian_structure)
+
+        if k > offset_outputs + nout
+          # skip this oracle's block
+          index += H_nnz
+          offset_outputs += nout
+          continue
+        end
+
+        # this oracle owns constraint k; local index ℓ
+        ℓ = k - offset_outputs
+
+        # build local x
+        for i in 1:s.set.input_dimension
+          s.x[i] = x[f.variables[i].value]
+        end
+
+        # local multipliers μ: one-hot at ℓ
+        μ = zeros(eltype(x), nout)
+        μ[ℓ] = 1.0
+
+        # fill this oracle's Hessian block
+        ind = (index + 1):(index + H_nnz)
+        s.set.eval_hessian_lagrangian(view(vals, ind), s.x, μ)
+
+        break
+      end
+    end
+  end
   return vals
 end
 
