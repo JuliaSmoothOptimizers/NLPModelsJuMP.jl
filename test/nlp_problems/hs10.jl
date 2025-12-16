@@ -13,7 +13,7 @@ function hs10()
   return nlp
 end
 
-# Same problem, but the nonlinear constraint is a VectorNonlinearOracle
+"Problem 10 in the Hock-Schittkowski suite, but the nonlinear constraint is a VectorNonlinearOracle"
 function hs10_oracle()
     model = Model()
 
