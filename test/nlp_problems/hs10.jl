@@ -27,11 +27,11 @@ function hs10_oracle()
     # Bounds: 0 ≤ g(x) ≤ +∞
     set = MOI.VectorNonlinearOracle(;
         dimension = 2,                # number of input variables (x1, x2)
-        l = [0.0],                    # lower bound on g(x)
+        l = [-1.0],                    # lower bound on g(x)
         u = [Inf],                    # upper bound on g(x)
         eval_f = (ret, xv) -> begin
             # ret[1] = g(x)
-            ret[1] = -3 * xv[1]^2 + 2 * xv[1] * xv[2] - xv[2]^2 + 1
+            ret[1] = -3 * xv[1]^2 + 2 * xv[1] * xv[2] - xv[2]^2
         end,
         # Jacobian of g(x): ∇g = [∂g/∂x1, ∂g/∂x2]
         # ∂g/∂x1 = -6 x1 + 2 x2

@@ -29,11 +29,11 @@ function hs14_oracle()
     # g(x) = -x1^2/4 - x2^2 + 1,  0 ≤ g(x) ≤ +∞
     set = MOI.VectorNonlinearOracle(;
         dimension = 2,                # 2 inputs: x1, x2
-        l = [0.0],                    # lower bound on g(x)
+        l = [-1.0],                    # lower bound on g(x)
         u = [Inf],                    # upper bound on g(x)
         eval_f = (ret, xv) -> begin
             # ret[1] = g(x)
-            ret[1] = -0.25 * xv[1]^2 - xv[2]^2 + 1
+            ret[1] = -0.25 * xv[1]^2 - xv[2]^2
         end,
         # Jacobian of g(x): ∇g = [∂g/∂x1, ∂g/∂x2]
         # ∂g/∂x1 = -0.5 x1

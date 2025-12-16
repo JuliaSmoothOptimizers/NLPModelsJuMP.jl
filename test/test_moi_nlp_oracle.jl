@@ -16,6 +16,6 @@
     if m > 0
         ncx_no_oracle = cons(nlp_no_oracle, x)
         ncx_with_oracle = cons(nlp_with_oracle, x)
-        @test isapprox(ncx_no_oracle, ncx_with_oracle; rtol = 1e-1)
+        @test isapprox(ncx_no_oracle, ncx_with_oracle; atol = 1e-8, rtol = 1e-8)
     end
 end

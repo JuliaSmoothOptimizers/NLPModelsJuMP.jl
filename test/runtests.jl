@@ -21,6 +21,8 @@ end
 include("test_moi_nlp_model.jl")
 include("test_moi_nls_model.jl")
 
+include("test_moi_nlp_oracle.jl")
+
 include("nlp_consistency.jl")
 include("nls_consistency.jl")
 
