@@ -1,4 +1,4 @@
-for problem in Symbol.(lowercase.(nlp_problems ∪ extra_nlp_oracle_problems))
+for problem in [nlp_problems; extra_nlp_oracle_problems]
   @testset "Problem $problem" begin
     nlp_manual = eval(Symbol(problem))()
     problem_f = eval(Symbol(lowercase(problem)))
