@@ -24,6 +24,9 @@ const SNF = MOI.ScalarNonlinearFunction
 const VNF = MOI.VectorNonlinearFunction
 const NF = Union{SNF, VNF}
 
+# VectorNonlinearOracle
+const ORACLE = MOI.VectorNonlinearOracle{Float64}  # VectorNonlinearOracle{Float64}(input_dimension, output_dimension, l, u, eval_f, jacobian_structure, eval_jacobian, hessian_lagrangian_structure, eval_hessian_lagrangian)
+
 # Cache of VectorNonlinearOracle
 mutable struct _VectorNonlinearOracleCache
     set::MOI.VectorNonlinearOracle{Float64}
@@ -121,23 +124,23 @@ mutable struct Objective
 end
 
 """
-    OraclesData
+    Oracles
 
 Structure containing nonlinear oracles data:
 - oracles: vector of tuples (MOI.VectorOfVariables, _VectorNonlinearOracleCache)
-- noracle: number of scalar constraints represented by all oracles
-- l_oracle: lower bounds of oracle constraints
-- u_oracle: upper bounds of oracle constraints
-- nnzj_oracle: number of non-zero entries in the Jacobian of all oracles
-- nnzh_oracle: number of non-zero entries in the Hessian of all oracles
+- ncon: number of scalar constraints represented by all oracles
+- lcon: lower bounds of oracle constraints
+- ucon: upper bounds of oracle constraints
+- nnzj: number of non-zero entries in the Jacobian of all oracles
+- nnzh: number of non-zero entries in the Hessian of all oracles
 """
-mutable struct OraclesData
+mutable struct Oracles
   oracles::Vector{Tuple{MOI.VectorOfVariables,_VectorNonlinearOracleCache}}
-  noracle::Int
-  l_oracle::Vector{Float64}
-  u_oracle::Vector{Float64}
-  nnzj_oracle::Int
-  nnzh_oracle::Int
+  ncon::Int
+  lcon::Vector{Float64}
+  ucon::Vector{Float64}
+  nnzj::Int
+  nnzh::Int
 end
 
 """
@@ -577,7 +580,6 @@ end
 Parse nonlinear constraints of an `nlp_data`.
 
 Returns:
-- nnln: number of nonlinear constraints
 - nlcon: NonLinearStructure containing Jacobian and Hessian structures
 - nl_lcon: lower bounds of nonlinear constraints
 - nl_ucon: upper bounds of nonlinear constraints
@@ -600,18 +602,19 @@ function parser_NL(nlp_data; hessian::Bool = true)
   nnzh = length(hess)
   nlcon = NonLinearStructure(nnln, jac_rows, jac_cols, nnzj, hess_rows, hess_cols, nnzh)
 
-  return nnln, nlcon, nl_lcon, nl_ucon
+  return nlcon, nl_lcon, nl_ucon
 end
 
 """
-    parser_oracles(moimodel)
+    oracles, hessian_oracles_supported = parser_oracles(moimodel)
 
 Parse nonlinear oracles of a `MOI.ModelLike`.
 """
 function parser_oracles(moimodel)
+    hessian_oracles_supported = true
     oracles = Tuple{MOI.VectorOfVariables,_VectorNonlinearOracleCache}[]
-    l_oracle = Float64[]
-    u_oracle = Float64[]
+    lcon = Float64[]
+    ucon = Float64[]
 
     # We know this pair exists from ListOfConstraintTypesPresent
     for ci in MOI.get(
@@ -625,23 +628,26 @@ function parser_oracles(moimodel)
         push!(oracles, (f, cache))
 
         # Bounds: MOI.VectorNonlinearOracle stores them internally (l, u)
-        append!(l_oracle, set.l)
-        append!(u_oracle, set.u)
+        append!(lcon, set.l)
+        append!(ucon, set.u)
+
+        # Support for the Hessian
+        hessian_oracles_supported = hessian_oracles_supported && !isnothing(set.eval_hessian_lagrangian)
     end
 
-    # Sizes: number of scalar constraints represented by all oracles
-    noracle = length(l_oracle)
+    # Number of scalar constraints represented by all oracles
+    ncon = length(lcon)
 
-    # Sparsity:
-    nnzj_oracle = 0
-    nnzh_oracle = 0
+    # Number of nonzeros for the Jacobian and Hessian
+    nnzj = 0
+    nnzh = 0
     for (_, cache) in oracles
-        nnzj_oracle += length(cache.set.jacobian_structure)
+        nnzj += length(cache.set.jacobian_structure)
         # there may or may not be Hessian info
-        nnzh_oracle += length(cache.set.hessian_lagrangian_structure)
+        nnzh += length(cache.set.hessian_lagrangian_structure)
     end
 
-    return OraclesData(oracles, noracle, l_oracle, u_oracle, nnzj_oracle, nnzh_oracle)
+    return Oracles(oracles, ncon, lcon, ucon, nnzj, nnzh), hessian_oracles_supported
 end
 
 """

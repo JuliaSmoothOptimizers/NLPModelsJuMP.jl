@@ -27,7 +27,7 @@ function hs10_oracle()
     # Bounds: 0 ≤ g(x) ≤ +∞
     set = MOI.VectorNonlinearOracle(;
         dimension = 2,                # number of input variables (x1, x2)
-        l = [-1.0],                    # lower bound on g(x)
+        l = [-1.0],                   # lower bound on g(x)
         u = [Inf],                    # upper bound on g(x)
         eval_f = (ret, xv) -> begin
             # ret[1] = g(x)
