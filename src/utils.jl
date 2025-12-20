@@ -31,9 +31,13 @@ const ORACLE = MOI.VectorNonlinearOracle{Float64}  # VectorNonlinearOracle{Float
 mutable struct _VectorNonlinearOracleCache
     set::MOI.VectorNonlinearOracle{Float64}
     x::Vector{Float64}
+    nzJ::Vector{Float64}
+    nzH::Vector{Float64}
 
     function _VectorNonlinearOracleCache(set::MOI.VectorNonlinearOracle{Float64})
-        return new(set, zeros(set.input_dimension))
+        nnzj = length(set.jacobian_structure)
+        nnzh = length(set.hessian_lagrangian_structure)
+        return new(set, zeros(set.input_dimension), zeros(nnzj), zeros(nnzh))
     end
 end
 
@@ -133,6 +137,9 @@ Structure containing nonlinear oracles data:
 - ucon: upper bounds of oracle constraints
 - nnzj: number of non-zero entries in the Jacobian of all oracles
 - nnzh: number of non-zero entries in the Hessian of all oracles
+- nzJ: buffer to store the nonzeros of the Jacobian for all oracles (needed for the functions jprod and jtprod)
+- nzH: buffer to store the nonzeros of the Hessian for all oracles (needed for the function hprod)
+- hessian_oracles_supported: support of the Hessian for all oracles
 """
 mutable struct Oracles
   oracles::Vector{Tuple{MOI.VectorOfVariables,_VectorNonlinearOracleCache}}
@@ -141,6 +148,7 @@ mutable struct Oracles
   ucon::Vector{Float64}
   nnzj::Int
   nnzh::Int
+  hessian_oracles_supported::Bool
 end
 
 """
@@ -606,7 +614,7 @@ function parser_NL(nlp_data; hessian::Bool = true)
 end
 
 """
-    oracles, hessian_oracles_supported = parser_oracles(moimodel)
+    oracles = parser_oracles(moimodel)
 
 Parse nonlinear oracles of a `MOI.ModelLike`.
 """
@@ -647,7 +655,7 @@ function parser_oracles(moimodel)
         nnzh += length(cache.set.hessian_lagrangian_structure)
     end
 
-    return Oracles(oracles, ncon, lcon, ucon, nnzj, nnzh), hessian_oracles_supported
+    return Oracles(oracles, ncon, lcon, ucon, nnzj, nnzh, hessian_oracles_supported)
 end
 
 """

@@ -36,7 +36,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
 
   nlp_data = _nlp_block(moimodel)
   nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
-  oracles, hessian_oracles_supported = parser_oracles(moimodel)
+  oracles = parser_oracles(moimodel)
   counters = Counters()
   λ = zeros(Float64, nlcon.nnln)  # Lagrange multipliers for hess_coord! and hprod! without y
   hv = zeros(Float64, nvar)  # workspace for ghjvprod!
@@ -70,10 +70,8 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     minimize = MOI.get(moimodel, MOI.ObjectiveSense()) == MOI.MIN_SENSE,
     islp = (obj.type == "LINEAR") && (nlin == ncon),
     name = name,
-    jprod_available = isempty(oracles.oracles),
-    jtprod_available = isempty(oracles.oracles),
-    hprod_available = isempty(oracles.oracles) && hessian,
-    hess_available = hessian && hessian_oracles_supported,
+    hprod_available = hessian && oracles.hessian_oracles_supported,
+    hess_available = hessian && oracles.hessian_oracles_supported,
   )
 
   return MathOptNLPModel(meta, nlp_data.evaluator, lincon, quadcon, nlcon, oracles, λ, hv, obj, counters),
@@ -324,10 +322,10 @@ function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals:
       for i in 1:s.set.input_dimension
         s.x[i] = x[f.variables[i].value]
       end
-      nnz_oracle = length(s.set.jacobian_structure)
-      ind_oracle = (offset + 1):(offset + nnz_oracle)
+      nnzj_oracle = length(s.set.jacobian_structure)
+      ind_oracle = (offset + 1):(offset + nnzj_oracle)
       s.set.eval_jacobian(view(vals, ind_oracle), s.x)
-      offset += nnz_oracle
+      offset += nnzj_oracle
     end
   end
   @assert offset == nlp.meta.nln_nnzj
@@ -375,10 +373,10 @@ function NLPModels.jac_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::Abs
       for i in 1:s.set.input_dimension
         s.x[i] = x[f.variables[i].value]
       end
-      nnz_oracle = length(s.set.jacobian_structure)
-      ind_oracle = (offset + 1):(offset + nnz_oracle)
+      nnzj_oracle = length(s.set.jacobian_structure)
+      ind_oracle = (offset + 1):(offset + nnzj_oracle)
       s.set.eval_jacobian(view(vals, ind_oracle), s.x)
-      offset += nnz_oracle
+      offset += nnzj_oracle
     end
   end
   @assert offset == nlp.meta.nnzj
@@ -391,7 +389,6 @@ function NLPModels.jprod_lin!(
   v::AbstractVector,
   Jv::AbstractVector,
 )
-  nlp.meta.jprod_available || error("J * v products are not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_jprod_lin)
   jprod_lin!(
     nlp,
@@ -410,7 +407,6 @@ function NLPModels.jprod_nln!(
   v::AbstractVector,
   Jv::AbstractVector,
 )
-  nlp.meta.jprod_available || error("J * v products are not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_jprod_nln)
   if nlp.quadcon.nquad > 0
     for i = 1:(nlp.quadcon.nquad)
@@ -420,8 +416,28 @@ function NLPModels.jprod_nln!(
     end
   end
   if nlp.nlcon.nnln > 0
-    ind_nnln = (nlp.quadcon.nquad + 1):(nlp.meta.nnln)
+    ind_nnln = (nlp.quadcon.nquad + 1):(nlp.quadcon.nquad + nlp.nlcon.nnln)
     MOI.eval_constraint_jacobian_product(nlp.eval, view(Jv, ind_nnln), x, v)
+  end
+  if nlp.oracles.ncon > 0
+    for i in (nlp.quadcon.nquad + nlp.nlcon.nnln + 1):(nlp.quadcon.nquad + nlp.nlcon.nnln + nlp.oracles.ncon)
+      Jv[i] = 0
+    end
+    row_offset = nlp.quadcon.nquad + nlp.nlcon.nnln
+    for (f, s) in nlp.oracles.oracles
+      for i in 1:s.set.input_dimension
+        s.x[i] = x[f.variables[i].value]
+      end
+      s.set.eval_jacobian(s.nzJ, s.x)
+      k = 0
+      for (r, c) in s.set.jacobian_structure
+        k += 1
+        row = row_offset + r
+        col = f.variables[c].value
+        Jv[row] += s.nzJ[k] * v[col]
+      end
+      row_offset += s.set.output_dimension
+    end
   end
   return Jv
 end
@@ -432,7 +448,6 @@ function NLPModels.jprod!(
   v::AbstractVector,
   Jv::AbstractVector,
 )
-  nlp.meta.jprod_available || error("J * v products are not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_jprod)
   if nlp.meta.nlin > 0
     view(Jv, nlp.meta.lin) .= 0.0
@@ -456,8 +471,28 @@ function NLPModels.jprod!(
     end
   end
   if nlp.nlcon.nnln > 0
-    ind_nnln = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon)
+    ind_nnln = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln)
     MOI.eval_constraint_jacobian_product(nlp.eval, view(Jv, ind_nnln), x, v)
+  end
+  if nlp.oracles.ncon > 0
+    for i in (nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln + 1):(nlp.meta.ncon)
+      Jv[i] = 0
+    end
+    row_offset = nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln
+    for (f, s) in nlp.oracles.oracles
+      for i in 1:s.set.input_dimension
+        s.x[i] = x[f.variables[i].value]
+      end
+      s.set.eval_jacobian(s.nzJ, s.x)
+      k = 0
+      for (r, c) in s.set.jacobian_structure
+        k += 1
+        row = row_offset + r
+        col = f.variables[c].value
+        Jv[row] += s.nzJ[k] * v[col]
+      end
+      row_offset += s.set.output_dimension
+    end
   end
   return Jv
 end
@@ -468,7 +503,6 @@ function NLPModels.jtprod_lin!(
   v::AbstractVector,
   Jtv::AbstractVector,
 )
-  nlp.meta.jtprod_available || error("J' * v products are not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_jtprod_lin)
   jtprod_lin!(
     nlp,
@@ -487,19 +521,35 @@ function NLPModels.jtprod_nln!(
   v::AbstractVector,
   Jtv::AbstractVector,
 )
-  nlp.meta.jtprod_available || error("J' * v products are not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_jtprod_nln)
   if nlp.nlcon.nnln > 0
-    ind_nnln = (nlp.quadcon.nquad + 1):(nlp.meta.nnln)
+    ind_nnln = (nlp.quadcon.nquad + 1):(nlp.quadcon.nquad + nlp.nlcon.nnln)
     MOI.eval_constraint_jacobian_transpose_product(nlp.eval, Jtv, x, view(v, ind_nnln))
   end
-  (nlp.quadcon.nquad == nlp.meta.nnln) && (Jtv .= 0.0)
+  (nlp.nlcon.nnln == 0) && (Jtv .= 0.0)
   if nlp.quadcon.nquad > 0
     for i = 1:(nlp.quadcon.nquad)
       # Jtv += v[i] * (Aᵢ * x + bᵢ)
       qcon = nlp.quadcon.constraints[i]
       coo_sym_add_mul!(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, Jtv, v[i])
       Jtv .+= v[i] .* qcon.b
+    end
+  end
+  if nlp.oracles.ncon > 0
+    row_offset = nlp.quadcon.nquad + nlp.nlcon.nnln
+    for (f, s) in nlp.oracles.oracles
+      for i in 1:s.set.input_dimension
+        s.x[i] = x[f.variables[i].value]
+      end
+      s.set.eval_jacobian(s.nzJ, s.x)
+      k = 0
+      for (r, c) in s.set.jacobian_structure
+        k += 1
+        row = row_offset + r
+        col = f.variables[c].value
+        Jtv[col] += s.nzJ[k] * v[row]
+      end
+      row_offset += s.set.output_dimension
     end
   end
   return Jtv
@@ -511,13 +561,12 @@ function NLPModels.jtprod!(
   v::AbstractVector,
   Jtv::AbstractVector,
 )
-  nlp.meta.jtprod_available || error("J' * v products are not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_jtprod)
   if nlp.nlcon.nnln > 0
-    ind_nnln = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon)
+    ind_nnln = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln)
     MOI.eval_constraint_jacobian_transpose_product(nlp.eval, Jtv, x, view(v, ind_nnln))
   end
-  (nlp.quadcon.nquad == nlp.meta.nnln) && (Jtv .= 0.0)
+  (nlp.nlcon.nnln == 0) && (Jtv .= 0.0)
   if nlp.meta.nlin > 0
     transpose = true
     coo_unsym_add_mul!(
@@ -537,6 +586,23 @@ function NLPModels.jtprod!(
       Jtv .+= v[nlp.meta.nlin + i] .* qcon.b
     end
   end
+  if nlp.oracles.ncon > 0
+    row_offset = nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln
+    for (f, s) in nlp.oracles.oracles
+      for i in 1:s.set.input_dimension
+        s.x[i] = x[f.variables[i].value]
+      end
+      s.set.eval_jacobian(s.nzJ, s.x)
+      k = 0
+      for (r, c) in s.set.jacobian_structure
+        k += 1
+        row = row_offset + r
+        col = f.variables[c].value
+        Jtv[col] += s.nzJ[k] * v[row]
+      end
+      row_offset += s.set.output_dimension
+    end
+  end
   return Jtv
 end
 
@@ -545,6 +611,7 @@ function NLPModels.hess_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
+  nlp.meta.hess_available || error("The function hess_structure! is not supported by this MathOptNLPModel.")
   if nlp.obj.type == "QUADRATIC"
     view(rows, 1:(nlp.obj.nnzh)) .= nlp.obj.hessian.rows
     view(cols, 1:(nlp.obj.nnzh)) .= nlp.obj.hessian.cols
@@ -582,6 +649,7 @@ function NLPModels.hess_coord!(
   vals::AbstractVector;
   obj_weight::Float64 = 1.0,
 )
+  nlp.meta.hess_available || error("The function hess_coord! is not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_hess)
 
   # 1. Quadratic objective block (if any)
@@ -650,6 +718,7 @@ function NLPModels.hess_coord!(
   vals::AbstractVector;
   obj_weight::Float64 = 1.0,
 )
+  nlp.meta.hess_available || error("The function hess_coord! is not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_hess)
   if nlp.obj.type == "LINEAR"
     vals .= 0.0
@@ -660,7 +729,8 @@ function NLPModels.hess_coord!(
   end
   if nlp.obj.type == "NONLINEAR"
     view(vals, 1:(nlp.obj.nnzh + nlp.quadcon.nnzh)) .= 0.0
-    ind_nnln = (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.meta.nnzh)
+    view(vals, (nlp.obj.nnzh + nlp.quadcon.nnzh + nlp.nlcon.nnzh + 1):(nlp.meta.nnzh)) .= 0.0
+    ind_nnln = (nlp.obj.nnzh + nlp.quadcon.nnzh + 1):(nlp.obj.nnzh + nlp.quadcon.nnzh + nlp.nlcon.nnzh)
     MOI.eval_hessian_lagrangian(nlp.eval, view(vals, ind_nnln), x, obj_weight, nlp.λ)
   end
   return vals
@@ -672,6 +742,7 @@ function NLPModels.jth_hess_coord!(
   j::Integer,
   vals::AbstractVector,
 )
+  nlp.meta.hess_available || error("The function jth_hess_coord! is not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_jhess)
   @rangecheck 1 nlp.meta.ncon j
   vals .= 0.0
@@ -711,7 +782,7 @@ function NLPModels.jth_hess_coord!(
       if !find_oracle
         ncon_oracle = s.set.output_dimension
         nnzh_oracle = length(s.set.hessian_lagrangian_structure)
-        if offset_λ + 1 ≤ j ≤ offset_λ
+        if offset_λ + 1 ≤ j ≤ offset_λ + s.set.output_dimension
           find_oracle = true
           # build local x
           for i in 1:s.set.input_dimension
@@ -720,7 +791,7 @@ function NLPModels.jth_hess_coord!(
           # We could preallocate the vector in the structure nlp
           λ_oracle = zeros(Float64, s.set.output_dimension)
           λ_oracle[j - offset_λ] = 1.0
-          index_nnzh = (offset_nnzh + 1):(offset_nnzh + nnz_oracle)
+          index_nnzh = (offset_nnzh + 1):(offset_nnzh + nnzh_oracle)
           s.set.eval_hessian_lagrangian(
             view(vals, index_nnzh),
             s.x,
@@ -744,17 +815,18 @@ function NLPModels.hprod!(
   hv::AbstractVector;
   obj_weight::Float64 = 1.0,
 )
-  nlp.meta.hprod_available || error("H * v products are not supported by this MathOptNLPModel.")
+  nlp.meta.hprod_available || error("The function hprod! is not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_hprod)
   if (nlp.obj.type == "LINEAR") && (nlp.meta.nnln == 0)
     hv .= 0.0
   end
   if (nlp.obj.type == "NONLINEAR") || (nlp.nlcon.nnln > 0)
-    λ = view(y, (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon))
+    ind_nnln = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln)
+    λ = view(y, ind_nnln)
     MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, obj_weight, λ)
   end
   if nlp.obj.type == "QUADRATIC"
-    (nlp.meta.nnln == nlp.quadcon.nquad) && (hv .= 0.0)
+    (nlp.nlcon.nnln == 0) && (hv .= 0.0)
     coo_sym_add_mul!(
       nlp.obj.hessian.rows,
       nlp.obj.hessian.cols,
@@ -765,10 +837,30 @@ function NLPModels.hprod!(
     )
   end
   if nlp.quadcon.nquad > 0
-    (nlp.obj.type == "LINEAR") && (hv .= 0.0)
+    (nlp.obj.type == "LINEAR") && (nlp.nlcon.nnln == 0) && (hv .= 0.0)
     for i = 1:(nlp.quadcon.nquad)
       qcon = nlp.quadcon.constraints[i]
       coo_sym_add_mul!(qcon.A.rows, qcon.A.cols, qcon.A.vals, v, hv, y[nlp.meta.nlin + i])
+    end
+  end
+  if nlp.oracles.ncon > 0
+    (nlp.obj.type == "LINEAR") && (nlp.meta.nnln == nlp.oracles.ncon) && (hv .= 0.0)
+    offset_y = nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln
+    for (f, s) in nlp.oracles.oracles
+      for i in 1:s.set.input_dimension
+        s.x[i] = x[f.variables[i].value]
+      end
+      ind_y = (offset_y + 1):(offset_y + s.set.output_dimension)
+      y_oracle = view(y, ind_y)
+      s.set.eval_hessian_lagrangian(s.nzH, s.x, y_oracle)
+      k = 0
+      for (r, c) in s.set.hessian_lagrangian_structure
+        k += 1
+        row = f.variables[r].value
+        col = f.variables[c].value
+        hv[row] += s.nzH[k] * v[col]
+      end
+      offset_y += s.set.output_dimension
     end
   end
   return hv
@@ -781,7 +873,7 @@ function NLPModels.hprod!(
   hv::AbstractVector;
   obj_weight::Float64 = 1.0,
 )
-  nlp.meta.hprod_available || error("H * v products are not supported by this MathOptNLPModel.")
+  nlp.meta.hprod_available || error("The function hprod! is not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_hprod)
   if nlp.obj.type == "LINEAR"
     hv .= 0.0
@@ -810,17 +902,48 @@ function NLPModels.jth_hprod!(
   j::Integer,
   hv::AbstractVector,
 )
-  nlp.meta.hprod_available || error("H * v products are not supported by this MathOptNLPModel.")
+  nlp.meta.hprod_available || error("The function jth_hprod! is not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_jhprod)
   @rangecheck 1 nlp.meta.ncon j
   hv .= 0.0
   if nlp.meta.nlin + 1 ≤ j ≤ nlp.meta.nlin + nlp.quadcon.nquad
     qcon = nlp.quadcon.constraints[j - nlp.meta.nlin]
     coo_sym_add_mul!(qcon.A.rows, qcon.A.cols, qcon.A.vals, v, hv, 1.0)
-  elseif nlp.meta.nlin + nlp.quadcon.nquad + 1 ≤ j ≤ nlp.meta.ncon
+  elseif nlp.meta.nlin + nlp.quadcon.nquad + 1 ≤ j ≤ nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln
     nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 1.0
     MOI.eval_hessian_lagrangian_product(nlp.eval, hv, x, v, 0.0, nlp.λ)
     nlp.λ[j - nlp.meta.nlin - nlp.quadcon.nquad] = 0.0
+  elseif nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln + 1 ≤ j ≤ nlp.meta.ncon
+    find_oracle = false
+    offset_λ = nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln
+    for (f, s) in nlp.oracles.oracles
+      if !find_oracle
+        if offset_λ + 1 ≤ j ≤ offset_λ + s.set.output_dimension
+          find_oracle = true
+          # build local x
+          for i in 1:s.set.input_dimension
+            s.x[i] = x[f.variables[i].value]
+          end
+          # We could preallocate the vector in the structure nlp
+          λ_oracle = zeros(Float64, s.set.output_dimension)
+          λ_oracle[j - offset_λ] = 1.0
+          s.set.eval_hessian_lagrangian(
+            s.nzH,
+            s.x,
+            λ_oracle,
+          )
+          k = 0
+          for (r, c) in s.set.hessian_lagrangian_structure
+            k += 1
+            row = f.variables[r].value
+            col = f.variables[c].value
+            hv[row] += s.nzH[k] * v[col]
+          end
+        else
+          offset_λ += ncon_oracle
+        end
+      end
+    end
   end
   return hv
 end
@@ -832,7 +955,7 @@ function NLPModels.ghjvprod!(
   v::AbstractVector,
   ghv::AbstractVector,
 )
-  nlp.meta.hprod_available || error("The operation is not supported by this MathOptNLPModel.")
+  nlp.meta.hprod_available || error("The function ghjvprod! is not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_hprod)
   ghv .= 0.0
   for i = (nlp.meta.nlin + 1):(nlp.meta.nlin + nlp.quadcon.nquad)
