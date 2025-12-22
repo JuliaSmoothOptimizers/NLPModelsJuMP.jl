@@ -434,7 +434,7 @@ function NLPModels.jprod_nln!(
   end
   if nlp.oracles.ncon > 0
     for i =
-        (nlp.quadcon.nquad + nlp.nlcon.nnln + 1):(nlp.quadcon.nquad + nlp.nlcon.nnln + nlp.oracles.ncon)
+      (nlp.quadcon.nquad + nlp.nlcon.nnln + 1):(nlp.quadcon.nquad + nlp.nlcon.nnln + nlp.oracles.ncon)
 
       Jv[i] = 0
     end
