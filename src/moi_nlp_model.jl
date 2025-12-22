@@ -129,7 +129,7 @@ function NLPModels.cons_nln!(nlp::MathOptNLPModel, x::AbstractVector, c::Abstrac
   if nlp.nlcon.nnln > 0
     offset += nlp.nlcon.nnln
     index_nlcon = (nlp.quadcon.nquad + 1):(offset)
-    MOI.eval_constraint(nlp.eval, view(c, ), x)
+    MOI.eval_constraint(nlp.eval, view(c, index_nlcon), x)
   end
   if nlp.oracles.ncon > 0
     for (f, s) in nlp.oracles.oracles
@@ -162,7 +162,8 @@ function NLPModels.cons!(nlp::MathOptNLPModel, x::AbstractVector, c::AbstractVec
   end
   if nlp.nlcon.nnln > 0
     offset += nlp.nlcon.nnln
-    MOI.eval_constraint(nlp.eval, view(c, (nlp.meta.nlin + nlp.quadcon.nquad + 1):(offset)), x)
+    index_nlcon = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(offset)
+    MOI.eval_constraint(nlp.eval, view(c, index_nlcon), x)
   end
   if nlp.oracles.ncon > 0
     for (f, s) in nlp.oracles.oracles
