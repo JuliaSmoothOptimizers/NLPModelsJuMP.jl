@@ -882,7 +882,7 @@ function NLPModels.hprod!(
   nls.meta.hprod_available || error("The function hprod! is not supported by this MathOptNLSModel.")
   increment!(nls, :neval_hprod)
   if (nls.nls_meta.nnln > 0) || (nls.nlcon.nnln > 0)
-    λ = view(y, (nls.meta.nlin + nls.quadcon.nquad + 1):(nls.meta.nlin + nls.quadcon.nquad + nls.nlcon.ncon))
+    λ = view(y, (nls.meta.nlin + nls.quadcon.nquad + 1):(nls.meta.nlin + nls.quadcon.nquad + nls.nlcon.nnln))
     MOI.eval_hessian_lagrangian_product(nls.ceval, hv, x, v, obj_weight, λ)
   end
   (nls.nls_meta.nnln == 0) && (nls.nlcon.nnln == 0) && (hv .= 0.0)
