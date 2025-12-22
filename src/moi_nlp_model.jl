@@ -35,7 +35,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     parser_MOI(moimodel, index_map, nvar)
 
   nlp_data = _nlp_block(moimodel)
-  nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
+  nlcon = parser_NL(nlp_data, hessian = hessian)
   oracles = parser_oracles(moimodel)
   counters = Counters()
   λ = zeros(Float64, nlcon.nnln)  # Lagrange multipliers for hess_coord! and hprod! without y
@@ -49,8 +49,8 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
 
   # Total counts
   ncon = nlin + quadcon.nquad + nlcon.nnln + oracles.ncon
-  lcon = vcat(lin_lcon, quad_lcon, nl_lcon, oracles.lcon)
-  ucon = vcat(lin_ucon, quad_ucon, nl_ucon, oracles.ucon)
+  lcon = vcat(lin_lcon, quad_lcon, nlcon.nl_lcon, oracles.lcon)
+  ucon = vcat(lin_ucon, quad_ucon, nlcon.nl_ucon, oracles.ucon)
   nnzj = lincon.nnzj + quadcon.nnzj + nlcon.nnzj + oracles.nnzj
   nnzh = obj.nnzh + quadcon.nnzh + nlcon.nnzh + oracles.nnzh
   meta = NLPModelMeta(

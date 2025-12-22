@@ -36,7 +36,7 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
     parser_MOI(moimodel, index_map, nvar)
 
   nlp_data = _nlp_block(moimodel)
-  nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
+  nlcon = parser_NL(nlp_data, hessian = hessian)
   λ = zeros(nlcon.nnln)  # Lagrange multipliers for hess_coord! and hprod! without y
 
   nequ = nlinequ + nnlnequ
@@ -44,8 +44,8 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
   Fnnzh = nlequ.nnzh
 
   ncon = nlin + quadcon.nquad + nlcon.nnln
-  lcon = vcat(lin_lcon, quad_lcon, nl_lcon)
-  ucon = vcat(lin_ucon, quad_ucon, nl_ucon)
+  lcon = vcat(lin_lcon, quad_lcon, nlcon.nl_lcon)
+  ucon = vcat(lin_ucon, quad_ucon, nlcon.nl_ucon)
   cnnzj = lincon.nnzj + quadcon.nnzj + nlcon.nnzj
   cnnzh = lls.nnzh + quadcon.nnzh + nlcon.nnzh
 

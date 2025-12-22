@@ -96,6 +96,8 @@ end
 
 Structure containing Jacobian and Hessian structures of nonlinear constraints:
 - nnln: number of nonlinear constraints
+- nl_lcon: lower bounds of nonlinear constraints
+- nl_ucon: upper bounds of nonlinear constraints
 - jac_rows: row indices of the Jacobian in Coordinate format (COO) format
 - jac_cols: column indices of the Jacobian in COO format
 - nnzj: number of non-zero entries in the Jacobian
@@ -105,6 +107,8 @@ Structure containing Jacobian and Hessian structures of nonlinear constraints:
 """
 mutable struct NonLinearStructure
   nnln::Int
+  nl_lcon::Vector{Float64}
+  nl_ucon::Vector{Float64}
   jac_rows::Vector{Int}
   jac_cols::Vector{Int}
   nnzj::Int
@@ -589,8 +593,6 @@ Parse nonlinear constraints of an `nlp_data`.
 
 Returns:
 - nlcon: NonLinearStructure containing Jacobian and Hessian structures
-- nl_lcon: lower bounds of nonlinear constraints
-- nl_ucon: upper bounds of nonlinear constraints
 """
 function parser_NL(nlp_data; hessian::Bool = true)
   nnln = length(nlp_data.constraint_bounds)
@@ -608,9 +610,9 @@ function parser_NL(nlp_data; hessian::Bool = true)
   hess_rows = hessian ? getindex.(hess, 1) : Int[]
   hess_cols = hessian ? getindex.(hess, 2) : Int[]
   nnzh = length(hess)
-  nlcon = NonLinearStructure(nnln, jac_rows, jac_cols, nnzj, hess_rows, hess_cols, nnzh)
+  nlcon = NonLinearStructure(nnln, nl_lcon, nl_ucon, jac_rows, jac_cols, nnzj, hess_rows, hess_cols, nnzh)
 
-  return nlcon, nl_lcon, nl_ucon
+  return nlcon
 end
 
 """
@@ -886,7 +888,7 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
   Fhess_cols = hessian && Feval ≠ nothing ? getindex.(Fhess, 2) : Int[]
   nl_Fnnzh = length(Fhess)
 
-  nlequ = NonLinearStructure(nnlnequ, Fjac_rows, Fjac_cols, nl_Fnnzj, Fhess_rows, Fhess_cols, nl_Fnnzh)
+  nlequ = NonLinearStructure(nnlnequ, Float64[], Float64[], Fjac_rows, Fjac_cols, nl_Fnnzj, Fhess_rows, Fhess_cols, nl_Fnnzh)
 
   return Feval, nlequ, nnlnequ
 end
