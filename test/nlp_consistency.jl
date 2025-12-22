@@ -1,4 +1,4 @@
-for problem in [nlp_problems; extra_nlp_oracle_problems]
+for problem in [nlp_problems; nlp_oracle_problems]
   @testset "Problem $problem" begin
     nlp_manual = eval(replace(problem, "_oracle" => "") |> uppercase |> Symbol)()
     problem_f = eval(problem |> lowercase |> Symbol)

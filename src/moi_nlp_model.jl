@@ -859,6 +859,9 @@ function NLPModels.hprod!(
         row = f.variables[r].value
         col = f.variables[c].value
         hv[row] += s.nzH[k] * v[col]
+        if row != col
+          hv[col] += s.nzH[k] * v[row]
+        end
       end
       offset_y += s.set.output_dimension
     end
@@ -938,6 +941,9 @@ function NLPModels.jth_hprod!(
             row = f.variables[r].value
             col = f.variables[c].value
             hv[row] += s.nzH[k] * v[col]
+            if row != col
+              hv[col] += s.nzH[k] * v[row]
+            end
           end
         else
           offset_λ += ncon_oracle

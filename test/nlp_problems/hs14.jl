@@ -48,12 +48,12 @@ function hs14_oracle()
         # ∂²g/∂x1∂x2 = 0
         # ∂²g/∂x2² = -2
         #
-        # We store only upper-triangular entries: (1,1), (1,2), (2,2)
-        hessian_lagrangian_structure = [(1, 1), (1, 2), (2, 2)],
+        # We store only lower-triangular entries: (1,1), (2,1), (2,2)
+        hessian_lagrangian_structure = [(1, 1), (2, 1), (2, 2)],
         eval_hessian_lagrangian = (ret, xv, μ) -> begin
             # Hessian of μ[1] * g(x)
             ret[1] = μ[1] * (-0.5)   # (1,1)
-            ret[2] = μ[1] * 0.0      # (1,2)
+            ret[2] = μ[1] * 0.0      # (2,1)
             ret[3] = μ[1] * (-2.0)   # (2,2)
         end,
     )
