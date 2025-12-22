@@ -24,6 +24,23 @@ const SNF = MOI.ScalarNonlinearFunction
 const VNF = MOI.VectorNonlinearFunction
 const NF = Union{SNF, VNF}
 
+# VectorNonlinearOracle
+const ORACLE = MOI.VectorNonlinearOracle{Float64}  # VectorNonlinearOracle{Float64}(input_dimension, output_dimension, l, u, eval_f, jacobian_structure, eval_jacobian, hessian_lagrangian_structure, eval_hessian_lagrangian)
+
+# Cache of VectorNonlinearOracle
+mutable struct _VectorNonlinearOracleCache
+    set::MOI.VectorNonlinearOracle{Float64}
+    x::Vector{Float64}
+    nzJ::Vector{Float64}
+    nzH::Vector{Float64}
+
+    function _VectorNonlinearOracleCache(set::MOI.VectorNonlinearOracle{Float64})
+        nnzj = length(set.jacobian_structure)
+        nnzh = length(set.hessian_lagrangian_structure)
+        return new(set, zeros(set.input_dimension), zeros(nnzj), zeros(nnzh))
+    end
+end
+
 # AffLinSets and VecLinSets
 const ALS = Union{
   MOI.EqualTo{Float64},
@@ -74,7 +91,24 @@ mutable struct QuadraticConstraints
   nnzh::Int
 end
 
+"""
+    NonLinearStructure
+
+Structure containing Jacobian and Hessian structures of nonlinear constraints:
+- nnln: number of nonlinear constraints
+- nl_lcon: lower bounds of nonlinear constraints
+- nl_ucon: upper bounds of nonlinear constraints
+- jac_rows: row indices of the Jacobian in Coordinate format (COO) format
+- jac_cols: column indices of the Jacobian in COO format
+- nnzj: number of non-zero entries in the Jacobian
+- hess_rows: row indices of the Hessian in COO format
+- hess_cols: column indices of the Hessian in COO format
+- nnzh: number of non-zero entries in the Hessian
+"""
 mutable struct NonLinearStructure
+  nnln::Int
+  nl_lcon::Vector{Float64}
+  nl_ucon::Vector{Float64}
   jac_rows::Vector{Int}
   jac_cols::Vector{Int}
   nnzj::Int
@@ -95,6 +129,30 @@ mutable struct Objective
   gradient::SparseVector{Float64}
   hessian::COO
   nnzh::Int
+end
+
+"""
+    Oracles
+
+Structure containing nonlinear oracles data:
+- oracles: vector of tuples (MOI.VectorOfVariables, _VectorNonlinearOracleCache)
+- ncon: number of scalar constraints represented by all oracles
+- lcon: lower bounds of oracle constraints
+- ucon: upper bounds of oracle constraints
+- nnzj: number of non-zero entries in the Jacobian of all oracles
+- nnzh: number of non-zero entries in the Hessian of all oracles
+- nzJ: buffer to store the nonzeros of the Jacobian for all oracles (needed for the functions jprod and jtprod)
+- nzH: buffer to store the nonzeros of the Hessian for all oracles (needed for the function hprod)
+- hessian_oracles_supported: support of the Hessian for all oracles
+"""
+mutable struct Oracles
+  oracles::Vector{Tuple{MOI.VectorOfVariables,_VectorNonlinearOracleCache}}
+  ncon::Int
+  lcon::Vector{Float64}
+  ucon::Vector{Float64}
+  nnzj::Int
+  nnzh::Int
+  hessian_oracles_supported::Bool
 end
 
 """
@@ -407,6 +465,10 @@ function parser_MOI(moimodel, index_map, nvar)
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
+    # Ignore VectorNonlinearOracle here, we'll parse it separately
+    if F == MOI.VectorOfVariables && S <: MOI.VectorNonlinearOracle{Float64}
+        continue
+    end
     (F == VNF) && error(
       "The function $F is not supported. Please use `.<=`, `.==`, and `.>=` in your constraints to ensure compatibility with ScalarNonlinearFunction.",
     )
@@ -444,7 +506,6 @@ function parser_MOI(moimodel, index_map, nvar)
   coo = COO(linrows, lincols, linvals)
   lin_nnzj = length(linvals)
   lincon = LinearConstraints(coo, lin_nnzj)
-
   quad_nnzj = 0
   quad_nnzh = 0
   for i = 1:nquad
@@ -529,6 +590,9 @@ end
     parser_NL(nlp_data; hessian)
 
 Parse nonlinear constraints of an `nlp_data`.
+
+Returns:
+- nlcon: NonLinearStructure containing Jacobian and Hessian structures
 """
 function parser_NL(nlp_data; hessian::Bool = true)
   nnln = length(nlp_data.constraint_bounds)
@@ -546,9 +610,54 @@ function parser_NL(nlp_data; hessian::Bool = true)
   hess_rows = hessian ? getindex.(hess, 1) : Int[]
   hess_cols = hessian ? getindex.(hess, 2) : Int[]
   nnzh = length(hess)
-  nlcon = NonLinearStructure(jac_rows, jac_cols, nnzj, hess_rows, hess_cols, nnzh)
+  nlcon = NonLinearStructure(nnln, nl_lcon, nl_ucon, jac_rows, jac_cols, nnzj, hess_rows, hess_cols, nnzh)
 
-  return nnln, nlcon, nl_lcon, nl_ucon
+  return nlcon
+end
+
+"""
+    oracles = parser_oracles(moimodel)
+
+Parse nonlinear oracles of a `MOI.ModelLike`.
+"""
+function parser_oracles(moimodel)
+    hessian_oracles_supported = true
+    oracles = Tuple{MOI.VectorOfVariables,_VectorNonlinearOracleCache}[]
+    lcon = Float64[]
+    ucon = Float64[]
+
+    # We know this pair exists from ListOfConstraintTypesPresent
+    for ci in MOI.get(
+        moimodel,
+        MOI.ListOfConstraintIndices{MOI.VectorOfVariables, MOI.VectorNonlinearOracle{Float64}}(),
+    )
+        f   = MOI.get(moimodel, MOI.ConstraintFunction(), ci)  # ::MOI.VectorOfVariables
+        set = MOI.get(moimodel, MOI.ConstraintSet(), ci)       # ::MOI.VectorNonlinearOracle{Float64}
+
+        cache = _VectorNonlinearOracleCache(set)
+        push!(oracles, (f, cache))
+
+        # Bounds: MOI.VectorNonlinearOracle stores them internally (l, u)
+        append!(lcon, set.l)
+        append!(ucon, set.u)
+
+        # Support for the Hessian
+        hessian_oracles_supported = hessian_oracles_supported && !isnothing(set.eval_hessian_lagrangian)
+    end
+
+    # Number of scalar constraints represented by all oracles
+    ncon = length(lcon)
+
+    # Number of nonzeros for the Jacobian and Hessian
+    nnzj = 0
+    nnzh = 0
+    for (_, cache) in oracles
+        nnzj += length(cache.set.jacobian_structure)
+        # there may or may not be Hessian info
+        nnzh += length(cache.set.hessian_lagrangian_structure)
+    end
+
+    return Oracles(oracles, ncon, lcon, ucon, nnzj, nnzh, hessian_oracles_supported)
 end
 
 """
@@ -742,6 +851,7 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
 
   # Nonlinear least squares model
   F_is_array_of_containers = F isa Array{<:AbstractArray}
+  nnlnequ = 0
   if F_is_array_of_containers
     nnlnequ = sum(sum(isa(Fi, NLE) for Fi in FF) for FF in F)
     if nnlnequ > 0
@@ -778,7 +888,7 @@ function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
   Fhess_cols = hessian && Feval ≠ nothing ? getindex.(Fhess, 2) : Int[]
   nl_Fnnzh = length(Fhess)
 
-  nlequ = NonLinearStructure(Fjac_rows, Fjac_cols, nl_Fnnzj, Fhess_rows, Fhess_cols, nl_Fnnzh)
+  nlequ = NonLinearStructure(nnlnequ, Float64[], Float64[], Fjac_rows, Fjac_cols, nl_Fnnzj, Fhess_rows, Fhess_cols, nl_Fnnzh)
 
   return Feval, nlequ, nnlnequ
 end

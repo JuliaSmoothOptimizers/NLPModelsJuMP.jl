@@ -36,16 +36,16 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
     parser_MOI(moimodel, index_map, nvar)
 
   nlp_data = _nlp_block(moimodel)
-  nnln, nlcon, nl_lcon, nl_ucon = parser_NL(nlp_data, hessian = hessian)
-  λ = zeros(nnln)  # Lagrange multipliers for hess_coord! and hprod! without y
+  nlcon = parser_NL(nlp_data, hessian = hessian)
+  λ = zeros(nlcon.nnln)  # Lagrange multipliers for hess_coord! and hprod! without y
 
   nequ = nlinequ + nnlnequ
   Fnnzj = linequ.nnzj + nlequ.nnzj
   Fnnzh = nlequ.nnzh
 
-  ncon = nlin + quadcon.nquad + nnln
-  lcon = vcat(lin_lcon, quad_lcon, nl_lcon)
-  ucon = vcat(lin_ucon, quad_ucon, nl_ucon)
+  ncon = nlin + quadcon.nquad + nlcon.nnln
+  lcon = vcat(lin_lcon, quad_lcon, nlcon.nl_lcon)
+  ucon = vcat(lin_ucon, quad_ucon, nlcon.nl_ucon)
   cnnzj = lincon.nnzj + quadcon.nnzj + nlcon.nnzj
   cnnzh = lls.nnzh + quadcon.nnzh + nlcon.nnzh
 
@@ -265,7 +265,7 @@ function NLPModels.cons_nln!(nls::MathOptNLSModel, x::AbstractVector, c::Abstrac
       c[i] = 0.5 * coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, x) + dot(qcon.b, x)
     end
   end
-  if nls.meta.nnln > nls.quadcon.nquad
+  if nls.nlcon.nnln > 0
     MOI.eval_constraint(nls.ceval, view(c, (nls.quadcon.nquad + 1):(nls.meta.nnln)), x)
   end
   return c
@@ -284,7 +284,7 @@ function NLPModels.cons!(nls::MathOptNLSModel, x::AbstractVector, c::AbstractVec
           0.5 * coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, x) + dot(qcon.b, x)
       end
     end
-    if nls.meta.nnln > nls.quadcon.nquad
+    if nls.nlcon.nnln > 0
       index_nnln = (nls.meta.nlin + nls.quadcon.nquad + 1):(nls.meta.ncon)
       MOI.eval_constraint(nls.ceval, view(c, index_nnln), x)
     end
@@ -319,7 +319,7 @@ function NLPModels.jac_nln_structure!(
       index += qcon.nnzg
     end
   end
-  if nls.meta.nnln > nls.quadcon.nquad
+  if nls.nlcon.nnln > 0
     ind_nnln = (nls.quadcon.nnzj + 1):(nls.quadcon.nnzj + nls.nlcon.nnzj)
     view(rows, ind_nnln) .= nls.quadcon.nquad .+ nls.nlcon.jac_rows
     view(cols, ind_nnln) .= nls.nlcon.jac_cols
@@ -349,7 +349,7 @@ function NLPModels.jac_structure!(
         index += qcon.nnzg
       end
     end
-    if nls.meta.nnln > nls.quadcon.nquad
+    if nls.nlcon.nnln > 0
       ind_nnln = (nls.lincon.nnzj + nls.quadcon.nnzj + 1):(nls.meta.nnzj)
       view(rows, ind_nnln) .= nls.meta.nlin .+ nls.quadcon.nquad .+ nls.nlcon.jac_rows
       view(cols, ind_nnln) .= nls.nlcon.jac_cols
@@ -391,7 +391,7 @@ function NLPModels.jac_nln_coord!(nls::MathOptNLSModel, x::AbstractVector, vals:
       index += qcon.nnzg
     end
   end
-  if nls.meta.nnln > nls.quadcon.nquad
+  if nls.nlcon.nnln > 0
     ind_nnln = (nls.quadcon.nnzj + 1):(nls.quadcon.nnzj + nls.nlcon.nnzj)
     MOI.eval_constraint_jacobian(nls.ceval, view(vals, ind_nnln), x)
   end
@@ -429,7 +429,7 @@ function NLPModels.jac_coord!(nls::MathOptNLSModel, x::AbstractVector, vals::Abs
         index += qcon.nnzg
       end
     end
-    if nls.meta.nnln > nls.quadcon.nquad
+    if nls.nlcon.nnln > 0
       ind_nnln = (nls.lincon.nnzj + nls.quadcon.nnzj + 1):(nls.meta.nnzj)
       MOI.eval_constraint_jacobian(nls.ceval, view(vals, ind_nnln), x)
     end
@@ -469,7 +469,7 @@ function NLPModels.jprod_nln!(
       Jv[i] = coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, v) + dot(qcon.b, v)
     end
   end
-  if nls.meta.nnln > nls.quadcon.nquad
+  if nls.nlcon.nnln > 0
     ind_nnln = (nls.quadcon.nquad + 1):(nls.meta.nnln)
     MOI.eval_constraint_jacobian_product(nls.ceval, view(Jv, ind_nnln), x, v)
   end
@@ -504,7 +504,7 @@ function NLPModels.jprod!(
         coo_sym_dot(qcon.A.rows, qcon.A.cols, qcon.A.vals, x, v) + dot(qcon.b, v)
     end
   end
-  if nls.meta.nnln > nls.quadcon.nquad
+  if nls.nlcon.nnln > 0
     ind_nnln = (nls.meta.nlin + nls.quadcon.nquad + 1):(nls.meta.ncon)
     MOI.eval_constraint_jacobian_product(nls.ceval, view(Jv, ind_nnln), x, v)
   end
@@ -536,7 +536,7 @@ function NLPModels.jtprod_nln!(
   Jtv::AbstractVector,
 )
   increment!(nls, :neval_jtprod_nln)
-  if nls.meta.nnln > nls.quadcon.nquad
+  if nls.nlcon.nnln > 0
     ind_nnln = (nls.quadcon.nquad + 1):(nls.meta.nnln)
     MOI.eval_constraint_jacobian_transpose_product(nls.ceval, Jtv, x, view(v, ind_nnln))
   end
@@ -559,7 +559,7 @@ function NLPModels.jtprod!(
   Jtv::AbstractVector,
 )
   increment!(nls, :neval_jtprod)
-  if nls.meta.nnln > nls.quadcon.nquad
+  if nls.nlcon.nnln > 0
     ind_nnln = (nls.meta.nlin + nls.quadcon.nquad + 1):(nls.meta.ncon)
     MOI.eval_constraint_jacobian_transpose_product(nls.ceval, Jtv, x, view(v, ind_nnln))
   end
@@ -595,7 +595,7 @@ function NLPModels.hess_structure!(
     view(rows, 1:(nls.lls.nnzh)) .= nls.lls.hessian.rows
     view(cols, 1:(nls.lls.nnzh)) .= nls.lls.hessian.cols
   end
-  if (nls.nls_meta.nnln > 0) || (nls.meta.nnln > nls.quadcon.nquad)
+  if (nls.nls_meta.nnln > 0) || (nls.nlcon.nnln > 0)
     view(rows, (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.meta.nnzh)) .= nls.nlcon.hess_rows
     view(cols, (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.meta.nnzh)) .= nls.nlcon.hess_cols
   end
@@ -622,7 +622,7 @@ function NLPModels.hess_coord!(
   if nls.nls_meta.nlin > 0
     view(vals, 1:(nls.lls.nnzh)) .= obj_weight .* nls.lls.hessian.vals
   end
-  if (nls.nls_meta.nnln > 0) || (nls.meta.nnln > nls.quadcon.nquad)
+  if (nls.nls_meta.nnln > 0) || (nls.nlcon.nnln > 0)
     λ = view(y, (nls.meta.nlin + nls.quadcon.nquad + 1):(nls.meta.ncon))
     MOI.eval_hessian_lagrangian(
       nls.ceval,
@@ -658,7 +658,7 @@ function NLPModels.hess_coord!(
     ind_nnln = (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.meta.nnzh)
     MOI.eval_hessian_lagrangian(nls.ceval, view(vals, ind_nnln), x, obj_weight, nls.λ)
   else
-    if nls.meta.nnln > nls.quadcon.nquad
+    if nls.nlcon.nnln > 0
       view(vals, (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.meta.nnzh)) .= 0.0
     end
   end
@@ -674,7 +674,7 @@ function NLPModels.hprod!(
   obj_weight::Float64 = 1.0,
 )
   increment!(nls, :neval_hprod)
-  if (nls.nls_meta.nnln > 0) || (nls.meta.nnln > nls.quadcon.nquad)
+  if (nls.nls_meta.nnln > 0) || (nls.nlcon.nnln > 0)
     λ = view(y, (nls.meta.nlin + nls.quadcon.nquad + 1):(nls.meta.ncon))
     MOI.eval_hessian_lagrangian_product(nls.ceval, hv, x, v, obj_weight, λ)
   end
