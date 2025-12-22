@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Tutorial · NLPModelsJuMP.jl</title><meta name="title" content="Tutorial · NLPModelsJuMP.jl"/><meta property="og:title" content="Tutorial · NLPModelsJuMP.jl"/><meta property="twitter:title" content="Tutorial · NLPModelsJuMP.jl"/><meta name="description" content="Documentation for NLPModelsJuMP.jl."/><meta property="og:description" content="Documentation for NLPModelsJuMP.jl."/><meta property="twitter:description" content="Documentation for NLPModelsJuMP.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script><link href="../assets/style.css" rel="stylesheet" type="text/css"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../"><img src="../assets/logo.png" alt="NLPModelsJuMP.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../">NLPModelsJuMP.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Tutorial</a><ul class="internal"><li><a class="tocitem" href="#MathOptNLPModel"><span>MathOptNLPModel</span></a></li><li><a class="tocitem" href="#MathOptNLSModel"><span>MathOptNLSModel</span></a></li></ul></li><li><a class="tocitem" href="../reference/">Reference</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Tutorial</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Tutorial</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl/blob/main/docs/src/tutorial.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Tutorial"><a class="docs-heading-anchor" href="#Tutorial">Tutorial</a><a id="Tutorial-1"></a><a class="docs-heading-anchor-permalink" href="#Tutorial" title="Permalink"></a></h1><p>NLPModelsJuMP is a combination of NLPModels and JuMP, as the name implies. Sometimes it may be required to refer to the specific documentation, as we&#39;ll present here only the documention specific to NLPModelsJuMP.</p><ul><li><a href="#Tutorial">Tutorial</a></li><li class="no-marker"><ul><li><a href="#MathOptNLPModel">MathOptNLPModel</a></li><li><a href="#MathOptNLSModel">MathOptNLSModel</a></li></ul></li></ul><h2 id="MathOptNLPModel"><a class="docs-heading-anchor" href="#MathOptNLPModel">MathOptNLPModel</a><a id="MathOptNLPModel-1"></a><a class="docs-heading-anchor-permalink" href="#MathOptNLPModel" title="Permalink"></a></h2><article><details class="docstring" open="true"><summary id="NLPModelsJuMP.MathOptNLPModel"><a class="docstring-binding" href="#NLPModelsJuMP.MathOptNLPModel"><code>NLPModelsJuMP.MathOptNLPModel</code></a> — <span class="docstring-category">Type</span></summary><section><div><pre><code class="language-julia hljs">MathOptNLPModel(model, hessian=true, name=&quot;Generic&quot;)</code></pre><p>Construct a <code>MathOptNLPModel</code> from a <code>JuMP</code> model.</p><p><code>hessian</code> should be set to <code>false</code> for multivariate user-defined functions registered without hessian.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl/blob/7fd3cae3a49bef9ee6064b437ce18e7485908ad2/src/moi_nlp_model.jl#L16-L22">source</a></section></details></article><p><code>MathOptNLPModel</code> is a simple yet efficient model. It uses JuMP to define the problem, and can be accessed through the NLPModels API. An advantage of <code>MathOptNLPModel</code> over simpler models such as <a href="https://github.com/JuliaSmoothOptimizers/ADNLPModels.jl"><code>ADNLPModels</code></a> is that they provide sparse derivates.</p><p>Let&#39;s define the famous Rosenbrock function</p><p class="math-container">\[f(x) = (x_1 - 1)^2 + 100(x_2 - x_1^2)^2,\]</p><p>with starting point <span>$x^0 = (-1.2,1.0)$</span>.</p><pre><code class="language-julia hljs">using NLPModels, NLPModelsJuMP, JuMP
+
+x0 = [-1.2; 1.0]
+model = Model() # No solver is required
+@variable(model, x[i=1:2], start=x0[i])
+@NLobjective(model, Min, (x[1] - 1)^2 + 100 * (x[2] - x[1]^2)^2)
+
+nlp = MathOptNLPModel(model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">MathOptNLPModel
+  Problem name: Generic
+   All variables: ████████████████████ 2      All constraints: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+            free: ████████████████████ 2                 free: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+           lower: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0                lower: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+           upper: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0                upper: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+         low/upp: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0              low/upp: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+           fixed: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0                fixed: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+          infeas: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0               infeas: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+            nnzh: (  0.00% sparsity)   3               linear: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+                                                    nonlinear: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+                                                         nnzj: (------% sparsity)         
+                                                     lin_nnzj: (------% sparsity)         
+                                                     nln_nnzj: (------% sparsity)         
+
+  Counters:
+             obj: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0                 grad: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0                 cons: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+        cons_lin: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0             cons_nln: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0                 jcon: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+           jgrad: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0                  jac: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0              jac_lin: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+         jac_nln: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0                jprod: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0            jprod_lin: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+       jprod_nln: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0               jtprod: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0           jtprod_lin: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+      jtprod_nln: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0                 hess: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0                hprod: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+           jhess: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0               jhprod: ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ 0     
+</code></pre><p>Let&#39;s get the objective function value at <span>$x^0$</span>, using only <code>nlp</code>.</p><pre><code class="language-julia hljs">fx = obj(nlp, nlp.meta.x0)
+println(&quot;fx = $fx&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">fx = 24.199999999999996</code></pre><p>Let&#39;s try the gradient and Hessian.</p><pre><code class="language-julia hljs">gx = grad(nlp, nlp.meta.x0)
+Hx = hess(nlp, nlp.meta.x0)
+println(&quot;gx = $gx&quot;)
+println(&quot;Hx = $Hx&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">gx = [-215.59999999999997, -87.99999999999999]
+Hx = [1330.0 480.0; 480.0 200.0]</code></pre><p>Let&#39;s do something a little more complex here, defining a function to try to solve this problem through steepest descent method with Armijo search. Namely, the method</p><ol><li>Given <span>$x^0$</span>, <span>$\varepsilon &gt; 0$</span>, and <span>$\eta \in (0,1)$</span>. Set <span>$k = 0$</span>;</li><li>If <span>$\Vert \nabla f(x^k) \Vert &lt; \varepsilon$</span> STOP with <span>$x^* = x^k$</span>;</li><li>Compute <span>$d^k = -\nabla f(x^k)$</span>;</li><li>Compute <span>$\alpha_k \in (0,1]$</span> such that <span>$f(x^k + \alpha_kd^k) &lt; f(x^k) + \alpha_k\eta \nabla f(x^k)^Td^k$</span></li><li>Define <span>$x^{k+1} = x^k + \alpha_kx^k$</span></li><li>Update <span>$k = k + 1$</span> and go to step 2.</li></ol><pre><code class="language-julia hljs">using LinearAlgebra
+
+function steepest(nlp; itmax=100000, eta=1e-4, eps=1e-6, sigma=0.66)
+  x = nlp.meta.x0
+  fx = obj(nlp, x)
+  ∇fx = grad(nlp, x)
+  slope = dot(∇fx, ∇fx)
+  ∇f_norm = sqrt(slope)
+  iter = 0
+  while ∇f_norm &gt; eps &amp;&amp; iter &lt; itmax
+    t = 1.0
+    x_trial = x - t * ∇fx
+    f_trial = obj(nlp, x_trial)
+    while f_trial &gt; fx - eta * t * slope
+      t *= sigma
+      x_trial = x - t * ∇fx
+      f_trial = obj(nlp, x_trial)
+    end
+    x = x_trial
+    fx = f_trial
+    ∇fx = grad(nlp, x)
+    slope = dot(∇fx, ∇fx)
+    ∇f_norm = sqrt(slope)
+    iter += 1
+  end
+  optimal = ∇f_norm &lt;= eps
+  return x, fx, ∇f_norm, optimal, iter
+end
+
+x, fx, ngx, optimal, iter = steepest(nlp)
+println(&quot;x = $x&quot;)
+println(&quot;fx = $fx&quot;)
+println(&quot;ngx = $ngx&quot;)
+println(&quot;optimal = $optimal&quot;)
+println(&quot;iter = $iter&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">x = [1.0000006499501406, 1.0000013043156974]
+fx = 4.2438440239813445e-13
+ngx = 9.984661274466946e-7
+optimal = true
+iter = 17962</code></pre><p>Maybe this code is too complicated? If you&#39;re in a class you just want to show a Newton step.</p><pre><code class="language-julia hljs">f(x) = obj(nlp, x)
+g(x) = grad(nlp, x)
+H(x) = hess(nlp, x)
+x = nlp.meta.x0
+d = -H(x) \ g(x)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
+ 0.024719101123595457
+ 0.38067415730337084</code></pre><p>or a few</p><pre><code class="language-julia hljs">for i = 1:5
+  global x
+  x = x - H(x) \ g(x)
+  println(&quot;x = $x&quot;)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">x = [-1.1752808988764043, 1.3806741573033703]
+x = [0.7631148711766087, -3.1750338547485217]
+x = [0.7634296788842126, 0.5828247754973592]
+x = [0.9999953110849883, 0.9440273238534098]
+x = [0.9999956956536664, 0.9999913913257125]</code></pre><h3 id="OptimizationProblems"><a class="docs-heading-anchor" href="#OptimizationProblems">OptimizationProblems</a><a id="OptimizationProblems-1"></a><a class="docs-heading-anchor-permalink" href="#OptimizationProblems" title="Permalink"></a></h3><p>The package <a href="https://github.com/JuliaSmoothOptimizers/OptimizationProblems.jl">OptimizationProblems</a> provides a collection of problems defined in JuMP format, which can be converted to <code>MathOptNLPModel</code>.</p><pre><code class="language-julia hljs">using OptimizationProblems.PureJuMP  # Defines a lot of JuMP models
+
+nlp = MathOptNLPModel(woods())
+x, fx, ngx, optimal, iter = steepest(nlp)
+println(&quot;fx = $fx&quot;)
+println(&quot;ngx = $ngx&quot;)
+println(&quot;optimal = $optimal&quot;)
+println(&quot;iter = $iter&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">fx = 3.148279165902827e-12
+ngx = 2.4345698807478627e-6
+optimal = false
+iter = 100000</code></pre><p>Constrained problems can also be converted.</p><pre><code class="language-julia hljs">using NLPModels, NLPModelsJuMP, JuMP
+
+model = Model()
+x0 = [-1.2; 1.0]
+@variable(model, x[i=1:2] &gt;= 0.0, start=x0[i])
+@NLobjective(model, Min, (x[1] - 1)^2 + 100 * (x[2] - x[1]^2)^2)
+@constraint(model, x[1] + x[2] == 3.0)
+@NLconstraint(model, x[1] * x[2] &gt;= 1.0)
+
+nlp = MathOptNLPModel(model)
+
+println(&quot;cx = $(cons(nlp, nlp.meta.x0))&quot;)
+println(&quot;Jx = $(jac(nlp, nlp.meta.x0))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">cx = [-0.19999999999999996, -2.2]
+Jx = sparse([1, 2, 1, 2], [1, 1, 2, 2], [1.0, 1.0, 1.0, -1.2], 2, 2)</code></pre><h2 id="MathOptNLSModel"><a class="docs-heading-anchor" href="#MathOptNLSModel">MathOptNLSModel</a><a id="MathOptNLSModel-1"></a><a class="docs-heading-anchor-permalink" href="#MathOptNLSModel" title="Permalink"></a></h2><article><details class="docstring" open="true"><summary id="NLPModelsJuMP.MathOptNLSModel"><a class="docstring-binding" href="#NLPModelsJuMP.MathOptNLSModel"><code>NLPModelsJuMP.MathOptNLSModel</code></a> — <span class="docstring-category">Type</span></summary><section><div><pre><code class="language-julia hljs">MathOptNLSModel(model, F, hessian=true, name=&quot;Generic&quot;)</code></pre><p>Construct a <code>MathOptNLSModel</code> from a <code>JuMP</code> model and a container of JuMP <code>GenericAffExpr</code> (generated by @expression) and <code>NonlinearExpression</code> (generated by @NLexpression).</p><p><code>hessian</code> should be set to <code>false</code> for multivariate user-defined functions registered without hessian.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSmoothOptimizers/NLPModelsJuMP.jl/blob/7fd3cae3a49bef9ee6064b437ce18e7485908ad2/src/moi_nls_model.jl#L18-L25">source</a></section></details></article><p><code>MathOptNLSModel</code> is a model for nonlinear least squares using JuMP, The objective function of NLS problems has the form <span>$f(x) = \tfrac{1}{2}\|F(x)\|^2$</span>, but specialized methods handle <span>$F$</span> directly, instead of <span>$f$</span>. To use <code>MathOptNLSModel</code>, we define a JuMP model without the objective, and use <code>NLexpression</code>s to define the residual function <span>$F$</span>. For instance, the Rosenbrock function can be expressed in nonlinear least squares format by defining</p><p class="math-container">\[F(x) = \begin{bmatrix} x_1 - 1\\ 10(x_2 - x_1^2) \end{bmatrix},\]</p><p>and noting that <span>$f(x) = \|F(x)\|^2$</span> (the constant <span>$\frac{1}{2}$</span> is ignored as it doesn&#39;t change the solution). We implement this function as</p><pre><code class="language-julia hljs">using NLPModels, NLPModelsJuMP, JuMP
+
+model = Model()
+x0 = [-1.2; 1.0]
+@variable(model, x[i=1:2], start=x0[i])
+@NLexpression(model, F1, x[1] - 1)
+@NLexpression(model, F2, 10 * (x[2] - x[1]^2))
+
+nls = MathOptNLSModel(model, [F1, F2], name=&quot;rosen-nls&quot;)
+
+residual(nls, nls.meta.x0)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
+ -2.2
+ -4.3999999999999995</code></pre><pre><code class="language-julia hljs">jac_residual(nls, nls.meta.x0)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2×2 SparseArrays.SparseMatrixCSC{Float64, Int64} with 3 stored entries:
+  1.0    ⋅ 
+ 24.0  10.0</code></pre><h3 id="NLSProblems"><a class="docs-heading-anchor" href="#NLSProblems">NLSProblems</a><a id="NLSProblems-1"></a><a class="docs-heading-anchor-permalink" href="#NLSProblems" title="Permalink"></a></h3><p>The package <a href="https://github.com/JuliaSmoothOptimizers/NLSProblems.jl">NLSProblems</a> provides a collection of problems already defined as <code>MathOptNLSModel</code>.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../reference/">Reference »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Monday 22 December 2025 02:48">Monday 22 December 2025</span>. Using Julia version 1.12.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
