@@ -73,13 +73,7 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
     hess_available = hessian && oracles.hessian_oracles_supported,
   )
 
-  nls_meta = NLSMeta(
-    nequ,
-    nvar,
-    nnzj = Fnnzj,
-    nnzh = Fnnzh,
-    lin = collect(1:nlinequ)
-  )
+  nls_meta = NLSMeta(nequ, nvar, nnzj = Fnnzj, nnzh = Fnnzh, lin = collect(1:nlinequ))
 
   return MathOptNLSModel(
     meta,
@@ -817,10 +811,16 @@ function NLPModels.hess_coord!(
     end
   end
   if (nls.nls_meta.nnln > 0) || (nls.nlcon.nnln > 0)
-    λ = view(y, (nls.meta.nlin + nls.quadcon.nquad + 1):(nls.meta.nlin + nls.quadcon.nquad + nls.nnln.ncon))
+    λ = view(
+      y,
+      (nls.meta.nlin + nls.quadcon.nquad + 1):(nls.meta.nlin + nls.quadcon.nquad + nls.nnln.ncon),
+    )
     MOI.eval_hessian_lagrangian(
       nls.ceval,
-      view(vals, (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.lls.nnzh + nls.quadcon.nnzh + nls.nlcon.nnzh)),
+      view(
+        vals,
+        (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.lls.nnzh + nls.quadcon.nnzh + nls.nlcon.nnzh),
+      ),
       x,
       obj_weight,
       λ,
@@ -860,11 +860,15 @@ function NLPModels.hess_coord!(
   end
   view(vals, (nls.lls.nnzh + 1):(nls.lls.nnzh + nls.quadcon.nnzh)) .= 0.0
   if nls.nls_meta.nnln > 0
-    ind_nnln = (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.lls.nnzh + nls.quadcon.nnzh + nls.nlcon.nnzh)
+    ind_nnln =
+      (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.lls.nnzh + nls.quadcon.nnzh + nls.nlcon.nnzh)
     MOI.eval_hessian_lagrangian(nls.ceval, view(vals, ind_nnln), x, obj_weight, nls.λ)
   else
     if nls.nlcon.nnln > 0
-      view(vals, (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.lls.nnzh + nls.quadcon.nnzh + nls.nlcon.nnzh)) .= 0.0
+      view(
+        vals,
+        (nls.lls.nnzh + nls.quadcon.nnzh + 1):(nls.lls.nnzh + nls.quadcon.nnzh + nls.nlcon.nnzh),
+      ) .= 0.0
     end
   end
   view(vals, (nls.lls.nnzh + nls.quadcon.nnzh + nls.nlcon.nnzh + 1):(nls.meta.nnzh)) .= 0.0
@@ -882,7 +886,10 @@ function NLPModels.hprod!(
   nls.meta.hprod_available || error("The function hprod! is not supported by this MathOptNLSModel.")
   increment!(nls, :neval_hprod)
   if (nls.nls_meta.nnln > 0) || (nls.nlcon.nnln > 0)
-    λ = view(y, (nls.meta.nlin + nls.quadcon.nquad + 1):(nls.meta.nlin + nls.quadcon.nquad + nls.nlcon.nnln))
+    λ = view(
+      y,
+      (nls.meta.nlin + nls.quadcon.nquad + 1):(nls.meta.nlin + nls.quadcon.nquad + nls.nlcon.nnln),
+    )
     MOI.eval_hessian_lagrangian_product(nls.ceval, hv, x, v, obj_weight, λ)
   end
   (nls.nls_meta.nnln == 0) && (nls.nlcon.nnln == 0) && (hv .= 0.0)
