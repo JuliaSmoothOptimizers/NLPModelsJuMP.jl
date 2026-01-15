@@ -93,6 +93,8 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
 end
 
 function NLPModels.residual!(nls::MathOptNLSModel, x::AbstractVector, Fx::AbstractVector)
+  @lencheck nls.nls_meta.nvar x
+  @lencheck nls.nls_meta.nequ Fx
   increment!(nls, :neval_residual)
   if nls.nls_meta.nlin > 0
     coo_prod!(
@@ -132,6 +134,7 @@ function NLPModels.jac_coord_residual!(
   x::AbstractVector,
   vals::AbstractVector,
 )
+  @lencheck nls.nls_meta.nvar x
   increment!(nls, :neval_jac_residual)
   if nls.nls_meta.nlin > 0
     view(vals, 1:(nls.linequ.nnzj)) .= nls.linequ.jacobian.vals
@@ -152,6 +155,7 @@ function NLPModels.jprod_residual!(
   v::AbstractVector,
   Jv::AbstractVector,
 )
+  @lencheck nls.nls_meta.nvar x
   increment!(nls, :neval_jprod_residual)
   nls.nls_meta.nlin > 0 && (Jv .= 0.0)
   if nls.nls_meta.nnln > 0
@@ -173,6 +177,7 @@ function NLPModels.jtprod_residual!(
   v::AbstractVector,
   Jtv::AbstractVector,
 )
+  @lencheck nls.nls_meta.nvar x
   increment!(nls, :neval_jtprod_residual)
   nls.nls_meta.nlin > 0 && (Jtv .= 0.0)
   if nls.nls_meta.nnln > 0
@@ -206,6 +211,7 @@ function NLPModels.hess_coord_residual!(
   v::AbstractVector,
   vals::AbstractVector,
 )
+  @lencheck nls.nls_meta.nvar x
   increment!(nls, :neval_hess_residual)
   if nls.nls_meta.nnln > 0
     MOI.eval_hessian_lagrangian(nls.Feval, vals, x, 0.0, view(v, nls.nls_meta.nln))
@@ -220,6 +226,7 @@ function NLPModels.hprod_residual!(
   v::AbstractVector,
   Hiv::AbstractVector,
 )
+  @lencheck nls.nls_meta.nvar x
   increment!(nls, :neval_hprod_residual)
   if i ∈ nls.nls_meta.lin
     Hiv .= 0.0
@@ -232,6 +239,7 @@ function NLPModels.hprod_residual!(
 end
 
 function NLPModels.obj(nls::MathOptNLSModel, x::AbstractVector)
+  @lencheck nls.nls_meta.nvar x
   increment!(nls, :neval_obj)
   obj = 0.0
   if nls.nls_meta.nnln > 0
@@ -247,6 +255,7 @@ function NLPModels.obj(nls::MathOptNLSModel, x::AbstractVector)
 end
 
 function NLPModels.grad!(nls::MathOptNLSModel, x::AbstractVector, g::AbstractVector)
+  @lencheck nls.nls_meta.nvar x
   increment!(nls, :neval_grad)
   if nls.nls_meta.nnln > 0
     MOI.eval_objective_gradient(nls.ceval, g, x)
@@ -260,12 +269,16 @@ function NLPModels.grad!(nls::MathOptNLSModel, x::AbstractVector, g::AbstractVec
 end
 
 function NLPModels.cons_lin!(nls::MathOptNLSModel, x::AbstractVector, c::AbstractVector)
+  @lencheck nls.nls_meta.nvar x
+  @lencheck nls.meta.ncon c
   increment!(nls, :neval_cons_lin)
   coo_prod!(nls.lincon.jacobian.rows, nls.lincon.jacobian.cols, nls.lincon.jacobian.vals, x, c)
   return c
 end
 
 function NLPModels.cons_nln!(nls::MathOptNLSModel, x::AbstractVector, c::AbstractVector)
+  @lencheck nls.nls_meta.nvar x
+  @lencheck nls.meta.nnln c
   increment!(nls, :neval_cons_nln)
   offset = 0
   if nls.quadcon.nquad > 0
@@ -295,6 +308,8 @@ function NLPModels.cons_nln!(nls::MathOptNLSModel, x::AbstractVector, c::Abstrac
 end
 
 function NLPModels.cons!(nls::MathOptNLSModel, x::AbstractVector, c::AbstractVector)
+  @lencheck nls.nls_meta.nvar x
+  @lencheck nls.meta.ncon c
   increment!(nls, :neval_cons)
   offset = 0
   if nls.meta.nlin > 0
@@ -423,6 +438,7 @@ function NLPModels.jac_structure!(
 end
 
 function NLPModels.jac_lin_coord!(nls::MathOptNLSModel, x::AbstractVector, vals::AbstractVector)
+  @lencheck nls.nls_meta.nvar x
   increment!(nls, :neval_jac_lin)
   index_lin = 1:(nls.lincon.nnzj)
   view(vals, index_lin) .= nls.lincon.jacobian.vals
@@ -430,6 +446,7 @@ function NLPModels.jac_lin_coord!(nls::MathOptNLSModel, x::AbstractVector, vals:
 end
 
 function NLPModels.jac_nln_coord!(nls::MathOptNLSModel, x::AbstractVector, vals::AbstractVector)
+  @lencheck nls.nls_meta.nvar x
   increment!(nls, :neval_jac_nln)
   offset = 0
   if nls.quadcon.nquad > 0

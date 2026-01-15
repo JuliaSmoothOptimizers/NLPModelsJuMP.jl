@@ -90,6 +90,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
 end
 
 function NLPModels.obj(nlp::MathOptNLPModel, x::AbstractVector)
+  @lencheck nlp.meta.nvar x
   increment!(nlp, :neval_obj)
   if nlp.obj.type == "LINEAR"
     res = dot(nlp.obj.gradient, x) + nlp.obj.constant
@@ -107,6 +108,7 @@ function NLPModels.obj(nlp::MathOptNLPModel, x::AbstractVector)
 end
 
 function NLPModels.grad!(nlp::MathOptNLPModel, x::AbstractVector, g::AbstractVector)
+  @lencheck nlp.meta.nvar x
   increment!(nlp, :neval_grad)
   if nlp.obj.type == "LINEAR"
     g .= nlp.obj.gradient
@@ -128,6 +130,8 @@ function NLPModels.cons_lin!(nlp::MathOptNLPModel, x::AbstractVector, c::Abstrac
 end
 
 function NLPModels.cons_nln!(nlp::MathOptNLPModel, x::AbstractVector, c::AbstractVector)
+  @lencheck nlp.meta.nvar x
+  @lencheck nlp.meta.nnln c
   increment!(nlp, :neval_cons_nln)
   offset = 0
   if nlp.quadcon.nquad > 0
@@ -158,6 +162,8 @@ function NLPModels.cons_nln!(nlp::MathOptNLPModel, x::AbstractVector, c::Abstrac
 end
 
 function NLPModels.cons!(nlp::MathOptNLPModel, x::AbstractVector, c::AbstractVector)
+  @lencheck nlp.meta.nvar x
+  @lencheck nlp.meta.ncon c
   increment!(nlp, :neval_cons)
   offset = 0
   if nlp.meta.nlin > 0
@@ -293,6 +299,7 @@ function NLPModels.jac_structure!(
 end
 
 function NLPModels.jac_lin_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::AbstractVector)
+  @lencheck nlp.meta.nvar x
   increment!(nlp, :neval_jac_lin)
   index_lin = 1:(nlp.lincon.nnzj)
   view(vals, index_lin) .= nlp.lincon.jacobian.vals
@@ -300,6 +307,7 @@ function NLPModels.jac_lin_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals:
 end
 
 function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::AbstractVector)
+  @lencheck nlp.meta.nvar x
   increment!(nlp, :neval_jac_nln)
   offset = 0
   if nlp.quadcon.nquad > 0
