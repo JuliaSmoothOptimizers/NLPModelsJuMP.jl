@@ -3,6 +3,7 @@ export MathOptNLPModel
 mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
   meta::NLPModelMeta{Float64, Vector{Float64}}
   eval::MOI.Nonlinear.Evaluator
+  jump_variables::Dict{String,Int}
   lincon::LinearConstraints
   quadcon::QuadraticConstraints
   nlcon::NonLinearStructure
@@ -26,13 +27,12 @@ function MathOptNLPModel(jmodel::JuMP.Model; kws...)
 end
 
 function MathOptNLPModel(moimodel::MOI.ModelLike; kws...)
-  return nlp_model(moimodel; kws...)[1]
+  return nlp_model(moimodel; kws...)
 end
 
 function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String = "Generic")
-  index_map, nvar, lvar, uvar, x0 = parser_variables(moimodel)
-  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon =
-    parser_MOI(moimodel, index_map, nvar)
+  jump_variables, variables, nvar, lvar, uvar, x0 = parser_variables(moimodel)
+  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon = parser_MOI(moimodel, variables)
 
   nlp_data = _nlp_block(moimodel)
   nlcon = parser_NL(nlp_data, hessian = hessian)
@@ -44,7 +44,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
   if nlp_data.has_objective
     obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
   else
-    obj = parser_objective_MOI(moimodel, nvar, index_map)
+    obj = parser_objective_MOI(moimodel, variables)
   end
 
   # Total counts
@@ -77,6 +77,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
   return MathOptNLPModel(
     meta,
     nlp_data.evaluator,
+    jump_variables,
     lincon,
     quadcon,
     nlcon,
@@ -85,8 +86,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     hv,
     obj,
     counters,
-  ),
-  index_map
+  )
 end
 
 function NLPModels.obj(nlp::MathOptNLPModel, x::AbstractVector)
