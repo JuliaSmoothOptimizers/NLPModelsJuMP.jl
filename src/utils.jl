@@ -452,6 +452,11 @@ function parser_MOI(moimodel, variables)
   # Number of variables
   nvar = length(variables)
 
+  # Ensure that each constraint has a valid label
+  valid_label = true
+  jump_constraints_linear = Dict{String, Int}()
+  jump_constraints_quadratic = Dict{String, Int}()
+
   # Variables associated to linear constraints
   nlin = 0
   linrows = Int[]
@@ -481,23 +486,36 @@ function parser_MOI(moimodel, variables)
     (F == VI) && continue
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
     for cidx in conindices
+      cname = MOI.get(moimodel, MOI.ConstraintName(), cidx)
       fun = MOI.get(moimodel, MOI.ConstraintFunction(), cidx)
       set = MOI.get(moimodel, MOI.ConstraintSet(), cidx)
       if typeof(fun) <: SAF
         parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
         nlin += 1
+        if valid_label && (cname != "")
+          jump_constraints_linear[cname] = nlin
+        else
+          valid_label = false
+        end
       end
       if typeof(fun) <: VAF
         parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
         nlin += set.dimension
+        valid_label = false
       end
       if typeof(fun) <: SQF
         parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
         nquad += 1
+        if valid_label && (cname != "")
+          jump_constraints_quadratic[cname] = nquad
+        else
+          valid_label = false
+        end
       end
       if typeof(fun) <: VQF
         parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
         nquad += set.dimension
+        valid_label = false
       end
     end
   end
@@ -512,15 +530,28 @@ function parser_MOI(moimodel, variables)
   end
   quadcon = QuadraticConstraints(nquad, qcons, quad_nnzj, quad_nnzh)
 
-  return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon
+  return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon, jump_constraints_linear, jump_constraints_quadratic, valid_label
 end
 
 # Affine or quadratic, nothing to do
-_nlp_model(::MOI.Nonlinear.Model, ::MOI.ModelLike, ::Type, ::Type) = false
-
-function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF}, S::Type)
+function _nlp_model(::MOI.Nonlinear.Model, ::MOI.ModelLike, ::Dict{String, Int}, ::Type, ::Type)
   has_nonlinear = false
+  valid_label = true
+  return has_nonlinear, valid_label
+end
+
+function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, jump_constraints_nonlinear::Dict{String, Int}, F::Type{SNF}, S::Type)
+  has_nonlinear = false
+  valid_label = true
+  ncon = 0
   for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
+    cname = MOI.get(src, MOI.ConstraintName(), ci)
+    ncon += 1
+    if valid_label && (cname != "")
+      jump_constraints_nonlinear[cname] = ncon
+    else
+      valid_label = false
+    end
     MOI.Nonlinear.add_constraint(
       dest,
       MOI.get(src, MOI.ConstraintFunction(), ci),
@@ -528,12 +559,14 @@ function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF},
     )
     has_nonlinear = true
   end
-  return has_nonlinear
+  return has_nonlinear, valid_label
 end
 
-function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
+function _nlp_model(model::MOI.ModelLike)
   nlp_model = MOI.Nonlinear.Model()
   has_nonlinear = false
+  valid_label = true
+  jump_constraints_nonlinear = Dict{String, Int}()
   for attr in MOI.get(model, MOI.ListOfModelAttributesSet())
     if attr isa MOI.UserDefinedFunction
       has_nonlinear = true
@@ -542,7 +575,9 @@ function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
     end
   end
   for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
-    has_nonlinear |= _nlp_model(nlp_model, model, F, S)
+    has_nonlinear_constraint, valid_label_constraint = _nlp_model(nlp_model, model, jump_constraints_nonlinear, F, S)
+    has_nonlinear |= has_nonlinear_constraint
+    valid_label = valid_label && valid_label_constraint
   end
   F = MOI.get(model, MOI.ObjectiveFunctionType())
   if F <: SNF
@@ -550,16 +585,16 @@ function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
     has_nonlinear = true
   end
   if !has_nonlinear
-    return nothing
+    return nothing, valid_label, jump_constraints_nonlinear
   end
-  return nlp_model
+  return nlp_model, valid_label, jump_constraints_nonlinear
 end
 
 function _nlp_block(model::MOI.ModelLike)
   # Old interface with `@NL...`
   nlp_data = MOI.get(model, MOI.NLPBlock())
   # New interface with `@constraint` and `@objective`
-  nlp_model = _nlp_model(model)
+  nlp_model, valid_label, jump_constraints_nonlinear = _nlp_model(model)
   vars = MOI.get(model, MOI.ListOfVariableIndices())
   if isnothing(nlp_data)
     if isnothing(nlp_model)
@@ -572,6 +607,7 @@ function _nlp_block(model::MOI.ModelLike)
       nlp_data = MOI.NLPBlockData(evaluator)
     end
   else
+    valid_label = false
     if !isnothing(nlp_model)
       error(
         "Cannot optimize a model which contains the features from " *
@@ -581,7 +617,7 @@ function _nlp_block(model::MOI.ModelLike)
       )
     end
   end
-  return nlp_data
+  return nlp_data, valid_label, jump_constraints_nonlinear
 end
 
 """

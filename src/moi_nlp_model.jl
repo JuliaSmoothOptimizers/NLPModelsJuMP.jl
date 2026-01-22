@@ -4,6 +4,7 @@ mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
   meta::NLPModelMeta{Float64, Vector{Float64}}
   eval::MOI.Nonlinear.Evaluator
   jump_variables::Dict{String,Int}
+  jump_constraints::Dict{String,Int}
   lincon::LinearConstraints
   quadcon::QuadraticConstraints
   nlcon::NonLinearStructure
@@ -32,9 +33,9 @@ end
 
 function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String = "Generic")
   jump_variables, variables, nvar, lvar, uvar, x0 = parser_variables(moimodel)
-  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon = parser_MOI(moimodel, variables)
+  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon, jump_constraints_linear, jump_constraints_quadratic, valid_label = parser_MOI(moimodel, variables)
 
-  nlp_data = _nlp_block(moimodel)
+  nlp_data, valid_label2, jump_constraints_nonlinear = _nlp_block(moimodel)
   nlcon = parser_NL(nlp_data, hessian = hessian)
   oracles = parser_oracles(moimodel)
   counters = Counters()
@@ -74,10 +75,26 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     hess_available = hessian && oracles.hessian_oracles_supported,
   )
 
+  # Label of the constraints
+  jump_constraints = Dict{String, Int}()
+  if valid_label && valid_label2 && (oracles.ncon == 0)
+    sizehint!(jump_constraints, ncon)
+    for (key, val) in jump_constraints_linear
+      jump_constraints[key] = val
+    end
+    for (key, val) in jump_constraints_quadratic
+      jump_constraints[key] = val + nlin
+    end
+    for (key, val) in jump_constraints_nonlinear
+      jump_constraints[key] = val + nlin + quadcon.nquad
+    end
+  end
+
   return MathOptNLPModel(
     meta,
     nlp_data.evaluator,
     jump_variables,
+    jump_constraints,
     lincon,
     quadcon,
     nlcon,
