@@ -94,7 +94,7 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
   end
   dest.nlp = nlp_model(src)
   dest.solver = dest.options["solver"](dest.nlp)
-  return dest
+  return MOI.Utilities.identity_index_map(src)
 end
 
 function MOI.optimize!(model::Optimizer)
