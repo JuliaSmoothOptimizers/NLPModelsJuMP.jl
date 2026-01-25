@@ -5,6 +5,8 @@ mutable struct MathOptNLSModel <: AbstractNLSModel{Float64, Vector{Float64}}
   nls_meta::NLSMeta{Float64, Vector{Float64}}
   Feval::MOI.Nonlinear.Evaluator
   ceval::MOI.Nonlinear.Evaluator
+  jump_variables::Dict{String,Int}
+  jump_constraints::Dict{String,Int}
   lls::Objective
   linequ::LinearEquations
   nlequ::NonLinearStructure
@@ -26,17 +28,16 @@ Construct a `MathOptNLSModel` from a `JuMP` model and a container of JuMP
 """
 function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::String = "Generic")
   moimodel = backend(cmodel)
-  index_map, nvar, lvar, uvar, x0 = parser_variables(moimodel)
+  jump_variables, variables, nvar, lvar, uvar, x0 = parser_variables(moimodel)
 
-  lls, linequ, nlinequ = parser_linear_expression(cmodel, nvar, index_map, F)
-  Feval, nlequ, nnlnequ = parser_nonlinear_expression(cmodel, nvar, F, hessian = hessian)
+  lls, linequ, nlinequ = parser_linear_expression(cmodel, variables, F)
+  Feval, nlequ, nnlnequ = parser_nonlinear_expression(cmodel, variables, F, hessian = hessian)
 
   _nlp_sync!(cmodel)
   moimodel = backend(cmodel)
-  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon =
-    parser_MOI(moimodel, index_map, nvar)
+  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon, jump_constraints_linear, jump_constraints_quadratic, valid_label = parser_MOI(moimodel, variables)
 
-  nlp_data = _nlp_block(moimodel)
+  nlp_data, valid_label2, jump_constraints_nonlinear = _nlp_block(moimodel)
   nlcon = parser_NL(nlp_data, hessian = hessian)
   oracles = parser_oracles(moimodel)
   nls_counters = NLSCounters()
@@ -75,11 +76,28 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
 
   nls_meta = NLSMeta(nequ, nvar, nnzj = Fnnzj, nnzh = Fnnzh, lin = collect(1:nlinequ))
 
+  # Label of the constraints
+  jump_constraints = Dict{String, Int}()
+  if valid_label && valid_label2 && (oracles.ncon == 0)
+    sizehint!(jump_constraints, ncon)
+    for (key, val) in jump_constraints_linear
+      jump_constraints[key] = val
+    end
+    for (key, val) in jump_constraints_quadratic
+      jump_constraints[key] = val + nlin
+    end
+    for (key, val) in jump_constraints_nonlinear
+      jump_constraints[key] = val + nlin + quadcon.nquad
+    end
+  end
+
   return MathOptNLSModel(
     meta,
     nls_meta,
     Feval,
     nlp_data.evaluator,
+    jump_variables,
+    jump_constraints,
     lls,
     linequ,
     nlequ,

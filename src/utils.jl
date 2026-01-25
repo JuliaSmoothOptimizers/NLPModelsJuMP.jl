@@ -252,13 +252,13 @@ function coo_sym_dot(
 end
 
 """
-    parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
+    parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
 
 Parse a `ScalarAffineFunction` fun with its associated set.
 `linrows`, `lincols`, `linvals`, `lin_lcon` and `lin_ucon` are updated.
 """
-function parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
-  _index(v::MOI.VariableIndex) = index_map[v].value
+function parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
+  _index(v::MOI.VariableIndex) = v.value
 
   # Parse a ScalarAffineTerm{Float64}(coefficient, variable)
   for term in fun.terms
@@ -285,13 +285,13 @@ function parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_uco
 end
 
 """
-    parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
+    parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
 
 Parse a `VectorAffineFunction` fun with its associated set.
 `linrows`, `lincols`, `linvals`, `lin_lcon` and `lin_ucon` are updated.
 """
-function parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
-  _index(v::MOI.VariableIndex) = index_map[v].value
+function parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
+  _index(v::MOI.VariableIndex) = v.value
 
   # Parse a VectorAffineTerm{Float64}(output_index, scalar_term)
   for term in fun.terms
@@ -314,13 +314,13 @@ function parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_uco
 end
 
 """
-    parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
+    parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
 
 Parse a `ScalarQuadraticFunction` fun with its associated set.
 `qcons`, `quad_lcon`, `quad_ucon` are updated.
 """
-function parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
-  _index(v::MOI.VariableIndex) = index_map[v].value
+function parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
+  _index(v::MOI.VariableIndex) = v.value
 
   b = spzeros(Float64, nvar)
   rows = Int[]
@@ -376,13 +376,13 @@ function parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
 end
 
 """
-    parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
+    parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
 
 Parse a `VectorQuadraticFunction` fun with its associated set.
 `qcons`, `quad_lcon`, `quad_ucon` are updated.
 """
-function parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
-  _index(v::MOI.VariableIndex) = index_map[v].value
+function parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
+  _index(v::MOI.VariableIndex) = v.value
 
   ncon = length(fun.constants)
   for k = 1:ncon
@@ -443,11 +443,19 @@ function parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
 end
 
 """
-    parser_MOI(moimodel, index_map, nvar)
+    parser_MOI(moimodel, variables)
 
 Parse linear constraints of a `MOI.ModelLike`.
 """
-function parser_MOI(moimodel, index_map, nvar)
+function parser_MOI(moimodel, variables)
+
+  # Number of variables
+  nvar = length(variables)
+
+  # Ensure that each constraint has a valid label
+  valid_label = true
+  jump_constraints_linear = Dict{String, Int}()
+  jump_constraints_quadratic = Dict{String, Int}()
 
   # Variables associated to linear constraints
   nlin = 0
@@ -475,31 +483,39 @@ function parser_MOI(moimodel, index_map, nvar)
     F <: AF || F <: QF || F == SNF || F == VI || error("Function $F is not supported.")
     S <: LS || error("Set $S is not supported.")
 
+    (F == VI) && continue
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
     for cidx in conindices
+      cname = MOI.get(moimodel, MOI.ConstraintName(), cidx)
       fun = MOI.get(moimodel, MOI.ConstraintFunction(), cidx)
-      if F == VI
-        index_map[cidx] = MOI.ConstraintIndex{F, S}(fun.value)
-        continue
-      else
-        index_map[cidx] = MOI.ConstraintIndex{F, S}(nlin)
-      end
       set = MOI.get(moimodel, MOI.ConstraintSet(), cidx)
       if typeof(fun) <: SAF
-        parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
+        parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
         nlin += 1
+        if valid_label && (cname != "")
+          jump_constraints_linear[cname] = nlin
+        else
+          valid_label = false
+        end
       end
       if typeof(fun) <: VAF
-        parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
+        parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
         nlin += set.dimension
+        valid_label = false
       end
       if typeof(fun) <: SQF
-        parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
+        parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
         nquad += 1
+        if valid_label && (cname != "")
+          jump_constraints_quadratic[cname] = nquad
+        else
+          valid_label = false
+        end
       end
       if typeof(fun) <: VQF
-        parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
+        parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
         nquad += set.dimension
+        valid_label = false
       end
     end
   end
@@ -514,15 +530,28 @@ function parser_MOI(moimodel, index_map, nvar)
   end
   quadcon = QuadraticConstraints(nquad, qcons, quad_nnzj, quad_nnzh)
 
-  return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon
+  return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon, jump_constraints_linear, jump_constraints_quadratic, valid_label
 end
 
 # Affine or quadratic, nothing to do
-_nlp_model(::MOI.Nonlinear.Model, ::MOI.ModelLike, ::Type, ::Type) = false
-
-function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF}, S::Type)
+function _nlp_model(::MOI.Nonlinear.Model, ::MOI.ModelLike, ::Dict{String, Int}, ::Type, ::Type)
   has_nonlinear = false
+  valid_label = true
+  return has_nonlinear, valid_label
+end
+
+function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, jump_constraints_nonlinear::Dict{String, Int}, F::Type{SNF}, S::Type)
+  has_nonlinear = false
+  valid_label = true
+  ncon = 0
   for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
+    cname = MOI.get(src, MOI.ConstraintName(), ci)
+    ncon += 1
+    if valid_label && (cname != "")
+      jump_constraints_nonlinear[cname] = ncon
+    else
+      valid_label = false
+    end
     MOI.Nonlinear.add_constraint(
       dest,
       MOI.get(src, MOI.ConstraintFunction(), ci),
@@ -530,12 +559,14 @@ function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF},
     )
     has_nonlinear = true
   end
-  return has_nonlinear
+  return has_nonlinear, valid_label
 end
 
-function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
+function _nlp_model(model::MOI.ModelLike)
   nlp_model = MOI.Nonlinear.Model()
   has_nonlinear = false
+  valid_label = true
+  jump_constraints_nonlinear = Dict{String, Int}()
   for attr in MOI.get(model, MOI.ListOfModelAttributesSet())
     if attr isa MOI.UserDefinedFunction
       has_nonlinear = true
@@ -544,7 +575,9 @@ function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
     end
   end
   for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
-    has_nonlinear |= _nlp_model(nlp_model, model, F, S)
+    has_nonlinear_constraint, valid_label_constraint = _nlp_model(nlp_model, model, jump_constraints_nonlinear, F, S)
+    has_nonlinear |= has_nonlinear_constraint
+    valid_label = valid_label && valid_label_constraint
   end
   F = MOI.get(model, MOI.ObjectiveFunctionType())
   if F <: SNF
@@ -552,16 +585,16 @@ function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
     has_nonlinear = true
   end
   if !has_nonlinear
-    return nothing
+    return nothing, valid_label, jump_constraints_nonlinear
   end
-  return nlp_model
+  return nlp_model, valid_label, jump_constraints_nonlinear
 end
 
 function _nlp_block(model::MOI.ModelLike)
   # Old interface with `@NL...`
   nlp_data = MOI.get(model, MOI.NLPBlock())
   # New interface with `@constraint` and `@objective`
-  nlp_model = _nlp_model(model)
+  nlp_model, valid_label, jump_constraints_nonlinear = _nlp_model(model)
   vars = MOI.get(model, MOI.ListOfVariableIndices())
   if isnothing(nlp_data)
     if isnothing(nlp_model)
@@ -574,6 +607,7 @@ function _nlp_block(model::MOI.ModelLike)
       nlp_data = MOI.NLPBlockData(evaluator)
     end
   else
+    valid_label = false
     if !isnothing(nlp_model)
       error(
         "Cannot optimize a model which contains the features from " *
@@ -583,7 +617,7 @@ function _nlp_block(model::MOI.ModelLike)
       )
     end
   end
-  return nlp_data
+  return nlp_data, valid_label, jump_constraints_nonlinear
 end
 
 """
@@ -633,7 +667,7 @@ function parser_oracles(moimodel)
     MOI.ListOfConstraintIndices{MOI.VectorOfVariables, MOI.VectorNonlinearOracle{Float64}}(),
   )
     f = MOI.get(moimodel, MOI.ConstraintFunction(), ci)  # ::MOI.VectorOfVariables
-    set = MOI.get(moimodel, MOI.ConstraintSet(), ci)       # ::MOI.VectorNonlinearOracle{Float64}
+    set = MOI.get(moimodel, MOI.ConstraintSet(), ci)     # ::MOI.VectorNonlinearOracle{Float64}
 
     cache = _VectorNonlinearOracleCache(set)
     push!(oracles, (f, cache))
@@ -668,20 +702,23 @@ Parse variables informations of a `MOI.ModelLike`.
 """
 function parser_variables(model::MOI.ModelLike)
   # Number of variables and bounds constraints
-  vars = MOI.get(model, MOI.ListOfVariableIndices())
-  nvar = length(vars)
+  variables = MOI.get(model, MOI.ListOfVariableIndices())
+  nvar = length(variables)
   lvar = zeros(nvar)
   uvar = zeros(nvar)
+
   # Initial solution
   x0 = zeros(nvar)
   has_start = MOI.VariablePrimalStart() in MOI.get(model, MOI.ListOfVariableAttributesSet())
 
-  index_map = MOI.Utilities.IndexMap()
-  for (i, vi) in enumerate(vars)
-    index_map[vi] = MOI.VariableIndex(i)
-  end
+  jump_variables = Dict{String,Int}()
+  sizehint!(jump_variables, nvar)
 
-  for (i, vi) in enumerate(vars)
+  for vi in variables
+    i = vi.value
+    name = MOI.get(model, MOI.VariableName(), vi)
+    jump_variables[name] = i
+
     lvar[i], uvar[i] = MOI.Utilities.get_bounds(model, Float64, vi)
     if has_start
       val = MOI.get(model, MOI.VariablePrimalStart(), vi)
@@ -691,16 +728,19 @@ function parser_variables(model::MOI.ModelLike)
     end
   end
 
-  return index_map, nvar, lvar, uvar, x0
+  return jump_variables, variables, nvar, lvar, uvar, x0
 end
 
 """
-    parser_objective_MOI(moimodel, nvar, index_map)
+    parser_objective_MOI(moimodel, variables)
 
 Parse linear and quadratic objective of a `MOI.ModelLike`.
 """
-function parser_objective_MOI(moimodel, nvar, index_map)
-  _index(v::MOI.VariableIndex) = index_map[v].value
+function parser_objective_MOI(moimodel, variables)
+  _index(v::MOI.VariableIndex) = v.value
+
+  # Number of variables
+  nvar = length(variables)
 
   # Variables associated to linear and quadratic objective
   type = "UNKNOWN"
@@ -751,11 +791,14 @@ function parser_objective_MOI(moimodel, nvar, index_map)
 end
 
 """
-    parser_linear_expression(cmodel, nvar, index_map, F)
+    parser_linear_expression(cmodel, variables, F)
 
 Parse linear expressions of type `VariableRef` and `GenericAffExpr{Float64,VariableRef}`.
 """
-function parser_linear_expression(cmodel, nvar, index_map, F)
+function parser_linear_expression(cmodel, variables, F)
+
+  # Number of variables
+  nvar = length(variables)
 
   # Variables associated to linear expressions
   rows = Int[]
@@ -810,7 +853,7 @@ function parser_linear_expression(cmodel, nvar, index_map, F)
     end
   end
   moimodel = backend(cmodel)
-  lls = parser_objective_MOI(moimodel, nvar, index_map)
+  lls = parser_objective_MOI(moimodel, variables)
   return lls, LinearEquations(COO(rows, cols, vals), constants, length(vals)), nlinequ
 end
 
@@ -844,11 +887,14 @@ function add_constraint_model(Fmodel, Fi::AbstractArray)
 end
 
 """
-    parser_nonlinear_expression(cmodel, nvar, F; hessian)
+    parser_nonlinear_expression(cmodel, variables, F; hessian)
 
 Parse nonlinear expressions of type `NonlinearExpression`.
 """
-function parser_nonlinear_expression(cmodel, nvar, F; hessian::Bool = true)
+function parser_nonlinear_expression(cmodel, variables, F; hessian::Bool = true)
+
+  # Number of variables
+  nvar = length(variables)
 
   # Nonlinear least squares model
   F_is_array_of_containers = F isa Array{<:AbstractArray}

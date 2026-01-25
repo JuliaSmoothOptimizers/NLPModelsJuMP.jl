@@ -92,9 +92,9 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
       "No solver specified, use for instance `using Percival; JuMP.set_attribute(model, \"solver\", PercivalSolver)`",
     )
   end
-  dest.nlp, index_map = nlp_model(src)
+  dest.nlp = nlp_model(src)
   dest.solver = dest.options["solver"](dest.nlp)
-  return index_map
+  return MOI.Utilities.identity_index_map(src)
 end
 
 function MOI.optimize!(model::Optimizer)
