@@ -533,7 +533,7 @@ function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF},
   return has_nonlinear
 end
 
-function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
+function _nlp_model(model::MOI.ModelLike)
   nlp_model = MOI.Nonlinear.Model()
   has_nonlinear = false
   for attr in MOI.get(model, MOI.ListOfModelAttributesSet())
@@ -550,6 +550,11 @@ function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
   if F <: SNF
     MOI.Nonlinear.set_objective(nlp_model, MOI.get(model, MOI.ObjectiveFunction{F}()))
     has_nonlinear = true
+  elseif F <: MOI.AbstractVectorFunction
+    # ArrayNonlinearFunction or similar: return the function directly.
+    # The ad_backend from the model will build the evaluator.
+    func = MOI.get(model, MOI.ObjectiveFunction{F}())
+    return func
   end
   if !has_nonlinear
     return nothing
@@ -557,9 +562,23 @@ function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
   return nlp_model
 end
 
-function _nlp_block(model::MOI.ModelLike)
+function _get_ad_backend(model::MOI.ModelLike)
+  if MOI.supports(model, MOI.AutomaticDifferentiationBackend())
+    return MOI.get(model, MOI.AutomaticDifferentiationBackend())
+  end
+  return MOI.Nonlinear.SparseReverseMode()
+end
+
+function _nlp_block(
+  model::MOI.ModelLike,
+  ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation = _get_ad_backend(model),
+)
   # Old interface with `@NL...`
-  nlp_data = MOI.get(model, MOI.NLPBlock())
+  nlp_data = if MOI.NLPBlock() in MOI.get(model, MOI.ListOfModelAttributesSet())
+    MOI.get(model, MOI.NLPBlock())
+  else
+    nothing
+  end
   # New interface with `@constraint` and `@objective`
   nlp_model = _nlp_model(model)
   vars = MOI.get(model, MOI.ListOfVariableIndices())
@@ -569,8 +588,7 @@ function _nlp_block(model::MOI.ModelLike)
         MOI.Nonlinear.Evaluator(MOI.Nonlinear.Model(), MOI.Nonlinear.SparseReverseMode(), vars)
       nlp_data = MOI.NLPBlockData(evaluator)
     else
-      backend = MOI.Nonlinear.SparseReverseMode()
-      evaluator = MOI.Nonlinear.Evaluator(nlp_model, backend, vars)
+      evaluator = MOI.Nonlinear.Evaluator(nlp_model, ad_backend, vars)
       nlp_data = MOI.NLPBlockData(evaluator)
     end
   else
