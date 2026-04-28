@@ -257,8 +257,8 @@ end
 Parse a `ScalarAffineFunction` fun with its associated set.
 `linrows`, `lincols`, `linvals`, `lin_lcon` and `lin_ucon` are updated.
 """
-function parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
-  _index(v::MOI.VariableIndex) = v.value
+function parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
+  _index(v::MOI.VariableIndex) = index_map[v].value
 
   # Parse a ScalarAffineTerm{Float64}(coefficient, variable)
   for term in fun.terms
@@ -290,8 +290,8 @@ end
 Parse a `VectorAffineFunction` fun with its associated set.
 `linrows`, `lincols`, `linvals`, `lin_lcon` and `lin_ucon` are updated.
 """
-function parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
-  _index(v::MOI.VariableIndex) = v.value
+function parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
+  _index(v::MOI.VariableIndex) = index_map[v].value
 
   # Parse a VectorAffineTerm{Float64}(output_index, scalar_term)
   for term in fun.terms
@@ -319,8 +319,8 @@ end
 Parse a `ScalarQuadraticFunction` fun with its associated set.
 `qcons`, `quad_lcon`, `quad_ucon` are updated.
 """
-function parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
-  _index(v::MOI.VariableIndex) = v.value
+function parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
+  _index(v::MOI.VariableIndex) = index_map[v].value
 
   b = spzeros(Float64, nvar)
   rows = Int[]
@@ -381,8 +381,8 @@ end
 Parse a `VectorQuadraticFunction` fun with its associated set.
 `qcons`, `quad_lcon`, `quad_ucon` are updated.
 """
-function parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
-  _index(v::MOI.VariableIndex) = v.value
+function parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
+  _index(v::MOI.VariableIndex) = index_map[v].value
 
   ncon = length(fun.constants)
   for k = 1:ncon
@@ -447,7 +447,7 @@ end
 
 Parse linear constraints of a `MOI.ModelLike`.
 """
-function parser_MOI(moimodel, variables)
+function parser_MOI(moimodel, variables, index_map)
 
   # Number of variables
   nvar = length(variables)
@@ -490,7 +490,7 @@ function parser_MOI(moimodel, variables)
       fun = MOI.get(moimodel, MOI.ConstraintFunction(), cidx)
       set = MOI.get(moimodel, MOI.ConstraintSet(), cidx)
       if typeof(fun) <: SAF
-        parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
+        parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
         nlin += 1
         if valid_label && (cname != "")
           jump_constraints_linear[cname] = nlin
@@ -499,12 +499,12 @@ function parser_MOI(moimodel, variables)
         end
       end
       if typeof(fun) <: VAF
-        parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon)
+        parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
         nlin += set.dimension
         valid_label = false
       end
       if typeof(fun) <: SQF
-        parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
+        parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
         nquad += 1
         if valid_label && (cname != "")
           jump_constraints_quadratic[cname] = nquad
@@ -513,7 +513,7 @@ function parser_MOI(moimodel, variables)
         end
       end
       if typeof(fun) <: VQF
-        parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon)
+        parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
         nquad += set.dimension
         valid_label = false
       end
@@ -714,21 +714,24 @@ function parser_variables(model::MOI.ModelLike)
   jump_variables = Dict{String,Int}()
   sizehint!(jump_variables, nvar)
 
-  for vi in variables
-    i = vi.value
+  # Build an IndexMap from source MOI.VariableIndex to contiguous 1:n.
+  # After variable deletion, vi.value may not be contiguous.
+  index_map = MOI.Utilities.IndexMap()
+  for (idx, vi) in enumerate(variables)
+    index_map[vi] = MOI.VariableIndex(idx)
     name = MOI.get(model, MOI.VariableName(), vi)
-    jump_variables[name] = i
+    jump_variables[name] = idx
 
-    lvar[i], uvar[i] = MOI.Utilities.get_bounds(model, Float64, vi)
+    lvar[idx], uvar[idx] = MOI.Utilities.get_bounds(model, Float64, vi)
     if has_start
       val = MOI.get(model, MOI.VariablePrimalStart(), vi)
       if val !== nothing
-        x0[i] = val
+        x0[idx] = val
       end
     end
   end
 
-  return jump_variables, variables, nvar, lvar, uvar, x0
+  return jump_variables, variables, nvar, lvar, uvar, x0, index_map
 end
 
 """
@@ -736,8 +739,8 @@ end
 
 Parse linear and quadratic objective of a `MOI.ModelLike`.
 """
-function parser_objective_MOI(moimodel, variables)
-  _index(v::MOI.VariableIndex) = v.value
+function parser_objective_MOI(moimodel, variables, index_map)
+  _index(v::MOI.VariableIndex) = index_map[v].value
 
   # Number of variables
   nvar = length(variables)
@@ -853,7 +856,11 @@ function parser_linear_expression(cmodel, variables, F)
     end
   end
   moimodel = backend(cmodel)
-  lls = parser_objective_MOI(moimodel, variables)
+  index_map = MOI.Utilities.IndexMap()
+  for (idx, vi) in enumerate(variables)
+    index_map[vi] = MOI.VariableIndex(idx)
+  end
+  lls = parser_objective_MOI(moimodel, variables, index_map)
   return lls, LinearEquations(COO(rows, cols, vals), constants, length(vals)), nlinequ
 end
 

@@ -28,14 +28,14 @@ Construct a `MathOptNLSModel` from a `JuMP` model and a container of JuMP
 """
 function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::String = "Generic")
   moimodel = backend(cmodel)
-  jump_variables, variables, nvar, lvar, uvar, x0 = parser_variables(moimodel)
+  jump_variables, variables, nvar, lvar, uvar, x0, index_map = parser_variables(moimodel)
 
   lls, linequ, nlinequ = parser_linear_expression(cmodel, variables, F)
   Feval, nlequ, nnlnequ = parser_nonlinear_expression(cmodel, variables, F, hessian = hessian)
 
   _nlp_sync!(cmodel)
   moimodel = backend(cmodel)
-  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon, jump_constraints_linear, jump_constraints_quadratic, valid_label = parser_MOI(moimodel, variables)
+  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon, jump_constraints_linear, jump_constraints_quadratic, valid_label = parser_MOI(moimodel, variables, index_map)
 
   nlp_data, valid_label2, jump_constraints_nonlinear = _nlp_block(moimodel)
   nlcon = parser_NL(nlp_data, hessian = hessian)

@@ -28,12 +28,13 @@ function MathOptNLPModel(jmodel::JuMP.Model; kws...)
 end
 
 function MathOptNLPModel(moimodel::MOI.ModelLike; kws...)
-  return nlp_model(moimodel; kws...)
+  nlp, _ = nlp_model(moimodel; kws...)
+  return nlp
 end
 
 function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String = "Generic")
-  jump_variables, variables, nvar, lvar, uvar, x0 = parser_variables(moimodel)
-  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon, jump_constraints_linear, jump_constraints_quadratic, valid_label = parser_MOI(moimodel, variables)
+  jump_variables, variables, nvar, lvar, uvar, x0, index_map = parser_variables(moimodel)
+  nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon, jump_constraints_linear, jump_constraints_quadratic, valid_label = parser_MOI(moimodel, variables, index_map)
 
   nlp_data, valid_label2, jump_constraints_nonlinear = _nlp_block(moimodel)
   nlcon = parser_NL(nlp_data, hessian = hessian)
@@ -45,7 +46,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
   if nlp_data.has_objective
     obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
   else
-    obj = parser_objective_MOI(moimodel, variables)
+    obj = parser_objective_MOI(moimodel, variables, index_map)
   end
 
   # Total counts
@@ -90,7 +91,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     end
   end
 
-  return MathOptNLPModel(
+  nlp = MathOptNLPModel(
     meta,
     nlp_data.evaluator,
     jump_variables,
@@ -104,6 +105,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     obj,
     counters,
   )
+  return nlp, index_map
 end
 
 function NLPModels.obj(nlp::MathOptNLPModel, x::AbstractVector)
