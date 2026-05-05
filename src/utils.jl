@@ -535,6 +535,46 @@ end
 
 _nonlinear_model(::MOI.Nonlinear.AbstractAutomaticDifferentiation) = MOI.Nonlinear.Model()
 
+"""
+    _detect_squared_residual(inner)
+
+Hook for AD extensions: given the `inner` function under a `:sum` root
+(i.e., the `?` in `sum(?)`), return the residual whose square sum is being
+minimized — typically the first argument of a broadcast `:^` with exponent 2.
+
+Default returns `nothing` (no NLS routing). Extensions for AD backends that
+carry vector-function types (e.g. `ArrayDiff.Mode`) override this.
+"""
+_detect_squared_residual(::Any) = nothing
+
+"""
+    _build_nls_from_residual(moimodel, residual, ad_backend)
+
+Hook for AD extensions: build an `AbstractNLSModel` that evaluates the given
+`residual` (a vector function) using `ad_backend`. Default returns `nothing`,
+which makes the optimizer fall back to `MathOptNLPModel`.
+"""
+_build_nls_from_residual(::Any, ::Any, ::MOI.Nonlinear.AbstractAutomaticDifferentiation) = nothing
+
+function _try_nls_model(
+  moimodel::MOI.ModelLike,
+  ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation,
+)
+  F = MOI.get(moimodel, MOI.ObjectiveFunctionType())
+  if !(F <: SNF)
+    return nothing
+  end
+  obj = MOI.get(moimodel, MOI.ObjectiveFunction{F}())
+  if obj.head !== :sum || length(obj.args) != 1
+    return nothing
+  end
+  residual = _detect_squared_residual(obj.args[1])
+  if residual === nothing
+    return nothing
+  end
+  return _build_nls_from_residual(moimodel, residual, ad_backend)
+end
+
 function _nlp_model(model::MOI.ModelLike, ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation)
   nlp_model = _nonlinear_model(ad_backend)
   has_nonlinear = false
