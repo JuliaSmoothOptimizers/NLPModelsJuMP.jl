@@ -533,8 +533,10 @@ function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF},
   return has_nonlinear
 end
 
-function _nlp_model(model::MOI.ModelLike)
-  nlp_model = MOI.Nonlinear.Model()
+_nonlinear_model(::MOI.Nonlinear.AbstractAutomaticDifferentiation) = MOI.Nonlinear.Model()
+
+function _nlp_model(model::MOI.ModelLike, ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation)
+  nlp_model = _nonlinear_model(ad_backend)
   has_nonlinear = false
   for attr in MOI.get(model, MOI.ListOfModelAttributesSet())
     if attr isa MOI.UserDefinedFunction
@@ -580,7 +582,7 @@ function _nlp_block(
     nothing
   end
   # New interface with `@constraint` and `@objective`
-  nlp_model = _nlp_model(model)
+  nlp_model = _nlp_model(model, ad_backend)
   vars = MOI.get(model, MOI.ListOfVariableIndices())
   if isnothing(nlp_data)
     if isnothing(nlp_model)
