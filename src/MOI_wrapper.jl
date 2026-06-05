@@ -4,7 +4,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
   options::Dict{String, Any}
   silent::Bool
   solver
-  nlp::Union{Nothing, MathOptNLPModel}
+  nlp::Union{Nothing, AbstractNLPModel{Float64, Vector{Float64}}}
   stats::Union{
     Nothing,
     SolverCore.GenericExecutionStats{Float64, Vector{Float64}, Vector{Float64}, Any},
@@ -92,7 +92,11 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
       "No solver specified, use for instance `using Percival; JuMP.set_attribute(model, \"solver\", PercivalSolver)`",
     )
   end
-  dest.nlp, index_map = nlp_model(src)
+  if is_qp_model(src)
+    dest.nlp, index_map = qp_model(src)
+  else
+    dest.nlp, index_map = nlp_model(src)
+  end
   dest.solver = dest.options["solver"](dest.nlp)
   return index_map
 end
