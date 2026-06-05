@@ -6,10 +6,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
   ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation
   solver
   nlp::Union{Nothing, AbstractNLPModel}
-  stats::Union{
-    Nothing,
-    SolverCore.GenericExecutionStats{Float64, Vector{Float64}, Vector{Float64}, Any},
-  }
+  stats::Union{Nothing, SolverCore.GenericExecutionStats}
   function Optimizer()
     return new(
       Dict{String, Any}(),
