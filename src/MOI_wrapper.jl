@@ -14,8 +14,16 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
   end
 end
 
-# FIXME return the name of the underlying NLPModel solver
-MOI.get(::Optimizer, ::MOI.SolverName) = "NLPModels"
+function MOI.get(optimizer::Optimizer, ::MOI.SolverName)
+  inner = if optimizer.solver !== nothing
+    string(nameof(typeof(optimizer.solver)))
+  elseif haskey(optimizer.options, "solver")
+    string(nameof(optimizer.options["solver"]))
+  else
+    "unspecified solver"
+  end
+  return "NLPModels with $inner"
+end
 
 MOI.is_empty(optimizer::Optimizer) = isnothing(optimizer.solver) && isnothing(optimizer.nlp)
 
