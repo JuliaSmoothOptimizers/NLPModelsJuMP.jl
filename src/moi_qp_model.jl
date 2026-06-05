@@ -25,11 +25,11 @@ const QPOptimizerCache = MOI.Utilities.GenericModel{
 """
     is_qp_model(moimodel::MOI.ModelLike)
 
-Return `true` if `moimodel` contains no `ScalarNonlinearFunction`, no
-`VectorNonlinearFunction`, no `VectorNonlinearOracle`, no `NLPBlock`, no
-quadratic constraints, no user-defined nonlinear functions and a linear or
-quadratic objective. Such a model can be represented as a
-`QuadraticModels.QuadraticModel`.
+Return `true` if `moimodel` can be represented as a
+`QuadraticModels.QuadraticModel`: no `NLPBlock`, no user-defined nonlinear
+functions, a linear or quadratic objective, and constraints restricted to
+`VariableIndex` and `ScalarAffineFunction` in scalar linear sets (`EqualTo`,
+`GreaterThan`, `LessThan`, `Interval`).
 """
 function is_qp_model(model::MOI.ModelLike)
   nlp_block = MOI.get(model, MOI.NLPBlock())
@@ -47,13 +47,11 @@ function is_qp_model(model::MOI.ModelLike)
     return false
   end
   for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
-    if F == SNF || F == VNF
-      return false
-    end
-    if F <: Union{SQF, VQF}
-      return false
-    end
-    if F == MOI.VectorOfVariables && S <: MOI.VectorNonlinearOracle{Float64}
+    if F == MOI.VariableIndex
+      S <: ALS || return false
+    elseif F == SAF
+      S <: ALS || return false
+    else
       return false
     end
   end
