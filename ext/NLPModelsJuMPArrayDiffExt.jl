@@ -23,26 +23,31 @@ function NLPModelsJuMP._detect_squared_residual(inner::ArrayDiff.ArrayNonlinearF
     return inner.args[1]
 end
 
-mutable struct ArrayDiffNLSModel{R} <: NLPModels.AbstractNLSModel{Float64, Vector{Float64}}
-    meta::NLPModels.NLPModelMeta{Float64, Vector{Float64}}
-    nls_meta::NLPModels.NLSMeta{Float64, Vector{Float64}}
+mutable struct ArrayDiffNLSModel{T, V <: AbstractVector{T}, R} <: NLPModels.AbstractNLSModel{T, V}
+    meta::NLPModels.NLPModelMeta{T, V}
+    nls_meta::NLPModels.NLSMeta{T, V}
     counters::NLPModels.NLSCounters
-    evaluator::ArrayDiff.Evaluator{Float64, R}
+    evaluator::ArrayDiff.Evaluator{T, R}
 end
 
 function NLPModelsJuMP._build_nls_from_residual(
     moimodel::MOI.ModelLike,
     residual::ArrayDiff.ArrayNonlinearFunction,
-    ad::ArrayDiff.Mode,
-)
+    ad::ArrayDiff.Mode{S},
+) where {S <: AbstractVector{<:Real}}
+    T = eltype(S)
+    V = S
     _, nvar, lvar, uvar, x0 = NLPModelsJuMP.parser_variables(moimodel)
+    lvar = convert(V, lvar)
+    uvar = convert(V, uvar)
+    x0 = convert(V, x0)
     model = ArrayDiff.model(ad)
     ArrayDiff.set_residual!(model, residual)
     vars = MOI.get(moimodel, MOI.ListOfVariableIndices())
     evaluator = MOI.Nonlinear.Evaluator(model, ad, vars)
     MOI.initialize(evaluator, [:Grad, :Jac, :JacVec])
     nresid = ArrayDiff.residual_dimension(evaluator)
-    meta = NLPModels.NLPModelMeta(
+    meta = NLPModels.NLPModelMeta{T, V}(
         nvar;
         x0 = x0,
         lvar = lvar,
@@ -53,7 +58,7 @@ function NLPModelsJuMP._build_nls_from_residual(
         hprod_available = false,
         hess_available = false,
     )
-    nls_meta = NLPModels.NLSMeta{Float64, Vector{Float64}}(
+    nls_meta = NLPModels.NLSMeta{T, V}(
         nresid,
         nvar;
         x0 = x0,
