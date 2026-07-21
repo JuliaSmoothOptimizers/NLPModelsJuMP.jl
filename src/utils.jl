@@ -600,15 +600,28 @@ function parser_NL(nlp_data; hessian::Bool = true)
   nl_ucon = Float64[bounds.upper for bounds in nlp_data.constraint_bounds]
 
   eval = nlp_data.evaluator
-  MOI.initialize(eval, hessian ? [:Grad, :Jac, :JacVec, :Hess, :HessVec] : [:Grad, :Jac, :JacVec])
+  has_hessian = hessian && :Hess in MOI.features_available(eval)
+  # Check features available in model
+  init_feat = [:Grad, :Jac]
+  if has_hessian
+    push!(init_feat, :Hess)
+  end
+  if :JacVec in MOI.features_available(eval)
+    push!(init_feat, :JacVec)
+  end
+  if :HessVec in MOI.features_available(eval)
+    push!(init_feat, :HessVec)
+  end
+
+  MOI.initialize(eval, init_feat)
 
   jac = MOI.jacobian_structure(eval)
   jac_rows, jac_cols = getindex.(jac, 1), getindex.(jac, 2)
   nnzj = length(jac)
 
-  hess = hessian ? MOI.hessian_lagrangian_structure(eval) : Tuple{Int, Int}[]
-  hess_rows = hessian ? getindex.(hess, 1) : Int[]
-  hess_cols = hessian ? getindex.(hess, 2) : Int[]
+  hess = has_hessian ? MOI.hessian_lagrangian_structure(eval) : Tuple{Int, Int}[]
+  hess_rows = has_hessian ? getindex.(hess, 1) : Int[]
+  hess_cols = has_hessian ? getindex.(hess, 2) : Int[]
   nnzh = length(hess)
   nlcon =
     NonLinearStructure(nnln, nl_lcon, nl_ucon, jac_rows, jac_cols, nnzj, hess_rows, hess_cols, nnzh)

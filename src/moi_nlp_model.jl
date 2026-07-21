@@ -2,7 +2,7 @@ export MathOptNLPModel
 
 mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
   meta::NLPModelMeta{Float64, Vector{Float64}}
-  eval::MOI.Nonlinear.Evaluator
+  eval::MOI.AbstractNLPEvaluator
   lincon::LinearConstraints
   quadcon::QuadraticConstraints
   nlcon::NonLinearStructure
@@ -73,6 +73,7 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     hprod_available = hessian && oracles.hessian_oracles_supported,
     hess_available = hessian && oracles.hessian_oracles_supported,
   )
+
 
   return MathOptNLPModel(
     meta,
