@@ -23,7 +23,7 @@ Let's define the famous Rosenbrock function
 ```math
 f(x) = (x_1 - 1)^2 + 100(x_2 - x_1^2)^2,
 ```
-with starting point ``x^0 = (-1.2,1.0)``.
+with starting point ``x_0 = (-1.2, 1.0)``.
 
 ```@example jumpnlp
 using NLPModels, NLPModelsJuMP, JuMP
@@ -31,7 +31,7 @@ using NLPModels, NLPModelsJuMP, JuMP
 x0 = [-1.2; 1.0]
 model = Model() # No solver is required
 @variable(model, x[i=1:2], start=x0[i])
-@NLobjective(model, Min, (x[1] - 1)^2 + 100 * (x[2] - x[1]^2)^2)
+@objective(model, Min, (x[1] - 1)^2 + 100 * (x[2] - x[1]^2)^2)
 
 nlp = MathOptNLPModel(model)
 ```
@@ -148,9 +148,9 @@ using NLPModels, NLPModelsJuMP, JuMP
 model = Model()
 x0 = [-1.2; 1.0]
 @variable(model, x[i=1:2] >= 0.0, start=x0[i])
-@NLobjective(model, Min, (x[1] - 1)^2 + 100 * (x[2] - x[1]^2)^2)
+@objective(model, Min, (x[1] - 1)^2 + 100 * (x[2] - x[1]^2)^2)
 @constraint(model, x[1] + x[2] == 3.0)
-@NLconstraint(model, x[1] * x[2] >= 1.0)
+@constraint(model, x[1] * x[2] >= 1.0)
 
 nlp = MathOptNLPModel(model)
 
@@ -184,7 +184,7 @@ using NLPModels, NLPModelsJuMP, JuMP
 model = Model()
 x0 = [-1.2; 1.0]
 @variable(model, x[i=1:2], start=x0[i])
-@NLexpression(model, F1, x[1] - 1)
+@expression(model, F1, x[1] - 1)
 @NLexpression(model, F2, 10 * (x[2] - x[1]^2))
 
 nls = MathOptNLSModel(model, [F1, F2], name="rosen-nls")

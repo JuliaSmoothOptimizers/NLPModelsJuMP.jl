@@ -83,6 +83,12 @@ MOI.supports_constraint(::Optimizer, ::Type{SQF}, ::Type{<:ALS}) = true
 MOI.supports_constraint(::Optimizer, ::Type{VQF}, ::Type{<:VLS}) = true
 MOI.supports_constraint(::Optimizer, ::Type{SNF}, ::Type{<:ALS}) = true
 
+function _add_identity_constraints!(index_map, src, F, S)
+  for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
+    index_map[ci] = ci
+  end
+end
+
 function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
   if !haskey(dest.options, "solver")
     error(
@@ -91,6 +97,10 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
   end
   dest.nlp, index_map = nlp_model(src)
   dest.solver = dest.options["solver"](dest.nlp)
+  # Add identity constraint mappings to the index map
+  for (F, S) in MOI.get(src, MOI.ListOfConstraintTypesPresent())
+    _add_identity_constraints!(index_map, src, F, S)
+  end
   return index_map
 end
 
