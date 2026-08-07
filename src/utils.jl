@@ -556,10 +556,31 @@ which makes the optimizer fall back to `MathOptNLPModel`.
 """
 _build_nls_from_residual(::Any, ::Any, ::MOI.Nonlinear.AbstractAutomaticDifferentiation) = nothing
 
+"""
+    _try_array_nlp_model(moimodel, ad_backend)
+
+Hook for AD extensions: when `moimodel` contains vector-function constraints
+kept whole by the AD backend (e.g. `ArrayDiff.ArrayNonlinearFunction` in
+`MOI.Zeros`/`MOI.Nonnegatives`/`MOI.Nonpositives`), build a constrained
+`AbstractNLPModel` that evaluates each constraint as one vectorized residual.
+Returns `(nlp, index_map)` or `nothing` (no such constraints, or unsupported
+backend), in which case the optimizer falls back to the NLS / scalar paths.
+"""
+_try_array_nlp_model(::MOI.ModelLike, ::MOI.Nonlinear.AbstractAutomaticDifferentiation) = nothing
+
 function _try_nls_model(
   moimodel::MOI.ModelLike,
   ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation,
 )
+  # The NLS model keeps only the residual objective: it is valid only when the
+  # problem has no constraints beyond variable bounds. Without this guard, a
+  # `sum((...)^2)` objective on a constrained model would silently drop the
+  # constraints.
+  for (F, _) in MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
+    if F != VI
+      return nothing
+    end
+  end
   F = MOI.get(moimodel, MOI.ObjectiveFunctionType())
   if !(F <: SNF)
     return nothing

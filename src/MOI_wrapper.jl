@@ -117,6 +117,15 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
       "No solver specified, use for instance `using Percival; JuMP.set_attribute(model, \"solver\", PercivalSolver)`",
     )
   end
+  # Vector-function constraints kept whole by the AD backend (for example
+  # ArrayDiff's `ArrayNonlinearFunction in MOI.Zeros`): build a constrained
+  # model whose cons/jprod/jtprod are one vectorized pass per constraint.
+  array_nlp = _try_array_nlp_model(src, dest.ad_backend)
+  if array_nlp !== nothing
+    dest.nlp, index_map = array_nlp
+    dest.solver = dest.options["solver"](dest.nlp)
+    return index_map
+  end
   nls = _try_nls_model(src, dest.ad_backend)
   if nls !== nothing
     dest.nlp = nls
