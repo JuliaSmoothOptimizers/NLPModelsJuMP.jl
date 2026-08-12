@@ -56,6 +56,13 @@ end
 
 MOI.get(optimizer::Optimizer, ::MOI.Silent) = optimizer.silent
 
+function MOI.supports(
+  optimizer::Optimizer,
+  ::MOI.ObjectiveFunction{F},
+) where {F <: MOI.AbstractVectorFunction}
+  return _supports_vector_objective(optimizer.ad_backend)
+end
+
 ###
 ### MOI.AutomaticDifferentiationBackend
 ###
@@ -84,7 +91,6 @@ function MOI.supports(
   ::Union{
     MOI.ObjectiveSense,
     MOI.ObjectiveFunction{<:Union{LinQuad, MOI.ScalarNonlinearFunction}},
-    MOI.ObjectiveFunction{<:MOI.AbstractVectorFunction},
     MOI.NLPBlock,
     MOI.UserDefinedFunction,
   },
@@ -123,7 +129,11 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
     dest.solver = dest.options["solver"](dest.nlp)
     return parser_variables(src)[1]
   end
-  dest.nlp, index_map = nlp_model(src; ad_backend = dest.ad_backend)
+  if _route_all_to_evaluator(dest.ad_backend)
+    dest.nlp, index_map = evaluator_nlp_model(src; ad_backend = dest.ad_backend)
+  else
+    dest.nlp, index_map = nlp_model(src; ad_backend = dest.ad_backend)
+  end
   dest.solver = dest.options["solver"](dest.nlp)
   return index_map
 end

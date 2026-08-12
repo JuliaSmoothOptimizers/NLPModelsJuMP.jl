@@ -23,6 +23,7 @@ include("test_moi_nlp_model.jl")
 include("test_moi_nls_model.jl")
 
 include("test_moi_nlp_oracle.jl")
+include("test_evaluator_model.jl")
 
 include("nlp_consistency.jl")
 include("nls_consistency.jl")

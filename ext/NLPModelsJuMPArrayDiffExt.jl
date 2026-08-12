@@ -8,6 +8,8 @@ import LinearAlgebra
 
 NLPModelsJuMP._nonlinear_model(ad::ArrayDiff.Mode) = ArrayDiff.model(ad)
 
+NLPModelsJuMP._supports_vector_objective(::ArrayDiff.Mode) = true
+
 # Detect `(...).^2` (broadcast `:^` with exponent 2) and return the residual `...`.
 function NLPModelsJuMP._detect_squared_residual(inner::ArrayDiff.ArrayNonlinearFunction)
     if inner.head !== :^ || !inner.broadcasted

@@ -517,10 +517,12 @@ function parser_MOI(moimodel, index_map, nvar)
   return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon
 end
 
-# Affine or quadratic, nothing to do
-_nlp_model(::MOI.Nonlinear.Model, ::MOI.ModelLike, ::Type, ::Type) = false
+# Affine or quadratic, nothing to do.
+# The first argument is either a `MOI.Nonlinear.Model`, possibly wrapped in
+# `MOI.Nonlinear` layers, or a custom AD backend's model, so it is untyped.
+_nlp_model(dest, ::MOI.ModelLike, ::Type, ::Type) = false
 
-function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF}, S::Type)
+function _nlp_model(dest, src::MOI.ModelLike, F::Type{SNF}, S::Type)
   has_nonlinear = false
   for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
     MOI.Nonlinear.add_constraint(
@@ -533,7 +535,9 @@ function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF},
   return has_nonlinear
 end
 
-_nonlinear_model(::MOI.Nonlinear.AbstractAutomaticDifferentiation) = MOI.Nonlinear.Model()
+# Delegates to `MOI.Nonlinear.model` so that custom AD backends receive the
+# model type they declared, wrapped in the layers they did not opt out of.
+_nonlinear_model(backend::MOI.Nonlinear.AbstractAutomaticDifferentiation) = MOI.Nonlinear.model(backend)
 
 """
     _detect_squared_residual(inner)
@@ -592,7 +596,7 @@ function _nlp_model(model::MOI.ModelLike, ad_backend::MOI.Nonlinear.AbstractAuto
   if F <: SNF
     MOI.Nonlinear.set_objective(nlp_model, MOI.get(model, MOI.ObjectiveFunction{F}()))
     has_nonlinear = true
-  elseif F <: MOI.AbstractVectorFunction
+  elseif F <: MOI.AbstractVectorFunction && _supports_vector_objective(ad_backend)
     # ArrayNonlinearFunction or similar: return the function directly.
     # The ad_backend from the model will build the evaluator.
     func = MOI.get(model, MOI.ObjectiveFunction{F}())
@@ -604,9 +608,26 @@ function _nlp_model(model::MOI.ModelLike, ad_backend::MOI.Nonlinear.AbstractAuto
   return nlp_model
 end
 
+"""
+    _supports_vector_objective(backend::MOI.Nonlinear.AbstractAutomaticDifferentiation)
+
+Hook for AD-backend extensions: return `true` if the backend can evaluate a
+vector-valued objective function (for example, `ArrayDiff.Mode` with an
+`ArrayNonlinearFunction` objective).
+"""
+_supports_vector_objective(::MOI.Nonlinear.AbstractAutomaticDifferentiation) = false
+
 function _get_ad_backend(model::MOI.ModelLike)
   if MOI.supports(model, MOI.AutomaticDifferentiationBackend())
-    return MOI.get(model, MOI.AutomaticDifferentiationBackend())
+    try
+      return MOI.get(model, MOI.AutomaticDifferentiationBackend())
+    catch err
+      # For example, a `CachingOptimizer` in state `NO_OPTIMIZER` claims
+      # support but cannot answer the query.
+      if !(err isa MOI.GetAttributeNotAllowed)
+        rethrow()
+      end
+    end
   end
   return MOI.Nonlinear.SparseReverseMode()
 end
