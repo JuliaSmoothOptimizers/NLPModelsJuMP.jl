@@ -374,7 +374,7 @@ function NLPModels.jprod_nln!(
   if nlp.quadcon.nquad > 0
     ind_quad = 1:(nlp.quadcon.nquad)
     view(Jv, ind_quad) .= 0.0
-    MOI.eval_constraint_jacobian_product(nlp.quadcon.block, view(Jv, ind_quad), x, v)
+    MOI.Nonlinear.add_constraint_jacobian_product(nlp.quadcon.block, view(Jv, ind_quad), x, v)
   end
   if nlp.nlcon.nnln > 0
     ind_nnln = (nlp.quadcon.nquad + 1):(nlp.quadcon.nquad + nlp.nlcon.nnln)
@@ -428,7 +428,7 @@ function NLPModels.jprod!(
   if nlp.quadcon.nquad > 0
     ind_quad = (nlp.meta.nlin + 1):(nlp.meta.nlin + nlp.quadcon.nquad)
     view(Jv, ind_quad) .= 0.0
-    MOI.eval_constraint_jacobian_product(nlp.quadcon.block, view(Jv, ind_quad), x, v)
+    MOI.Nonlinear.add_constraint_jacobian_product(nlp.quadcon.block, view(Jv, ind_quad), x, v)
   end
   if nlp.nlcon.nnln > 0
     ind_nnln =
@@ -490,7 +490,7 @@ function NLPModels.jtprod_nln!(
   (nlp.nlcon.nnln == 0) && (Jtv .= 0.0)
   if nlp.quadcon.nquad > 0
     # Jtv += Jᵀ * v[1:nquad], where J is the Jacobian of the quadratic block
-    MOI.eval_constraint_jacobian_transpose_product(
+    MOI.Nonlinear.add_constraint_jacobian_transpose_product(
       nlp.quadcon.block,
       Jtv,
       x,
@@ -544,7 +544,7 @@ function NLPModels.jtprod!(
   end
   if nlp.quadcon.nquad > 0
     ind_quad = (nlp.meta.nlin + 1):(nlp.meta.nlin + nlp.quadcon.nquad)
-    MOI.eval_constraint_jacobian_transpose_product(
+    MOI.Nonlinear.add_constraint_jacobian_transpose_product(
       nlp.quadcon.block,
       Jtv,
       x,
@@ -797,7 +797,7 @@ function NLPModels.hprod!(
   if nlp.quadcon.nquad > 0
     (nlp.obj.type == "LINEAR") && (nlp.nlcon.nnln == 0) && (hv .= 0.0)
     ind_quad = (nlp.meta.nlin + 1):(nlp.meta.nlin + nlp.quadcon.nquad)
-    MOI.eval_hessian_lagrangian_product(
+    MOI.Nonlinear.add_hessian_lagrangian_product(
       nlp.quadcon.block,
       hv,
       x,
@@ -874,7 +874,7 @@ function NLPModels.jth_hprod!(
   @rangecheck 1 nlp.meta.ncon j
   hv .= 0.0
   if nlp.meta.nlin + 1 ≤ j ≤ nlp.meta.nlin + nlp.quadcon.nquad
-    MOI.Nonlinear._eval_Hv_product(
+    MOI.Nonlinear._add_Hv_product(
       nlp.quadcon.block.constraints[j - nlp.meta.nlin],
       hv,
       x,
@@ -935,7 +935,7 @@ function NLPModels.ghjvprod!(
   ghv .= 0.0
   for i = (nlp.meta.nlin + 1):(nlp.meta.nlin + nlp.quadcon.nquad)
     fill!(nlp.hv, 0.0)
-    MOI.Nonlinear._eval_Hv_product(
+    MOI.Nonlinear._add_Hv_product(
       nlp.quadcon.block.constraints[i - nlp.meta.nlin],
       nlp.hv,
       x,

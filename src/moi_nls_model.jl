@@ -502,7 +502,7 @@ function NLPModels.jprod_nln!(
   if nls.quadcon.nquad > 0
     ind_quad = 1:(nls.quadcon.nquad)
     view(Jv, ind_quad) .= 0.0
-    MOI.eval_constraint_jacobian_product(nls.quadcon.block, view(Jv, ind_quad), x, v)
+    MOI.Nonlinear.add_constraint_jacobian_product(nls.quadcon.block, view(Jv, ind_quad), x, v)
   end
   if nls.nlcon.nnln > 0
     ind_nnln = (nls.quadcon.nquad + 1):(nls.quadcon.nquad + nls.nlcon.nnln)
@@ -556,7 +556,7 @@ function NLPModels.jprod!(
   if nls.quadcon.nquad > 0
     ind_quad = (nls.meta.nlin + 1):(nls.meta.nlin + nls.quadcon.nquad)
     view(Jv, ind_quad) .= 0.0
-    MOI.eval_constraint_jacobian_product(nls.quadcon.block, view(Jv, ind_quad), x, v)
+    MOI.Nonlinear.add_constraint_jacobian_product(nls.quadcon.block, view(Jv, ind_quad), x, v)
   end
   if nls.nlcon.nnln > 0
     ind_nnln =
@@ -618,7 +618,7 @@ function NLPModels.jtprod_nln!(
   (nls.nlcon.nnln == 0) && (Jtv .= 0.0)
   if nls.quadcon.nquad > 0
     # Jtv += Jᵀ * v[1:nquad], where J is the Jacobian of the quadratic block
-    MOI.eval_constraint_jacobian_transpose_product(
+    MOI.Nonlinear.add_constraint_jacobian_transpose_product(
       nls.quadcon.block,
       Jtv,
       x,
@@ -672,7 +672,7 @@ function NLPModels.jtprod!(
   end
   if nls.quadcon.nquad > 0
     ind_quad = (nls.meta.nlin + 1):(nls.meta.nlin + nls.quadcon.nquad)
-    MOI.eval_constraint_jacobian_transpose_product(
+    MOI.Nonlinear.add_constraint_jacobian_transpose_product(
       nls.quadcon.block,
       Jtv,
       x,
@@ -855,7 +855,7 @@ function NLPModels.hprod!(
   end
   if nls.quadcon.nquad > 0
     ind_quad = (nls.meta.nlin + 1):(nls.meta.nlin + nls.quadcon.nquad)
-    MOI.eval_hessian_lagrangian_product(
+    MOI.Nonlinear.add_hessian_lagrangian_product(
       nls.quadcon.block,
       hv,
       x,
