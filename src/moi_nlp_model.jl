@@ -132,7 +132,7 @@ function NLPModels.cons_nln!(nlp::MathOptNLPModel, x::AbstractVector, c::Abstrac
   offset = 0
   if nlp.quadcon.nquad > 0
     offset += nlp.quadcon.nquad
-    MOI.eval_constraint(nlp.quadcon.block, view(c, 1:(nlp.quadcon.nquad)), x)
+    MOI.eval_constraint(nlp.quadcon.evaluator, view(c, 1:(nlp.quadcon.nquad)), x)
   end
   if nlp.nlcon.nnln > 0
     offset += nlp.nlcon.nnln
@@ -164,7 +164,7 @@ function NLPModels.cons!(nlp::MathOptNLPModel, x::AbstractVector, c::AbstractVec
   if nlp.quadcon.nquad > 0
     offset += nlp.quadcon.nquad
     ind_quad = (nlp.meta.nlin + 1):(nlp.meta.nlin + nlp.quadcon.nquad)
-    MOI.eval_constraint(nlp.quadcon.block, view(c, ind_quad), x)
+    MOI.eval_constraint(nlp.quadcon.evaluator, view(c, ind_quad), x)
   end
   if nlp.nlcon.nnln > 0
     offset += nlp.nlcon.nnln
@@ -290,7 +290,7 @@ function NLPModels.jac_nln_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals:
   offset = 0
   if nlp.quadcon.nquad > 0
     ind_quad = 1:(nlp.quadcon.nnzj)
-    MOI.eval_constraint_jacobian(nlp.quadcon.block, view(vals, ind_quad), x)
+    MOI.eval_constraint_jacobian(nlp.quadcon.evaluator, view(vals, ind_quad), x)
     offset += nlp.quadcon.nnzj
   end
   if nlp.nlcon.nnln > 0
@@ -323,7 +323,7 @@ function NLPModels.jac_coord!(nlp::MathOptNLPModel, x::AbstractVector, vals::Abs
   end
   if nlp.quadcon.nquad > 0
     ind_quad = (nlp.lincon.nnzj + 1):(nlp.lincon.nnzj + nlp.quadcon.nnzj)
-    MOI.eval_constraint_jacobian(nlp.quadcon.block, view(vals, ind_quad), x)
+    MOI.eval_constraint_jacobian(nlp.quadcon.evaluator, view(vals, ind_quad), x)
     offset += nlp.quadcon.nnzj
   end
   if nlp.nlcon.nnln > 0
@@ -373,8 +373,7 @@ function NLPModels.jprod_nln!(
   increment!(nlp, :neval_jprod_nln)
   if nlp.quadcon.nquad > 0
     ind_quad = 1:(nlp.quadcon.nquad)
-    view(Jv, ind_quad) .= 0.0
-    MOI.Nonlinear.add_constraint_jacobian_product(nlp.quadcon.block, view(Jv, ind_quad), x, v)
+    MOI.eval_constraint_jacobian_product(nlp.quadcon.evaluator, view(Jv, ind_quad), x, v)
   end
   if nlp.nlcon.nnln > 0
     ind_nnln = (nlp.quadcon.nquad + 1):(nlp.quadcon.nquad + nlp.nlcon.nnln)
@@ -382,7 +381,7 @@ function NLPModels.jprod_nln!(
   end
   if nlp.oracles.ncon > 0
     for i =
-      (nlp.quadcon.nquad + nlp.nlcon.nnln + 1):(nlp.quadcon.nquad + nlp.nlcon.nnln + nlp.oracles.ncon)
+        (nlp.quadcon.nquad + nlp.nlcon.nnln + 1):(nlp.quadcon.nquad + nlp.nlcon.nnln + nlp.oracles.ncon)
 
       Jv[i] = 0
     end
@@ -427,8 +426,7 @@ function NLPModels.jprod!(
   end
   if nlp.quadcon.nquad > 0
     ind_quad = (nlp.meta.nlin + 1):(nlp.meta.nlin + nlp.quadcon.nquad)
-    view(Jv, ind_quad) .= 0.0
-    MOI.Nonlinear.add_constraint_jacobian_product(nlp.quadcon.block, view(Jv, ind_quad), x, v)
+    MOI.eval_constraint_jacobian_product(nlp.quadcon.evaluator, view(Jv, ind_quad), x, v)
   end
   if nlp.nlcon.nnln > 0
     ind_nnln =
@@ -489,13 +487,16 @@ function NLPModels.jtprod_nln!(
   end
   (nlp.nlcon.nnln == 0) && (Jtv .= 0.0)
   if nlp.quadcon.nquad > 0
-    # Jtv += Jᵀ * v[1:nquad], where J is the Jacobian of the quadratic block
-    MOI.Nonlinear.add_constraint_jacobian_transpose_product(
-      nlp.quadcon.block,
-      Jtv,
+    # Jtv += Jᵀ * v[1:nquad], where J is the Jacobian of the quadratic block.
+    # The product of the evaluator overwrites its output, so it goes through
+    # the workspace `nlp.hv`.
+    MOI.eval_constraint_jacobian_transpose_product(
+      nlp.quadcon.evaluator,
+      nlp.hv,
       x,
       view(v, 1:(nlp.quadcon.nquad)),
     )
+    Jtv .+= nlp.hv
   end
   if nlp.oracles.ncon > 0
     row_offset = nlp.quadcon.nquad + nlp.nlcon.nnln
@@ -544,12 +545,13 @@ function NLPModels.jtprod!(
   end
   if nlp.quadcon.nquad > 0
     ind_quad = (nlp.meta.nlin + 1):(nlp.meta.nlin + nlp.quadcon.nquad)
-    MOI.Nonlinear.add_constraint_jacobian_transpose_product(
-      nlp.quadcon.block,
-      Jtv,
+    MOI.eval_constraint_jacobian_transpose_product(
+      nlp.quadcon.evaluator,
+      nlp.hv,
       x,
       view(v, ind_quad),
     )
+    Jtv .+= nlp.hv
   end
   if nlp.oracles.ncon > 0
     row_offset = nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln
@@ -637,13 +639,7 @@ function NLPModels.hess_coord!(
   if nlp.quadcon.nquad > 0
     ind = (nlp.obj.nnzh + 1):(nlp.obj.nnzh + nlp.quadcon.nnzh)
     ind_quad = (nlp.meta.nlin + 1):(nlp.meta.nlin + nlp.quadcon.nquad)
-    MOI.eval_hessian_lagrangian(
-      nlp.quadcon.block,
-      view(vals, ind),
-      x,
-      0.0,
-      view(y, ind_quad),
-    )
+    MOI.eval_hessian_lagrangian(nlp.quadcon.evaluator, view(vals, ind), x, 0.0, view(y, ind_quad))
   end
 
   # 4. Oracle Hessian blocks are appended at the very end
@@ -715,15 +711,11 @@ function NLPModels.jth_hess_coord!(
 
   # Quadratic constraints
   if nlp.meta.nlin + 1 ≤ j ≤ nlp.meta.nlin + nlp.quadcon.nquad
-    i = j - nlp.meta.nlin
-    index = nlp.obj.nnzh + nlp.quadcon.hess_offset[i]
-    nnzh_i = nlp.quadcon.hess_offset[i + 1] - nlp.quadcon.hess_offset[i]
-    MOI.Nonlinear._eval_sparse_hessian(
-      view(vals, (index + 1):(index + nnzh_i)),
-      nlp.quadcon.block.constraints[i],
-      1.0,
-      nlp.quadcon.block.parameters,
-    )
+    μ = nlp.quadcon.y_scratch
+    μ[j - nlp.meta.nlin] = 1.0
+    ind = (nlp.obj.nnzh + 1):(nlp.obj.nnzh + nlp.quadcon.nnzh)
+    MOI.eval_hessian_lagrangian(nlp.quadcon.evaluator, view(vals, ind), x, 0.0, μ)
+    μ[j - nlp.meta.nlin] = 0.0
   end
 
   # Non-oracle nonlinear constraints
@@ -797,14 +789,8 @@ function NLPModels.hprod!(
   if nlp.quadcon.nquad > 0
     (nlp.obj.type == "LINEAR") && (nlp.nlcon.nnln == 0) && (hv .= 0.0)
     ind_quad = (nlp.meta.nlin + 1):(nlp.meta.nlin + nlp.quadcon.nquad)
-    MOI.Nonlinear.add_hessian_lagrangian_product(
-      nlp.quadcon.block,
-      hv,
-      x,
-      v,
-      0.0,
-      view(y, ind_quad),
-    )
+    MOI.eval_hessian_lagrangian_product(nlp.quadcon.evaluator, nlp.hv, x, v, 0.0, view(y, ind_quad))
+    hv .+= nlp.hv
   end
   if nlp.oracles.ncon > 0
     (nlp.obj.type == "LINEAR") && (nlp.meta.nnln == nlp.oracles.ncon) && (hv .= 0.0)
@@ -874,14 +860,10 @@ function NLPModels.jth_hprod!(
   @rangecheck 1 nlp.meta.ncon j
   hv .= 0.0
   if nlp.meta.nlin + 1 ≤ j ≤ nlp.meta.nlin + nlp.quadcon.nquad
-    MOI.Nonlinear._add_Hv_product(
-      nlp.quadcon.block.constraints[j - nlp.meta.nlin],
-      hv,
-      x,
-      v,
-      1.0,
-      nlp.quadcon.block.parameters,
-    )
+    μ = nlp.quadcon.y_scratch
+    μ[j - nlp.meta.nlin] = 1.0
+    MOI.eval_hessian_lagrangian_product(nlp.quadcon.evaluator, hv, x, v, 0.0, μ)
+    μ[j - nlp.meta.nlin] = 0.0
   elseif nlp.meta.nlin + nlp.quadcon.nquad + 1 ≤
          j ≤
          nlp.meta.nlin + nlp.quadcon.nquad + nlp.nlcon.nnln
@@ -933,16 +915,11 @@ function NLPModels.ghjvprod!(
     error("The function ghjvprod! is not supported by this MathOptNLPModel.")
   increment!(nlp, :neval_hprod)
   ghv .= 0.0
+  μ = nlp.quadcon.y_scratch
   for i = (nlp.meta.nlin + 1):(nlp.meta.nlin + nlp.quadcon.nquad)
-    fill!(nlp.hv, 0.0)
-    MOI.Nonlinear._add_Hv_product(
-      nlp.quadcon.block.constraints[i - nlp.meta.nlin],
-      nlp.hv,
-      x,
-      v,
-      1.0,
-      nlp.quadcon.block.parameters,
-    )
+    μ[i - nlp.meta.nlin] = 1.0
+    MOI.eval_hessian_lagrangian_product(nlp.quadcon.evaluator, nlp.hv, x, v, 0.0, μ)
+    μ[i - nlp.meta.nlin] = 0.0
     ghv[i] = dot(g, nlp.hv)
   end
   for i = (nlp.meta.nlin + nlp.quadcon.nquad + 1):(nlp.meta.ncon)
