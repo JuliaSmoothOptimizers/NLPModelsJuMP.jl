@@ -96,13 +96,9 @@ mutable struct QuadraticConstraints
   y_scratch::Vector{Float64}
 end
 
-function QuadraticConstraints(quad_model::MOI.Nonlinear.ModelWithQuad, nvar::Int)
+function QuadraticConstraints(quad_model::MOI.Nonlinear.ModelWithQuad)
   nquad = length(quad_model)
-  evaluator = MOI.Nonlinear.Evaluator(
-    quad_model,
-    MOI.Nonlinear.SparseReverseMode(),
-    MOI.VariableIndex.(1:nvar),
-  )
+  evaluator = MOI.Nonlinear.Evaluator(quad_model, MOI.Nonlinear.SparseReverseMode())
   MOI.initialize(evaluator, [:Grad, :Jac, :JacVec, :Hess, :HessVec])
   jac_structure = MOI.jacobian_structure(evaluator)
   jac_rows = [r for (r, _) in jac_structure]
@@ -392,6 +388,9 @@ function parser_MOI(moimodel, index_map, nvar)
   # Variables associated to quadratic constraints
   nquad = 0
   quad_model = MOI.Nonlinear.ModelWithQuad(MOI.Nonlinear.Model())
+  for _ = 1:nvar
+    MOI.add_variable(quad_model)
+  end
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
@@ -436,7 +435,7 @@ function parser_MOI(moimodel, index_map, nvar)
   coo = COO(linrows, lincols, linvals)
   lin_nnzj = length(linvals)
   lincon = LinearConstraints(coo, lin_nnzj)
-  quadcon = QuadraticConstraints(quad_model, nvar)
+  quadcon = QuadraticConstraints(quad_model)
   quad_bounds = MOI.NLPBlockData(quadcon.evaluator).constraint_bounds
   quad_lcon = [b.lower for b in quad_bounds]
   quad_ucon = [b.upper for b in quad_bounds]
