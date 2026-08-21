@@ -77,52 +77,46 @@ end
 """
     QuadraticConstraints
 
-The quadratic constraints, stored in a `MOI.Nonlinear.QPBlockData` whose rows
-are the constraints in the order they were parsed. The Jacobian and Hessian
-structures of the block are precomputed; `hess_offset[i]` is the number of
-Hessian entries before those of constraint `i`, so that the entries of
-constraint `i` are `hess_offset[i]+1:hess_offset[i+1]`.
+The quadratic constraints, stored in a `MOI.Nonlinear.ModelWithQuad` whose
+rows are the constraints in the order they were parsed, and evaluated through
+the corresponding `MOI.Nonlinear.EvaluatorWithQuad`. The Jacobian and Hessian
+structures of the block are precomputed. `y_scratch` holds basis multiplier
+vectors for the per-constraint methods (`jth_hess_coord!`, `jth_hprod!` and
+`ghjvprod!`).
 """
 mutable struct QuadraticConstraints
   nquad::Int
-  block::MOI.Nonlinear.QPBlockData{Float64}
+  evaluator::MOI.Nonlinear.EvaluatorWithQuad
   jac_rows::Vector{Int}
   jac_cols::Vector{Int}
   nnzj::Int
   hess_rows::Vector{Int}
   hess_cols::Vector{Int}
-  hess_offset::Vector{Int}
   nnzh::Int
+  y_scratch::Vector{Float64}
 end
 
-function QuadraticConstraints(block::MOI.Nonlinear.QPBlockData{Float64})
-  nquad = length(block)
-  jac_structure = MOI.jacobian_structure(block)
+function QuadraticConstraints(quad_model::MOI.Nonlinear.ModelWithQuad)
+  nquad = length(quad_model)
+  evaluator = MOI.Nonlinear.Evaluator(quad_model, MOI.Nonlinear.SparseReverseMode())
+  MOI.initialize(evaluator, [:Grad, :Jac, :JacVec, :Hess, :HessVec])
+  jac_structure = MOI.jacobian_structure(evaluator)
   jac_rows = [r for (r, _) in jac_structure]
   jac_cols = [c for (_, c) in jac_structure]
-  hess_structure = Tuple{Int, Int}[]
-  hess_offset = zeros(Int, nquad + 1)
-  for i = 1:nquad
-    MOI.Nonlinear._append_sparse_hessian_structure!(
-      block.constraints[i],
-      hess_structure,
-      block.parameters,
-    )
-    hess_offset[i + 1] = length(hess_structure)
-  end
+  hess_structure = MOI.hessian_lagrangian_structure(evaluator)
   # NLPModels expects the lower triangle
   hess_rows = [max(r, c) for (r, c) in hess_structure]
   hess_cols = [min(r, c) for (r, c) in hess_structure]
   return QuadraticConstraints(
     nquad,
-    block,
+    evaluator,
     jac_rows,
     jac_cols,
     length(jac_structure),
     hess_rows,
     hess_cols,
-    hess_offset,
     length(hess_structure),
+    zeros(nquad),
   )
 end
 
@@ -354,12 +348,12 @@ end
 Parse a `ScalarQuadraticFunction` fun with its associated set.
 `qcons`, `quad_lcon`, `quad_ucon` are updated.
 """
-function parser_SQF(fun, set, block, index_map)
+function parser_SQF(fun, set, quad_model, index_map)
   f = MOI.Utilities.map_indices(index_map, fun)
   # The constant is moved into the set, as MOI requires for
   # scalar-function-in-set constraints.
   g = SQF(f.quadratic_terms, f.affine_terms, 0.0)
-  MOI.add_constraint(block, g, MOI.Utilities.shift_constant(set, -f.constant))
+  MOI.add_constraint(quad_model, g, MOI.Utilities.shift_constant(set, -f.constant))
   return
 end
 
@@ -367,15 +361,11 @@ _scalar_set(::MOI.Nonnegatives) = MOI.GreaterThan(0.0)
 _scalar_set(::MOI.Nonpositives) = MOI.LessThan(0.0)
 _scalar_set(::MOI.Zeros) = MOI.EqualTo(0.0)
 
-function parser_VQF(fun, set, block, index_map)
+function parser_VQF(fun, set, quad_model, index_map)
   f = MOI.Utilities.map_indices(index_map, fun)
   for fi in MOI.Utilities.scalarize(f)
     g = SQF(fi.quadratic_terms, fi.affine_terms, 0.0)
-    MOI.add_constraint(
-      block,
-      g,
-      MOI.Utilities.shift_constant(_scalar_set(set), -fi.constant),
-    )
+    MOI.add_constraint(quad_model, g, MOI.Utilities.shift_constant(_scalar_set(set), -fi.constant))
   end
   return
 end
@@ -397,7 +387,10 @@ function parser_MOI(moimodel, index_map, nvar)
 
   # Variables associated to quadratic constraints
   nquad = 0
-  quad_block = MOI.Nonlinear.QPBlockData{Float64}()
+  quad_model = MOI.Nonlinear.ModelWithQuad(MOI.Nonlinear.Model())
+  for _ = 1:nvar
+    MOI.add_variable(quad_model)
+  end
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
@@ -430,11 +423,11 @@ function parser_MOI(moimodel, index_map, nvar)
         nlin += set.dimension
       end
       if typeof(fun) <: SQF
-        parser_SQF(fun, set, quad_block, index_map)
+        parser_SQF(fun, set, quad_model, index_map)
         nquad += 1
       end
       if typeof(fun) <: VQF
-        parser_VQF(fun, set, quad_block, index_map)
+        parser_VQF(fun, set, quad_model, index_map)
         nquad += set.dimension
       end
     end
@@ -442,9 +435,10 @@ function parser_MOI(moimodel, index_map, nvar)
   coo = COO(linrows, lincols, linvals)
   lin_nnzj = length(linvals)
   lincon = LinearConstraints(coo, lin_nnzj)
-  quadcon = QuadraticConstraints(quad_block)
-  quad_lcon = copy(quad_block.g_L)
-  quad_ucon = copy(quad_block.g_U)
+  quadcon = QuadraticConstraints(quad_model)
+  quad_bounds = MOI.NLPBlockData(quadcon.evaluator).constraint_bounds
+  quad_lcon = [b.lower for b in quad_bounds]
+  quad_ucon = [b.upper for b in quad_bounds]
 
   return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon
 end
