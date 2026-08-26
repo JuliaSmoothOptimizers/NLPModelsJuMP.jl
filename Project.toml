@@ -11,7 +11,15 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SolverCore = "ff4d7338-4cf1-434d-91df-b86cb86fb843"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
+[weakdeps]
+ArrayDiff = "c45fa1ca-6901-44ac-ae5b-5513a4852d50"
+
+[extensions]
+NLPModelsJuMPArrayDiffExt = "ArrayDiff"
+
 [compat]
+ArrayDiff = "0.1"
+ExaModels = "0.11"
 JuMP = "1.25"
 LinearAlgebra = "1.10"
 MathOptInterface = "1.46"
@@ -25,10 +33,11 @@ Test = "1.10"
 julia = "1.10"
 
 [extras]
+ExaModels = "1037b233-b668-4ce9-9b63-f9f681f55dd2"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 NLPModelsTest = "7998695d-6960-4d3a-85c4-e1bceb8cd856"
 Percival = "01435c0c-c90d-11e9-3788-63660f8fbccc"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["LinearAlgebra", "NLPModelsTest", "Percival", "Test"]
+test = ["ExaModels", "LinearAlgebra", "NLPModelsTest", "Percival", "Test"]
