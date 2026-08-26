@@ -74,7 +74,6 @@ function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String =
     hess_available = hessian && oracles.hessian_oracles_supported,
   )
 
-
   return MathOptNLPModel(
     meta,
     nlp_data.evaluator,
@@ -435,7 +434,7 @@ function NLPModels.jprod_nln!(
   end
   if nlp.oracles.ncon > 0
     for i =
-      (nlp.quadcon.nquad + nlp.nlcon.nnln + 1):(nlp.quadcon.nquad + nlp.nlcon.nnln + nlp.oracles.ncon)
+        (nlp.quadcon.nquad + nlp.nlcon.nnln + 1):(nlp.quadcon.nquad + nlp.nlcon.nnln + nlp.oracles.ncon)
 
       Jv[i] = 0
     end
