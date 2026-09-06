@@ -2,7 +2,7 @@ export MathOptNLPModel
 
 mutable struct MathOptNLPModel <: AbstractNLPModel{Float64, Vector{Float64}}
   meta::NLPModelMeta{Float64, Vector{Float64}}
-  eval::MOI.Nonlinear.Evaluator
+  eval::MOI.AbstractNLPEvaluator
   lincon::LinearConstraints
   quadcon::QuadraticConstraints
   nlcon::NonLinearStructure
@@ -29,12 +29,17 @@ function MathOptNLPModel(moimodel::MOI.ModelLike; kws...)
   return nlp_model(moimodel; kws...)[1]
 end
 
-function nlp_model(moimodel::MOI.ModelLike; hessian::Bool = true, name::String = "Generic")
+function nlp_model(
+  moimodel::MOI.ModelLike;
+  hessian::Bool = true,
+  name::String = "Generic",
+  backend = MOI.Nonlinear.SparseReverseMode(),
+)
   index_map, nvar, lvar, uvar, x0 = parser_variables(moimodel)
   nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon =
     parser_MOI(moimodel, index_map, nvar)
 
-  nlp_data = _nlp_block(moimodel)
+  nlp_data = _nlp_block(moimodel, backend)
   nlcon = parser_NL(nlp_data, hessian = hessian)
   oracles = parser_oracles(moimodel)
   counters = Counters()
