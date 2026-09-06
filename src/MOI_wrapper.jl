@@ -6,9 +6,28 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
   solver
   nlp::Union{Nothing, MathOptNLPModel}
   stats::Union{Nothing, SolverCore.GenericExecutionStats}
+  ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation
   function Optimizer()
-    return new(Dict{String, Any}(), false, nothing, nothing, nothing)
+    return new(
+      Dict{String, Any}(),
+      false,
+      nothing,
+      nothing,
+      nothing,
+      MOI.Nonlinear.SparseReverseMode(),
+    )
   end
+end
+
+MOI.supports(::Optimizer, ::MOI.AutomaticDifferentiationBackend) = true
+MOI.get(optimizer::Optimizer, ::MOI.AutomaticDifferentiationBackend) = optimizer.ad_backend
+function MOI.set(
+  optimizer::Optimizer,
+  ::MOI.AutomaticDifferentiationBackend,
+  backend::MOI.Nonlinear.AbstractAutomaticDifferentiation,
+)
+  optimizer.ad_backend = backend
+  return
 end
 
 # FIXME return the name of the underlying NLPModel solver
@@ -89,7 +108,7 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
       "No solver specified, use for instance `using Percival; JuMP.set_attribute(model, \"solver\", PercivalSolver)`",
     )
   end
-  dest.nlp, index_map = nlp_model(src)
+  dest.nlp, index_map = nlp_model(src; backend = dest.ad_backend)
   dest.solver = dest.options["solver"](dest.nlp)
   return index_map
 end
