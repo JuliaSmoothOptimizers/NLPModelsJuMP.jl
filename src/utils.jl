@@ -444,12 +444,12 @@ function parser_MOI(moimodel, index_map, nvar)
 end
 
 # Affine or quadratic, nothing to do
-_nlp_model(::MOI.Nonlinear.Model, ::MOI.ModelLike, ::Type, ::Type) = false
+_nlp_model(::MOI.ModelLike, ::MOI.ModelLike, ::Type, ::Type) = false
 
-function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF}, S::Type)
+function _nlp_model(dest::MOI.ModelLike, src::MOI.ModelLike, F::Type{SNF}, S::Type)
   has_nonlinear = false
   for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
-    MOI.Nonlinear.add_constraint(
+    MOI.add_constraint(
       dest,
       MOI.get(src, MOI.ConstraintFunction(), ci),
       MOI.get(src, MOI.ConstraintSet(), ci),
@@ -459,14 +459,22 @@ function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF},
   return has_nonlinear
 end
 
-function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
-  nlp_model = MOI.Nonlinear.Model()
+function _nlp_model(model::MOI.ModelLike, backend)::Union{Nothing, MOI.ModelLike}
+  nlp_model = MOI.Nonlinear.model(backend)
+  for _ in MOI.get(model, MOI.ListOfVariableIndices())
+    MOI.add_variable(nlp_model)
+  end
   has_nonlinear = false
   for attr in MOI.get(model, MOI.ListOfModelAttributesSet())
     if attr isa MOI.UserDefinedFunction
       has_nonlinear = true
       args = MOI.get(model, attr)
-      MOI.Nonlinear.register_operator(nlp_model, attr.name, attr.arity, args...)
+      MOI.Nonlinear.register_operator(
+        nlp_model,
+        attr.name,
+        attr.arity,
+        args...,
+      )
     end
   end
   for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
@@ -474,7 +482,9 @@ function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
   end
   F = MOI.get(model, MOI.ObjectiveFunctionType())
   if F <: SNF
-    MOI.Nonlinear.set_objective(nlp_model, MOI.get(model, MOI.ObjectiveFunction{F}()))
+    objective = MOI.get(model, MOI.ObjectiveFunction{F}())
+    MOI.set(nlp_model, MOI.ObjectiveFunction{F}(), objective)
+    MOI.set(nlp_model, MOI.ObjectiveSense(), MOI.get(model, MOI.ObjectiveSense()))
     has_nonlinear = true
   end
   if !has_nonlinear
@@ -483,21 +493,28 @@ function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
   return nlp_model
 end
 
-function _nlp_block(model::MOI.ModelLike)
+function _nlp_block(model::MOI.ModelLike, backend)
   # Old interface with `@NL...`
   nlp_data = MOI.get(model, MOI.NLPBlock())
   # New interface with `@constraint` and `@objective`
-  nlp_model = _nlp_model(model)
+  nlp_model = _nlp_model(model, backend)
   vars = MOI.get(model, MOI.ListOfVariableIndices())
   if isnothing(nlp_data)
     if isnothing(nlp_model)
       evaluator =
         MOI.Nonlinear.Evaluator(MOI.Nonlinear.Model(), MOI.Nonlinear.SparseReverseMode(), vars)
-      nlp_data = MOI.NLPBlockData(evaluator)
+      nlp_data = MOI.NLPBlockData(
+        MOI.Nonlinear._constraint_bounds(evaluator),
+        evaluator,
+        MOI.Nonlinear._has_objective(evaluator),
+      )
     else
-      backend = MOI.Nonlinear.SparseReverseMode()
       evaluator = MOI.Nonlinear.Evaluator(nlp_model, backend, vars)
-      nlp_data = MOI.NLPBlockData(evaluator)
+      nlp_data = MOI.NLPBlockData(
+        MOI.Nonlinear._constraint_bounds(evaluator),
+        evaluator,
+        MOI.Nonlinear._has_objective(evaluator),
+      )
     end
   else
     if !isnothing(nlp_model)
