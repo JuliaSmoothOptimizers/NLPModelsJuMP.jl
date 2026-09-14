@@ -13,6 +13,13 @@ jobs:
       - uses: julia-actions/setup-julia@latest
         with:
           version: '1'
+      - name: MOI
+        shell: julia --project=@. {0}
+        run: |
+          using Pkg
+          Pkg.add([
+              PackageSpec(name="MathOptInterface", rev="bl/qp_block_data"),
+          ])
       - name: Aqua.jl
         run: |
           PKG_SRC_PATH=`pwd`
