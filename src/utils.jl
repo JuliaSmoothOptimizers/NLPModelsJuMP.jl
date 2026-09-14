@@ -498,24 +498,20 @@ function _nlp_block(model::MOI.ModelLike, backend)
   nlp_data = MOI.get(model, MOI.NLPBlock())
   # New interface with `@constraint` and `@objective`
   nlp_model = _nlp_model(model, backend)
+  has_objective = MOI.get(model, MOI.ObjectiveFunctionType()) <: SNF
   vars = MOI.get(model, MOI.ListOfVariableIndices())
   if isnothing(nlp_data)
     if isnothing(nlp_model)
-      evaluator =
-        MOI.Nonlinear.Evaluator(MOI.Nonlinear.Model(), MOI.Nonlinear.SparseReverseMode(), vars)
-      nlp_data = MOI.NLPBlockData(
-        MOI.Nonlinear._constraint_bounds(evaluator),
-        evaluator,
-        MOI.Nonlinear._has_objective(evaluator),
-      )
-    else
-      evaluator = MOI.Nonlinear.Evaluator(nlp_model, backend, vars)
-      nlp_data = MOI.NLPBlockData(
-        MOI.Nonlinear._constraint_bounds(evaluator),
-        evaluator,
-        MOI.Nonlinear._has_objective(evaluator),
-      )
+      nlp_model = MOI.Nonlinear.Model()
+      backend = MOI.Nonlinear.SparseReverseMode()
     end
+    evaluator = MOI.Nonlinear.Evaluator(nlp_model, backend, vars)
+    bounds = MOI.Utilities.constraint_bounds(nlp_model)
+    nlp_data = MOI.NLPBlockData(
+      MOI.NLPBoundsPair.(bounds.lower, bounds.upper),
+      evaluator,
+      has_objective,
+    )
   else
     if !isnothing(nlp_model)
       error(
