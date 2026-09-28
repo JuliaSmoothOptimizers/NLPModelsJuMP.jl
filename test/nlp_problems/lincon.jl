@@ -23,7 +23,7 @@ function lincon()
 
   @constraint(nlp, 15.0 * x[15] - 21.0 == 1.0)
 
-  @NLobjective(nlp, Min, sum(i + x[i]^4 for i = 1:15))
+  @objective(nlp, Min, sum(i + x[i]^4 for i = 1:15))
 
   return nlp
 end

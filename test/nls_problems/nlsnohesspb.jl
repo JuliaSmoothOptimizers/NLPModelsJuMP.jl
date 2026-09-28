@@ -7,9 +7,8 @@ function nlsnohesspb()
   x₀ = [1.0, 0.1, 0.2, -0.5, 1.0]
   @variable(nls, x[i = 1:n], start = x₀[i])
 
-  register(nls, :g, n, g, autodiff = true)
-
-  @NLexpression(nls, res[i in 1:n], g(x...))
+  @operator(nls, custom_g, n, g)
+  @expression(nls, res[i in 1:n], custom_g(x...))
 
   return MathOptNLSModel(nls, res, hessian = false, name = "nlsnohesspb")
 end

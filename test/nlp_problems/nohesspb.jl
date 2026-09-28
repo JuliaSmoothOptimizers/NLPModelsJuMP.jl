@@ -11,8 +11,8 @@ function nohesspb()
     return v
   end
 
-  register(nlp, :g, 2, g, ∇g)
-  @NLobjective(nlp, Min, g(x[1], x[2]))
+  @operator(nlp, custom_g, 2, g, ∇g)
+  @objective(nlp, Min, custom_g(x[1], x[2]))
 
   return nlp
 end

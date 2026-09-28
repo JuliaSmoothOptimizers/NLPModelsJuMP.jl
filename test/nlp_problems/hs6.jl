@@ -6,7 +6,7 @@ function hs6()
   set_start_value(x[1], -1.2)
   set_start_value(x[2], 1.0)
 
-  @NLobjective(nlp, Min, (1 - x[1])^2)
+  @objective(nlp, Min, (1 - x[1])^2)
 
   @constraint(nlp, 10 * (x[2] - x[1]^2) == 0)
 

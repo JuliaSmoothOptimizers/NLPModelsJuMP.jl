@@ -4,7 +4,7 @@ function brownden()
   @variable(nlp, x[1:4])
   set_start_value.(x, [25.0; 5.0; -5.0; -1.0])
 
-  @NLobjective(
+  @objective(
     nlp,
     Min,
     sum(
