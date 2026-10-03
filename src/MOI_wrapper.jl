@@ -3,11 +3,19 @@ import SolverCore
 mutable struct Optimizer <: MOI.AbstractOptimizer
   options::Dict{String, Any}
   silent::Bool
+  ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation
   solver
-  nlp::Union{Nothing, MathOptNLPModel}
+  nlp::Union{Nothing, AbstractNLPModel}
   stats::Union{Nothing, SolverCore.GenericExecutionStats}
   function Optimizer()
-    return new(Dict{String, Any}(), false, nothing, nothing, nothing)
+    return new(
+      Dict{String, Any}(),
+      false,
+      MOI.Nonlinear.SparseReverseMode(),
+      nothing,
+      nothing,
+      nothing,
+    )
   end
 end
 
@@ -47,6 +55,32 @@ function MOI.set(optimizer::Optimizer, ::MOI.Silent, value::Bool)
 end
 
 MOI.get(optimizer::Optimizer, ::MOI.Silent) = optimizer.silent
+
+function MOI.supports(
+  optimizer::Optimizer,
+  ::MOI.ObjectiveFunction{F},
+) where {F <: MOI.AbstractVectorFunction}
+  return _supports_vector_objective(optimizer.ad_backend)
+end
+
+###
+### MOI.AutomaticDifferentiationBackend
+###
+
+MOI.supports(::Optimizer, ::MOI.AutomaticDifferentiationBackend) = true
+
+function MOI.get(optimizer::Optimizer, ::MOI.AutomaticDifferentiationBackend)
+  return optimizer.ad_backend
+end
+
+function MOI.set(
+  optimizer::Optimizer,
+  ::MOI.AutomaticDifferentiationBackend,
+  backend::MOI.Nonlinear.AbstractAutomaticDifferentiation,
+)
+  optimizer.ad_backend = backend
+  return
+end
 
 ###
 ### MOI.AbstractModelAttribute
@@ -89,12 +123,32 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
       "No solver specified, use for instance `using Percival; JuMP.set_attribute(model, \"solver\", PercivalSolver)`",
     )
   end
-  dest.nlp, index_map = nlp_model(src)
+  nls = _try_nls_model(src, dest.ad_backend)
+  if nls !== nothing
+    dest.nlp = nls
+    dest.solver = dest.options["solver"](dest.nlp)
+    return parser_variables(src)[1]
+  end
+  if _route_all_to_evaluator(dest.ad_backend)
+    dest.nlp, index_map = evaluator_nlp_model(src; ad_backend = dest.ad_backend)
+  else
+    dest.nlp, index_map = nlp_model(src; ad_backend = dest.ad_backend)
+  end
   dest.solver = dest.options["solver"](dest.nlp)
   return index_map
 end
 
 function MOI.optimize!(model::Optimizer)
+  if model.nlp === nothing
+    # Direct mode: build NLPModel from the optimizer itself
+    if !haskey(model.options, "solver")
+      error(
+        "No solver specified, use for instance `using Percival; JuMP.set_attribute(model, \"solver\", PercivalSolver)`",
+      )
+    end
+    model.nlp, _ = nlp_model(model; ad_backend = model.ad_backend)
+    model.solver = model.options["solver"](model.nlp)
+  end
   options = Dict{Symbol, Any}(
     Symbol(key) => model.options[key] for key in keys(model.options) if key != "solver"
   )

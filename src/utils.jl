@@ -517,10 +517,12 @@ function parser_MOI(moimodel, index_map, nvar)
   return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon
 end
 
-# Affine or quadratic, nothing to do
-_nlp_model(::MOI.Nonlinear.Model, ::MOI.ModelLike, ::Type, ::Type) = false
+# Affine or quadratic, nothing to do.
+# The first argument is either a `MOI.Nonlinear.Model`, possibly wrapped in
+# `MOI.Nonlinear` layers, or a custom AD backend's model, so it is untyped.
+_nlp_model(dest, ::MOI.ModelLike, ::Type, ::Type) = false
 
-function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF}, S::Type)
+function _nlp_model(dest, src::MOI.ModelLike, F::Type{SNF}, S::Type)
   has_nonlinear = false
   for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
     MOI.Nonlinear.add_constraint(
@@ -533,8 +535,52 @@ function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF},
   return has_nonlinear
 end
 
-function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
-  nlp_model = MOI.Nonlinear.Model()
+# Delegates to `MOI.Nonlinear.model` so that custom AD backends receive the
+# model type they declared, wrapped in the layers they did not opt out of.
+_nonlinear_model(backend::MOI.Nonlinear.AbstractAutomaticDifferentiation) = MOI.Nonlinear.model(backend)
+
+"""
+    _detect_squared_residual(inner)
+
+Hook for AD extensions: given the `inner` function under a `:sum` root
+(i.e., the `?` in `sum(?)`), return the residual whose square sum is being
+minimized — typically the first argument of a broadcast `:^` with exponent 2.
+
+Default returns `nothing` (no NLS routing). Extensions for AD backends that
+carry vector-function types (e.g. `ArrayDiff.Mode`) override this.
+"""
+_detect_squared_residual(::Any) = nothing
+
+"""
+    _build_nls_from_residual(moimodel, residual, ad_backend)
+
+Hook for AD extensions: build an `AbstractNLSModel` that evaluates the given
+`residual` (a vector function) using `ad_backend`. Default returns `nothing`,
+which makes the optimizer fall back to `MathOptNLPModel`.
+"""
+_build_nls_from_residual(::Any, ::Any, ::MOI.Nonlinear.AbstractAutomaticDifferentiation) = nothing
+
+function _try_nls_model(
+  moimodel::MOI.ModelLike,
+  ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation,
+)
+  F = MOI.get(moimodel, MOI.ObjectiveFunctionType())
+  if !(F <: SNF)
+    return nothing
+  end
+  obj = MOI.get(moimodel, MOI.ObjectiveFunction{F}())
+  if obj.head !== :sum || length(obj.args) != 1
+    return nothing
+  end
+  residual = _detect_squared_residual(obj.args[1])
+  if residual === nothing
+    return nothing
+  end
+  return _build_nls_from_residual(moimodel, residual, ad_backend)
+end
+
+function _nlp_model(model::MOI.ModelLike, ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation)
+  nlp_model = _nonlinear_model(ad_backend)
   has_nonlinear = false
   for attr in MOI.get(model, MOI.ListOfModelAttributesSet())
     if attr isa MOI.UserDefinedFunction
@@ -550,6 +596,11 @@ function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
   if F <: SNF
     MOI.Nonlinear.set_objective(nlp_model, MOI.get(model, MOI.ObjectiveFunction{F}()))
     has_nonlinear = true
+  elseif F <: MOI.AbstractVectorFunction && _supports_vector_objective(ad_backend)
+    # ArrayNonlinearFunction or similar: return the function directly.
+    # The ad_backend from the model will build the evaluator.
+    func = MOI.get(model, MOI.ObjectiveFunction{F}())
+    return func
   end
   if !has_nonlinear
     return nothing
@@ -557,11 +608,42 @@ function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
   return nlp_model
 end
 
-function _nlp_block(model::MOI.ModelLike)
+"""
+    _supports_vector_objective(backend::MOI.Nonlinear.AbstractAutomaticDifferentiation)
+
+Hook for AD-backend extensions: return `true` if the backend can evaluate a
+vector-valued objective function (for example, `ArrayDiff.Mode` with an
+`ArrayNonlinearFunction` objective).
+"""
+_supports_vector_objective(::MOI.Nonlinear.AbstractAutomaticDifferentiation) = false
+
+function _get_ad_backend(model::MOI.ModelLike)
+  if MOI.supports(model, MOI.AutomaticDifferentiationBackend())
+    try
+      return MOI.get(model, MOI.AutomaticDifferentiationBackend())
+    catch err
+      # For example, a `CachingOptimizer` in state `NO_OPTIMIZER` claims
+      # support but cannot answer the query.
+      if !(err isa MOI.GetAttributeNotAllowed)
+        rethrow()
+      end
+    end
+  end
+  return MOI.Nonlinear.SparseReverseMode()
+end
+
+function _nlp_block(
+  model::MOI.ModelLike,
+  ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation = _get_ad_backend(model),
+)
   # Old interface with `@NL...`
-  nlp_data = MOI.get(model, MOI.NLPBlock())
+  nlp_data = if MOI.NLPBlock() in MOI.get(model, MOI.ListOfModelAttributesSet())
+    MOI.get(model, MOI.NLPBlock())
+  else
+    nothing
+  end
   # New interface with `@constraint` and `@objective`
-  nlp_model = _nlp_model(model)
+  nlp_model = _nlp_model(model, ad_backend)
   vars = MOI.get(model, MOI.ListOfVariableIndices())
   if isnothing(nlp_data)
     if isnothing(nlp_model)
@@ -569,8 +651,7 @@ function _nlp_block(model::MOI.ModelLike)
         MOI.Nonlinear.Evaluator(MOI.Nonlinear.Model(), MOI.Nonlinear.SparseReverseMode(), vars)
       nlp_data = MOI.NLPBlockData(evaluator)
     else
-      backend = MOI.Nonlinear.SparseReverseMode()
-      evaluator = MOI.Nonlinear.Evaluator(nlp_model, backend, vars)
+      evaluator = MOI.Nonlinear.Evaluator(nlp_model, ad_backend, vars)
       nlp_data = MOI.NLPBlockData(evaluator)
     end
   else
