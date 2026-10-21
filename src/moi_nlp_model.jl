@@ -79,7 +79,6 @@ function nlp_model(
     hess_available = hessian && oracles.hessian_oracles_supported,
   )
 
-
   return MathOptNLPModel(
     meta,
     nlp_data.evaluator,
