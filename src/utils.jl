@@ -469,12 +469,7 @@ function _nlp_model(model::MOI.ModelLike, backend)::Union{Nothing, MOI.ModelLike
     if attr isa MOI.UserDefinedFunction
       has_nonlinear = true
       args = MOI.get(model, attr)
-      MOI.Nonlinear.register_operator(
-        nlp_model,
-        attr.name,
-        attr.arity,
-        args...,
-      )
+      MOI.Nonlinear.register_operator(nlp_model, attr.name, attr.arity, args...)
     end
   end
   for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
@@ -507,11 +502,8 @@ function _nlp_block(model::MOI.ModelLike, backend)
     end
     evaluator = MOI.Nonlinear.Evaluator(nlp_model, backend, vars)
     bounds = MOI.Utilities.constraint_bounds(nlp_model)
-    nlp_data = MOI.NLPBlockData(
-      MOI.NLPBoundsPair.(bounds.lower, bounds.upper),
-      evaluator,
-      has_objective,
-    )
+    nlp_data =
+      MOI.NLPBlockData(MOI.NLPBoundsPair.(bounds.lower, bounds.upper), evaluator, has_objective)
   else
     if !isnothing(nlp_model)
       error(
