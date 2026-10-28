@@ -11,7 +11,14 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SolverCore = "ff4d7338-4cf1-434d-91df-b86cb86fb843"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
+[weakdeps]
+ArrayDiff = "c45fa1ca-6901-44ac-ae5b-5513a4852d50"
+
+[extensions]
+NLPModelsJuMPArrayDiffExt = "ArrayDiff"
+
 [compat]
+ArrayDiff = "0.1"
 JuMP = "1.25"
 LinearAlgebra = "1.10"
 MathOptInterface = "1.46"

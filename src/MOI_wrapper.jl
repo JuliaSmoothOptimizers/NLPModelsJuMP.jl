@@ -4,7 +4,7 @@ mutable struct Optimizer <: MOI.AbstractOptimizer
   options::Dict{String, Any}
   silent::Bool
   solver
-  nlp::Union{Nothing, MathOptNLPModel}
+  nlp::Union{Nothing, AbstractNLPModel}
   stats::Union{Nothing, SolverCore.GenericExecutionStats}
   ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation
   function Optimizer()
@@ -107,6 +107,12 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
     error(
       "No solver specified, use for instance `using Percival; JuMP.set_attribute(model, \"solver\", PercivalSolver)`",
     )
+  end
+  nls = _try_nls_model(src, dest.ad_backend)
+  if nls !== nothing
+    dest.nlp = nls
+    dest.solver = dest.options["solver"](dest.nlp)
+    return parser_variables(src)[1]
   end
   dest.nlp, index_map = nlp_model(src; backend = dest.ad_backend)
   dest.solver = dest.options["solver"](dest.nlp)
