@@ -39,7 +39,7 @@ end
 # FIXME return the name of the underlying NLPModel solver
 MOI.get(::Optimizer, ::MOI.SolverName) = "NLPModels"
 
-MOI.is_empty(optimizer::Optimizer) = isnothing(optimizer.nlp)
+MOI.is_empty(optimizer::Optimizer) = isnothing(optimizer.solver) && isnothing(optimizer.nlp)
 
 function MOI.empty!(optimizer::Optimizer)
   optimizer.solver = nothing
