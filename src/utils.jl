@@ -443,69 +443,41 @@ function parser_MOI(moimodel, index_map, nvar)
   return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon
 end
 
-# Affine or quadratic, nothing to do
-_nlp_model(::MOI.ModelLike, ::MOI.ModelLike, ::Type, ::Type) = false
-
-function _nlp_model(dest::MOI.ModelLike, src::MOI.ModelLike, F::Type{SNF}, S::Type)
+function _copy_nonlinear!(dest, src)
+  src_vars = MOI.get(src, MOI.ListOfVariableIndices())
+  vars = MOI.add_variables(dest, length(src_vars))
+  index_map = Dict(zip(src_vars, vars))
   has_nonlinear = false
-  for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
-    MOI.add_constraint(
-      dest,
-      MOI.get(src, MOI.ConstraintFunction(), ci),
-      MOI.get(src, MOI.ConstraintSet(), ci),
-    )
-    has_nonlinear = true
-  end
-  return has_nonlinear
-end
-
-function _nlp_model(model::MOI.ModelLike, backend)::Union{Nothing, MOI.ModelLike}
-  nlp_model = MOI.Nonlinear.model(backend)
-  for _ in MOI.get(model, MOI.ListOfVariableIndices())
-    MOI.add_variable(nlp_model)
-  end
-  has_nonlinear = false
-  for attr in MOI.get(model, MOI.ListOfModelAttributesSet())
+  for attr in MOI.get(src, MOI.ListOfModelAttributesSet())
     if attr isa MOI.UserDefinedFunction
+      MOI.set(dest, attr, MOI.get(src, attr))
       has_nonlinear = true
-      args = MOI.get(model, attr)
-      MOI.Nonlinear.register_operator(nlp_model, attr.name, attr.arity, args...)
     end
   end
-  for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
-    has_nonlinear |= _nlp_model(nlp_model, model, F, S)
-  end
-  F = MOI.get(model, MOI.ObjectiveFunctionType())
-  if F <: SNF
-    objective = MOI.get(model, MOI.ObjectiveFunction{F}())
-    MOI.set(nlp_model, MOI.ObjectiveFunction{F}(), objective)
-    MOI.set(nlp_model, MOI.ObjectiveSense(), MOI.get(model, MOI.ObjectiveSense()))
-    has_nonlinear = true
-  end
-  if !has_nonlinear
-    return nothing
-  end
-  return nlp_model
-end
-
-function _nlp_block(model::MOI.ModelLike, backend)
-  # Old interface with `@NL...`
-  nlp_data = MOI.get(model, MOI.NLPBlock())
-  # New interface with `@constraint` and `@objective`
-  nlp_model = _nlp_model(model, backend)
-  has_objective = MOI.get(model, MOI.ObjectiveFunctionType()) <: SNF
-  vars = MOI.get(model, MOI.ListOfVariableIndices())
-  if isnothing(nlp_data)
-    if isnothing(nlp_model)
-      nlp_model = MOI.Nonlinear.Model()
-      backend = MOI.Nonlinear.SparseReverseMode()
+  for (F, S) in MOI.get(src, MOI.ListOfConstraintTypesPresent())
+    if F == SNF
+      for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
+        f = MOI.get(src, MOI.ConstraintFunction(), ci)
+        MOI.add_constraint(
+          dest,
+          MOI.Utilities.map_indices(index_map, f),
+          MOI.get(src, MOI.ConstraintSet(), ci),
+        )
+        has_nonlinear = true
+      end
     end
-    evaluator = MOI.Nonlinear.Evaluator(nlp_model, backend, vars)
-    bounds = MOI.Utilities.constraint_bounds(nlp_model)
-    nlp_data =
-      MOI.NLPBlockData(MOI.NLPBoundsPair.(bounds.lower, bounds.upper), evaluator, has_objective)
-  else
-    if !isnothing(nlp_model)
+  end
+  has_objective = MOI.get(src, MOI.ObjectiveFunctionType()) <: SNF
+  if has_objective
+    attr = MOI.ObjectiveFunction{SNF}()
+    MOI.set(dest, attr, MOI.Utilities.map_indices(index_map, MOI.get(src, attr)))
+    # NLPModelMeta stores the sense. Its evaluator must return the original objective.
+    sense = MOI.get(src, MOI.ObjectiveSense())
+    MOI.set(dest, MOI.ObjectiveSense(), sense == MOI.MAX_SENSE ? MOI.MIN_SENSE : sense)
+  end
+  legacy_block = MOI.get(src, MOI.NLPBlock())
+  if !isnothing(legacy_block)
+    if has_nonlinear || has_objective
       error(
         "Cannot optimize a model which contains the features from " *
         "both the legacy (macros beginning with `@NL`) and new " *
@@ -513,8 +485,21 @@ function _nlp_block(model::MOI.ModelLike, backend)
         "the other.",
       )
     end
+    return legacy_block
   end
-  return nlp_data
+  return (; model = dest, vars, has_objective)
+end
+
+_nlp_block(data::MOI.NLPBlockData, backend) = data
+
+function _nlp_block(data, backend)
+  evaluator = MOI.Nonlinear.Evaluator(data.model, backend, data.vars)
+  bounds = MOI.Utilities.constraint_bounds(data.model)
+  return MOI.NLPBlockData(
+    MOI.NLPBoundsPair.(bounds.lower, bounds.upper),
+    evaluator,
+    data.has_objective,
+  )
 end
 
 """
@@ -531,22 +516,28 @@ function parser_NL(nlp_data; hessian::Bool = true)
   nl_ucon = Float64[bounds.upper for bounds in nlp_data.constraint_bounds]
 
   eval = nlp_data.evaluator
-  has_hessian = hessian && :Hess in MOI.features_available(eval)
-  # Check features available in model
-  init_feat = [:Grad, :Jac]
+  features = MOI.features_available(eval)
+  has_hessian = hessian && :Hess in features
+  init_feat = Symbol[]
+  if nlp_data.has_objective
+    push!(init_feat, :Grad)
+  end
+  if nnln > 0
+    push!(init_feat, :Jac)
+  end
   if has_hessian
     push!(init_feat, :Hess)
   end
-  if :JacVec in MOI.features_available(eval)
+  if nnln > 0 && :JacVec in features
     push!(init_feat, :JacVec)
   end
-  if :HessVec in MOI.features_available(eval)
+  if hessian && :HessVec in features
     push!(init_feat, :HessVec)
   end
 
   MOI.initialize(eval, init_feat)
 
-  jac = MOI.jacobian_structure(eval)
+  jac = nnln > 0 ? MOI.jacobian_structure(eval) : Tuple{Int, Int}[]
   jac_rows, jac_cols = getindex.(jac, 1), getindex.(jac, 2)
   nnzj = length(jac)
 

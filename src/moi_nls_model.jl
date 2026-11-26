@@ -4,7 +4,7 @@ mutable struct MathOptNLSModel <: AbstractNLSModel{Float64, Vector{Float64}}
   meta::NLPModelMeta{Float64, Vector{Float64}}
   nls_meta::NLSMeta{Float64, Vector{Float64}}
   Feval::MOI.Nonlinear.Evaluator
-  ceval::MOI.Nonlinear.Evaluator
+  ceval::MOI.AbstractNLPEvaluator
   lls::Objective
   linequ::LinearEquations
   nlequ::NonLinearStructure
@@ -37,7 +37,9 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
   nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon =
     parser_MOI(moimodel, index_map, nvar)
 
-  nlp_data = _nlp_block(moimodel, MOI.Nonlinear.SparseReverseMode())
+  ad_backend = MOI.Nonlinear.SparseReverseMode()
+  nonlinear = _copy_nonlinear!(MOI.Nonlinear.model(ad_backend), moimodel)
+  nlp_data = _nlp_block(nonlinear, ad_backend)
   nlcon = parser_NL(nlp_data, hessian = hessian)
   oracles = parser_oracles(moimodel)
   nls_counters = NLSCounters()

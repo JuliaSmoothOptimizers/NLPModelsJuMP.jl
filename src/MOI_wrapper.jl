@@ -1,20 +1,33 @@
 import SolverCore
 
+"""
+    Optimizer()
+
+Set `MOI.AutomaticDifferentiationBackend()` to select the backend for nonlinear
+objectives and constraints. Backends that use the same model type can be switched
+between solves. Set a backend with a different model type before `MOI.copy_to`
+or after `MOI.empty!`.
+"""
 mutable struct Optimizer <: MOI.AbstractOptimizer
   options::Dict{String, Any}
   silent::Bool
   solver
   nlp::Union{Nothing, MathOptNLPModel}
   stats::Union{Nothing, SolverCore.GenericExecutionStats}
+  model::MOI.ModelLike
+  build_nlp::Union{Nothing, Function}
   ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation
   function Optimizer()
+    backend = MOI.Nonlinear.SparseReverseMode()
     return new(
       Dict{String, Any}(),
       false,
       nothing,
       nothing,
       nothing,
-      MOI.Nonlinear.SparseReverseMode(),
+      MOI.Nonlinear.model(backend),
+      nothing,
+      backend,
     )
   end
 end
@@ -26,6 +39,16 @@ function MOI.set(
   ::MOI.AutomaticDifferentiationBackend,
   backend::MOI.Nonlinear.AbstractAutomaticDifferentiation,
 )
+  new_model = MOI.Nonlinear.model(backend)
+  if typeof(new_model) != typeof(optimizer.model)
+    if !MOI.is_empty(optimizer)
+      error("The automatic-differentiation backend must be set before adding model data.")
+    end
+    optimizer.model = new_model
+  end
+  optimizer.nlp = nothing
+  optimizer.solver = nothing
+  optimizer.stats = nothing
   optimizer.ad_backend = backend
   return
 end
@@ -33,9 +56,11 @@ end
 # FIXME return the name of the underlying NLPModel solver
 MOI.get(::Optimizer, ::MOI.SolverName) = "NLPModels"
 
-MOI.is_empty(optimizer::Optimizer) = isnothing(optimizer.solver) && isnothing(optimizer.nlp)
+MOI.is_empty(optimizer::Optimizer) = isnothing(optimizer.build_nlp)
 
 function MOI.empty!(optimizer::Optimizer)
+  optimizer.model = MOI.Nonlinear.model(optimizer.ad_backend)
+  optimizer.build_nlp = nothing
   optimizer.solver = nothing
   optimizer.nlp = nothing
   optimizer.stats = nothing
@@ -108,12 +133,23 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
       "No solver specified, use for instance `using Percival; JuMP.set_attribute(model, \"solver\", PercivalSolver)`",
     )
   end
-  dest.nlp, index_map = nlp_model(src; backend = dest.ad_backend)
-  dest.solver = dest.options["solver"](dest.nlp)
+  model = MOI.Nonlinear.model(dest.ad_backend)
+  build_nlp, index_map = _prepare_nlp_model(model, src)
+  nlp = build_nlp(dest.ad_backend)
+  solver = dest.options["solver"](nlp)
+  dest.model = model
+  dest.build_nlp = build_nlp
+  dest.nlp = nlp
+  dest.solver = solver
+  dest.stats = nothing
   return index_map
 end
 
 function MOI.optimize!(model::Optimizer)
+  if isnothing(model.solver)
+    model.nlp = model.build_nlp(model.ad_backend)
+    model.solver = model.options["solver"](model.nlp)
+  end
   options = Dict{Symbol, Any}(
     Symbol(key) => model.options[key] for key in keys(model.options) if key != "solver"
   )
@@ -196,4 +232,4 @@ function MOI.get(optimizer::Optimizer, attr::MOI.VariablePrimal, vi::MOI.Variabl
   return optimizer.stats.solution[vi.value]
 end
 
-MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = 1
+MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = isnothing(optimizer.stats) ? 0 : 1

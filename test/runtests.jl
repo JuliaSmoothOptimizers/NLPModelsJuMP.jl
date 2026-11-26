@@ -27,4 +27,5 @@ include("test_moi_nlp_oracle.jl")
 include("nlp_consistency.jl")
 include("nls_consistency.jl")
 
+include("ad_backend.jl")
 include("MOI_wrapper.jl")
