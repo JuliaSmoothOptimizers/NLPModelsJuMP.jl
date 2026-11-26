@@ -37,9 +37,7 @@ function MathOptNLSModel(cmodel::JuMP.Model, F; hessian::Bool = true, name::Stri
   nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon =
     parser_MOI(moimodel, index_map, nvar)
 
-  ad_backend = MOI.Nonlinear.SparseReverseMode()
-  nonlinear = _copy_nonlinear!(MOI.Nonlinear.model(ad_backend), moimodel)
-  nlp_data = _nlp_block(nonlinear, ad_backend)
+  nlp_data = _nlp_block(moimodel, MOI.Nonlinear.SparseReverseMode())
   nlcon = parser_NL(nlp_data, hessian = hessian)
   oracles = parser_oracles(moimodel)
   nls_counters = NLSCounters()

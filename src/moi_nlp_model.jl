@@ -31,81 +31,75 @@ function MathOptNLPModel(moimodel::MOI.ModelLike; kws...)
   return nlp_model(moimodel; kws...)[1]
 end
 
-function nlp_model(moimodel::MOI.ModelLike; backend = MOI.Nonlinear.SparseReverseMode(), kws...)
-  model = MOI.Nonlinear.model(backend)
-  build_nlp, index_map = _prepare_nlp_model(model, moimodel; kws...)
-  return build_nlp(backend), index_map
-end
-
-function _prepare_nlp_model(model, moimodel; hessian::Bool = true, name::String = "Generic")
+function nlp_model(
+  moimodel::MOI.ModelLike;
+  hessian::Bool = true,
+  name::String = "Generic",
+  backend = MOI.Nonlinear.SparseReverseMode(),
+)
   index_map, nvar, lvar, uvar, x0 = parser_variables(moimodel)
   nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon =
     parser_MOI(moimodel, index_map, nvar)
 
-  nonlinear = _copy_nonlinear!(model, moimodel)
-  if nonlinear.has_objective
+  nlp_data = _nlp_block(moimodel, backend)
+  nlcon = parser_NL(nlp_data, hessian = hessian)
+  oracles = parser_oracles(moimodel)
+  counters = Counters()
+  λ = zeros(Float64, nlcon.nnln)  # Lagrange multipliers for hess_coord! and hprod! without y
+  hv = zeros(Float64, nvar)  # workspace for ghjvprod!
+
+  if nlp_data.has_objective
     obj = Objective("NONLINEAR", 0.0, spzeros(Float64, nvar), COO(), 0)
   else
     obj = parser_objective_MOI(moimodel, nvar, index_map)
   end
-  oracles = parser_oracles(moimodel)
-  minimize = MOI.get(moimodel, MOI.ObjectiveSense()) == MOI.MIN_SENSE
-  # A new AD backend may have different sparsity. Keep the copied problem data
-  # so we can rebuild the evaluator, metadata, and solver together.
-  function build_nlp(backend)
-    nlp_data = _nlp_block(nonlinear, backend)
-    nlcon = parser_NL(nlp_data, hessian = hessian)
-    counters = Counters()
-    λ = zeros(Float64, nlcon.nnln)  # Lagrange multipliers for hess_coord! and hprod! without y
-    hv = zeros(Float64, nvar)  # workspace for ghjvprod!
 
-    # Total counts
-    ncon = nlin + quadcon.nquad + nlcon.nnln + oracles.ncon
-    lcon = vcat(lin_lcon, quad_lcon, nlcon.nl_lcon, oracles.lcon)
-    ucon = vcat(lin_ucon, quad_ucon, nlcon.nl_ucon, oracles.ucon)
-    nnzj = lincon.nnzj + quadcon.nnzj + nlcon.nnzj + oracles.nnzj
-    nnzh = obj.nnzh + quadcon.nnzh + nlcon.nnzh + oracles.nnzh
-    features = MOI.features_available(nlp_data.evaluator)
-    has_nonlinear = nonlinear.has_objective || nlcon.nnln > 0
-    jac_products = ncon > 0 && (nlcon.nnln == 0 || :JacVec in features)
-    second_order = hessian && oracles.hessian_oracles_supported
-    meta = NLPModelMeta(
-      nvar,
-      x0 = x0,
-      lvar = lvar,
-      uvar = uvar,
-      ncon = ncon,
-      y0 = zeros(ncon),
-      lcon = lcon,
-      ucon = ucon,
-      nnzj = nnzj,
-      nnzh = nnzh,
-      lin = collect(1:nlin),
-      lin_nnzj = lincon.nnzj,
-      nln_nnzj = quadcon.nnzj + nlcon.nnzj + oracles.nnzj,
-      minimize = minimize,
-      islp = (obj.type == "LINEAR") && (nlin == ncon),
-      name = name,
-      jprod_available = jac_products,
-      jtprod_available = jac_products,
-      hprod_available = second_order && (!has_nonlinear || :HessVec in features),
-      hess_available = second_order && (!has_nonlinear || :Hess in features),
-    )
+  # Total counts
+  ncon = nlin + quadcon.nquad + nlcon.nnln + oracles.ncon
+  lcon = vcat(lin_lcon, quad_lcon, nlcon.nl_lcon, oracles.lcon)
+  ucon = vcat(lin_ucon, quad_ucon, nlcon.nl_ucon, oracles.ucon)
+  nnzj = lincon.nnzj + quadcon.nnzj + nlcon.nnzj + oracles.nnzj
+  nnzh = obj.nnzh + quadcon.nnzh + nlcon.nnzh + oracles.nnzh
+  features = MOI.features_available(nlp_data.evaluator)
+  has_nonlinear = nlp_data.has_objective || nlcon.nnln > 0
+  jac_products = ncon > 0 && (nlcon.nnln == 0 || :JacVec in features)
+  second_order = hessian && oracles.hessian_oracles_supported
+  meta = NLPModelMeta(
+    nvar,
+    x0 = x0,
+    lvar = lvar,
+    uvar = uvar,
+    ncon = ncon,
+    y0 = zeros(ncon),
+    lcon = lcon,
+    ucon = ucon,
+    nnzj = nnzj,
+    nnzh = nnzh,
+    lin = collect(1:nlin),
+    lin_nnzj = lincon.nnzj,
+    nln_nnzj = quadcon.nnzj + nlcon.nnzj + oracles.nnzj,
+    minimize = MOI.get(moimodel, MOI.ObjectiveSense()) == MOI.MIN_SENSE,
+    islp = (obj.type == "LINEAR") && (nlin == ncon),
+    name = name,
+    jprod_available = jac_products,
+    jtprod_available = jac_products,
+    hprod_available = second_order && (!has_nonlinear || :HessVec in features),
+    hess_available = second_order && (!has_nonlinear || :Hess in features),
+  )
 
-    return MathOptNLPModel(
-      meta,
-      nlp_data.evaluator,
-      lincon,
-      quadcon,
-      nlcon,
-      oracles,
-      λ,
-      hv,
-      obj,
-      counters,
-    )
-  end
-  return build_nlp, index_map
+  return MathOptNLPModel(
+    meta,
+    nlp_data.evaluator,
+    lincon,
+    quadcon,
+    nlcon,
+    oracles,
+    λ,
+    hv,
+    obj,
+    counters,
+  ),
+  index_map
 end
 
 function NLPModels.obj(nlp::MathOptNLPModel, x::AbstractVector)

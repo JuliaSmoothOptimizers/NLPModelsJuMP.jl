@@ -443,7 +443,8 @@ function parser_MOI(moimodel, index_map, nvar)
   return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon
 end
 
-function _copy_nonlinear!(dest, src)
+function _nlp_block(src, backend)
+  dest = MOI.Nonlinear.model(backend)
   src_vars = MOI.get(src, MOI.ListOfVariableIndices())
   vars = MOI.add_variables(dest, length(src_vars))
   index_map = Dict(zip(src_vars, vars))
@@ -487,19 +488,9 @@ function _copy_nonlinear!(dest, src)
     end
     return legacy_block
   end
-  return (; model = dest, vars, has_objective)
-end
-
-_nlp_block(data::MOI.NLPBlockData, backend) = data
-
-function _nlp_block(data, backend)
-  evaluator = MOI.Nonlinear.Evaluator(data.model, backend, data.vars)
-  bounds = MOI.Utilities.constraint_bounds(data.model)
-  return MOI.NLPBlockData(
-    MOI.NLPBoundsPair.(bounds.lower, bounds.upper),
-    evaluator,
-    data.has_objective,
-  )
+  evaluator = MOI.Nonlinear.Evaluator(dest, backend, vars)
+  bounds = MOI.Utilities.constraint_bounds(dest)
+  return MOI.NLPBlockData(MOI.NLPBoundsPair.(bounds.lower, bounds.upper), evaluator, has_objective)
 end
 
 """

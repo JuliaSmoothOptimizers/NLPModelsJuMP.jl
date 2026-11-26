@@ -39,14 +39,20 @@ end
   default = MOI.Nonlinear.SparseReverseMode()
   @test MOI.supports(opt, attr)
   @test MOI.get(opt, attr) === default
-  backend = CustomAD()
-  MOI.set(opt, attr, backend)
-  @test MOI.get(opt, attr) === backend
   @test MOI.is_empty(opt)
   MOI.set(opt, MOI.RawOptimizerAttribute("solver"), Percival.PercivalSolver)
   MOI.set(opt, MOI.Silent(), true)
+  MOI.copy_to(opt, JuMP.backend(src))
+  default_evaluator = opt.nlp.eval
+
+  backend = CustomAD()
+  MOI.set(opt, attr, backend)
+  @test MOI.get(opt, attr) === backend
+  @test opt.nlp.eval === default_evaluator
   index_map = MOI.copy_to(opt, JuMP.backend(src))
   @test !MOI.is_empty(opt)
+  @test typeof(opt.nlp.eval) != typeof(default_evaluator)
+  @test length(backend.models) == 1
   @test NLPModels.obj(opt.nlp, [1.0]) ≈ 1.0
   @test NLPModels.grad(opt.nlp, [1.0]) ≈ [-2.0]
   @test NLPModels.cons(opt.nlp, [1.0]) ≈ [exp(1.0) - exp(2.0)]
@@ -55,31 +61,9 @@ end
   variable = index_map[JuMP.index(x)]
   @test MOI.get(opt, MOI.VariablePrimal(), variable) ≈ 2.0 atol = 1e-4
 
-  # A rejected switch preserves both the copied data and the last solution.
-  err =
-    ErrorException("The automatic-differentiation backend must be set before adding model data.")
-  @test_throws err MOI.set(opt, attr, default)
-  @test MOI.get(opt, attr) === backend
-  @test MOI.get(opt, MOI.ResultCount()) == 1
-  @test MOI.get(opt, MOI.VariablePrimal(), variable) ≈ 2.0 atol = 1e-4
-
-  # A compatible backend must use the copied data even after the source changes.
-  JuMP.@objective(src, Min, x)
-  other = CustomAD()
-  MOI.set(opt, attr, other)
-  @test !MOI.is_empty(opt)
-  @test MOI.get(opt, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
-  @test MOI.get(opt, MOI.ResultCount()) == 0
-  MOI.optimize!(opt)
-  @test only(other.models) === only(backend.models)
-  @test MOI.get(opt, MOI.ObjectiveValue()) ≈ 0.0 atol = 1e-8
-  @test MOI.get(opt, MOI.VariablePrimal(), variable) ≈ 2.0 atol = 1e-4
-
   MOI.empty!(opt)
   @test MOI.is_empty(opt)
-  @test MOI.get(opt, attr) === other
-  MOI.set(opt, attr, default)
-  @test MOI.get(opt, attr) === default
+  @test MOI.get(opt, attr) === backend
 end
 
 @testset "Direct construction and legacy NLP blocks" begin
