@@ -14,7 +14,7 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 [compat]
 JuMP = "1.25"
 LinearAlgebra = "1.10"
-MathOptInterface = "1.46"
+MathOptInterface = "1.55"
 NLPModels = "0.21.6"
 NLPModelsTest = "0.10.6"
 Percival = "0.7.3"
