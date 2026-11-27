@@ -16,6 +16,7 @@ JuMP = "1.25"
 LinearAlgebra = "1.10"
 MathOptInterface = "1.55"
 NLPModels = "0.21.6"
+NLPModelsModifiers = "0.6, 0.7, 0.8"
 NLPModelsTest = "0.10.6"
 Percival = "0.7.3"
 Printf = "1.10"
@@ -26,9 +27,10 @@ julia = "1.10"
 
 [extras]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+NLPModelsModifiers = "e01155f1-5c6f-4375-a9d8-616dd036575f"
 NLPModelsTest = "7998695d-6960-4d3a-85c4-e1bceb8cd856"
 Percival = "01435c0c-c90d-11e9-3788-63660f8fbccc"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["LinearAlgebra", "NLPModelsTest", "Percival", "Test"]
+test = ["LinearAlgebra", "NLPModelsModifiers", "NLPModelsTest", "Percival", "Test"]

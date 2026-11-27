@@ -3,11 +3,22 @@ module TestMOI
 using Test
 import MathOptInterface as MOI
 import NLPModelsJuMP
+import NLPModelsModifiers
 import Percival
+
+# Percival needs Hessian-vector products for its augmented Lagrangian subproblems.
+function _subproblem_modifier(subproblem)
+  if subproblem.model.meta.hprod_available
+    return subproblem
+  end
+  return NLPModelsModifiers.LBFGSModel(subproblem)
+end
 
 function test_runtests()
   model = MOI.instantiate(NLPModelsJuMP.Optimizer, with_bridge_type = Float64)
-  MOI.set(model, MOI.RawOptimizerAttribute("solver"), Percival.PercivalSolver)
+  solver = nlp -> Percival.PercivalSolver(nlp; subproblem_modifier = _subproblem_modifier)
+  MOI.set(model, MOI.RawOptimizerAttribute("solver"), solver)
+  MOI.set(model, MOI.RawOptimizerAttribute("subproblem_modifier"), _subproblem_modifier)
   MOI.set(model, MOI.Silent(), true) # comment this to enable output
   config = MOI.Test.Config(
     atol = 1e-2,
