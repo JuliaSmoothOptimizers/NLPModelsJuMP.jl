@@ -1,14 +1,39 @@
 import SolverCore
 
+"""
+    Optimizer()
+
+Set `MOI.AutomaticDifferentiationBackend()` to select the backend that the next
+`MOI.copy_to` will use for nonlinear objectives and constraints.
+"""
 mutable struct Optimizer <: MOI.AbstractOptimizer
   options::Dict{String, Any}
   silent::Bool
   solver
   nlp::Union{Nothing, MathOptNLPModel}
   stats::Union{Nothing, SolverCore.GenericExecutionStats}
+  ad_backend::MOI.Nonlinear.AbstractAutomaticDifferentiation
   function Optimizer()
-    return new(Dict{String, Any}(), false, nothing, nothing, nothing)
+    return new(
+      Dict{String, Any}(),
+      false,
+      nothing,
+      nothing,
+      nothing,
+      MOI.Nonlinear.SparseReverseMode(),
+    )
   end
+end
+
+MOI.supports(::Optimizer, ::MOI.AutomaticDifferentiationBackend) = true
+MOI.get(optimizer::Optimizer, ::MOI.AutomaticDifferentiationBackend) = optimizer.ad_backend
+function MOI.set(
+  optimizer::Optimizer,
+  ::MOI.AutomaticDifferentiationBackend,
+  backend::MOI.Nonlinear.AbstractAutomaticDifferentiation,
+)
+  optimizer.ad_backend = backend
+  return
 end
 
 # FIXME return the name of the underlying NLPModel solver
@@ -82,6 +107,7 @@ MOI.supports_constraint(::Optimizer, ::Type{VAF}, ::Type{<:VLS}) = true
 MOI.supports_constraint(::Optimizer, ::Type{SQF}, ::Type{<:ALS}) = true
 MOI.supports_constraint(::Optimizer, ::Type{VQF}, ::Type{<:VLS}) = true
 MOI.supports_constraint(::Optimizer, ::Type{SNF}, ::Type{<:ALS}) = true
+MOI.supports_constraint(::Optimizer, ::Type{MOI.VectorOfVariables}, ::Type{ORACLE}) = true
 
 function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
   if !haskey(dest.options, "solver")
@@ -89,8 +115,10 @@ function MOI.copy_to(dest::Optimizer, src::MOI.ModelLike)
       "No solver specified, use for instance `using Percival; JuMP.set_attribute(model, \"solver\", PercivalSolver)`",
     )
   end
-  dest.nlp, index_map = nlp_model(src)
-  dest.solver = dest.options["solver"](dest.nlp)
+  nlp, index_map = nlp_model(src; backend = dest.ad_backend)
+  dest.solver = dest.options["solver"](nlp)
+  dest.nlp = nlp
+  dest.stats = nothing
   return index_map
 end
 
@@ -177,4 +205,4 @@ function MOI.get(optimizer::Optimizer, attr::MOI.VariablePrimal, vi::MOI.Variabl
   return optimizer.stats.solution[vi.value]
 end
 
-MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = 1
+MOI.get(optimizer::Optimizer, ::MOI.ResultCount) = isnothing(optimizer.stats) ? 0 : 1

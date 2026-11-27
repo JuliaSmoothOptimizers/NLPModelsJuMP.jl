@@ -25,21 +25,7 @@ const VNF = MOI.VectorNonlinearFunction
 const NF = Union{SNF, VNF}
 
 # VectorNonlinearOracle
-const ORACLE = MOI.VectorNonlinearOracle{Float64}  # VectorNonlinearOracle{Float64}(input_dimension, output_dimension, l, u, eval_f, jacobian_structure, eval_jacobian, hessian_lagrangian_structure, eval_hessian_lagrangian)
-
-# Cache of VectorNonlinearOracle
-mutable struct _VectorNonlinearOracleCache
-  set::MOI.VectorNonlinearOracle{Float64}
-  x::Vector{Float64}
-  nzJ::Vector{Float64}
-  nzH::Vector{Float64}
-
-  function _VectorNonlinearOracleCache(set::MOI.VectorNonlinearOracle{Float64})
-    nnzj = length(set.jacobian_structure)
-    nnzh = length(set.hessian_lagrangian_structure)
-    return new(set, zeros(set.input_dimension), zeros(nnzj), zeros(nnzh))
-  end
-end
+const ORACLE = MOI.VectorNonlinearOracle{Float64}
 
 # AffLinSets and VecLinSets
 const ALS = Union{
@@ -72,23 +58,6 @@ COO() = COO(Int[], Int[], Float64[])
 mutable struct LinearConstraints
   jacobian::COO
   nnzj::Int
-end
-
-# xᵀAx + bᵀx
-mutable struct QuadraticConstraint
-  A::COO
-  b::SparseVector{Float64}
-  g::Vector{Int}
-  dg::Dict{Int, Int}
-  nnzg::Int
-  nnzh::Int
-end
-
-mutable struct QuadraticConstraints
-  nquad::Int
-  constraints::Vector{QuadraticConstraint}
-  nnzj::Int
-  nnzh::Int
 end
 
 """
@@ -132,30 +101,6 @@ mutable struct Objective
 end
 
 """
-    Oracles
-
-Structure containing nonlinear oracles data:
-- oracles: vector of tuples (MOI.VectorOfVariables, _VectorNonlinearOracleCache)
-- ncon: number of scalar constraints represented by all oracles
-- lcon: lower bounds of oracle constraints
-- ucon: upper bounds of oracle constraints
-- nnzj: number of non-zero entries in the Jacobian of all oracles
-- nnzh: number of non-zero entries in the Hessian of all oracles
-- nzJ: buffer to store the nonzeros of the Jacobian for all oracles (needed for the functions jprod and jtprod)
-- nzH: buffer to store the nonzeros of the Hessian for all oracles (needed for the function hprod)
-- hessian_oracles_supported: support of the Hessian for all oracles
-"""
-mutable struct Oracles
-  oracles::Vector{Tuple{MOI.VectorOfVariables, _VectorNonlinearOracleCache}}
-  ncon::Int
-  lcon::Vector{Float64}
-  ucon::Vector{Float64}
-  nnzj::Int
-  nnzh::Int
-  hessian_oracles_supported::Bool
-end
-
-"""
     replace!(ex, x)
 
 Walk the expression `ex` and substitute in the actual variables `x`.
@@ -172,33 +117,6 @@ function replace!(ex, x)
       end
     end
   end
-end
-
-"""
-    coo_unsym_add_mul!(transpose, rows, cols, vals, x, y, α)
-
-Performs the update `y ← y + α * op(A) * x`, where `A` is an unsymmetric matrix in COO format given by `(rows, cols, vals)`.
-If `transpose == true`, then `op(A) = Aᵀ`; otherwise, `op(A) = A`.
-"""
-function coo_unsym_add_mul!(
-  transpose::Bool,
-  rows::AbstractVector{<:Integer},
-  cols::AbstractVector{<:Integer},
-  vals::AbstractVector,
-  x::AbstractVector,
-  y::AbstractVector,
-  α::Float64,
-)
-  nnz = length(vals)
-  @inbounds for k = 1:nnz
-    i, j, c = rows[k], cols[k], vals[k]
-    if transpose
-      y[j] += α * c * x[i]
-    else
-      y[i] += α * c * x[j]
-    end
-  end
-  return y
 end
 
 """
@@ -313,141 +231,29 @@ function parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_uco
   end
 end
 
-"""
-    parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
-
-Parse a `ScalarQuadraticFunction` fun with its associated set.
-`qcons`, `quad_lcon`, `quad_ucon` are updated.
-"""
-function parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
-  _index(v::MOI.VariableIndex) = index_map[v].value
-
-  b = spzeros(Float64, nvar)
-  rows = Int[]
-  cols = Int[]
-  vals = Float64[]
-
-  # Parse a ScalarAffineTerm{Float64}(coefficient, variable_index)
-  for term in fun.affine_terms
-    b[_index(term.variable)] = term.coefficient
+function _add_quadratic_constraint(model, f::SQF, set)
+  # Preserve the NLPModels convention of moving the constant into the bounds.
+  f, set = MOI.Utilities.normalize_constant(f, set; allow_modify_function = true)
+  if MOI.supports_constraint(model, SQF, typeof(set))
+    return MOI.add_constraint(model, f, set)
   end
+  return MOI.add_constraint(model, convert(SNF, f), set)
+end
 
-  # Parse a ScalarQuadraticTerm{Float64}(coefficient, variable_index_1, variable_index_2)
-  for term in fun.quadratic_terms
-    i = _index(term.variable_1)
-    j = _index(term.variable_2)
-    if i ≥ j
-      push!(rows, i)
-      push!(cols, j)
-    else
-      push!(rows, j)
-      push!(cols, i)
-    end
-    push!(vals, term.coefficient)
+function _add_quadratic_constraint(model, f::VQF, set)
+  scalar_set = MOI.Utilities.scalar_set_type(typeof(set), Float64)(0.0)
+  for row in MOI.Utilities.scalarize(f)
+    _add_quadratic_constraint(model, row, scalar_set)
   end
-
-  if typeof(set) in (MOI.Interval{Float64}, MOI.GreaterThan{Float64})
-    push!(quad_lcon, -fun.constant + set.lower)
-  elseif typeof(set) == MOI.EqualTo{Float64}
-    push!(quad_lcon, -fun.constant + set.value)
-  else
-    push!(quad_lcon, -Inf)
-  end
-
-  if typeof(set) in (MOI.Interval{Float64}, MOI.LessThan{Float64})
-    push!(quad_ucon, -fun.constant + set.upper)
-  elseif typeof(set) == MOI.EqualTo{Float64}
-    push!(quad_ucon, -fun.constant + set.value)
-  else
-    push!(quad_ucon, Inf)
-  end
-
-  A = COO(rows, cols, vals)
-  g = unique(vcat(rows, cols, b.nzind))  # sparsity pattern of Ax + b
-  nnzg = length(g)
-  # dg is a dictionary where:
-  # - The key `r` specifies a row index in the vector Ax + b.
-  # - The value `dg[r]` is a position in the vector (of length nnzg)
-  # where the non-zero entries of the Jacobian for row `r` are stored.
-  dg = Dict{Int, Int}(g[p] => p for p = 1:nnzg)
-  nnzh = length(vals)
-  qcon = QuadraticConstraint(A, b, g, dg, nnzg, nnzh)
-  push!(qcons, qcon)
+  return
 end
 
 """
-    parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
-
-Parse a `VectorQuadraticFunction` fun with its associated set.
-`qcons`, `quad_lcon`, `quad_ucon` are updated.
-"""
-function parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
-  _index(v::MOI.VariableIndex) = index_map[v].value
-
-  ncon = length(fun.constants)
-  for k = 1:ncon
-    b = spzeros(Float64, nvar)
-    rows = Int[]
-    cols = Int[]
-    vals = Float64[]
-
-    # Parse a VectorAffineTerm{Float64}(output_index, scalar_term)
-    for affine_term in fun.affine_terms
-      if affine_term.output_index == k
-        b[_index(affine_term.scalar_term.variable)] = affine_term.scalar_term.coefficient
-      end
-    end
-
-    # Parse a VectorQuadraticTerm{Float64}(output_index, scalar_term)
-    for quadratic_term in fun.quadratic_terms
-      if quadratic_term.output_index == k
-        i = _index(quadratic_term.scalar_term.variable_1)
-        j = _index(quadratic_term.scalar_term.variable_2)
-        if i ≥ j
-          push!(rows, i)
-          push!(cols, j)
-        else
-          push!(rows, j)
-          push!(cols, i)
-        end
-        push!(vals, quadratic_term.scalar_term.coefficient)
-      end
-    end
-
-    constant = fun.constants[k]
-
-    if typeof(set) in (MOI.Nonnegatives, MOI.Zeros)
-      append!(quad_lcon, constant)
-    else
-      append!(quad_lcon, -Inf)
-    end
-
-    if typeof(set) in (MOI.Nonpositives, MOI.Zeros)
-      append!(quad_ucon, -constant)
-    else
-      append!(quad_ucon, Inf)
-    end
-
-    A = COO(rows, cols, vals)
-    g = unique(vcat(rows, cols, b.nzind))  # sparsity pattern of Ax + b
-    nnzg = length(g)
-    # dg is a dictionary where:
-    # - The key `r` specifies a row index in the vector Ax + b.
-    # - The value `dg[r]` is a position in the vector (of length nnzg)
-    # where the non-zero entries of the Jacobian for row `r` are stored.
-    dg = Dict{Int, Int}(g[p] => p for p = 1:nnzg)
-    nnzh = length(vals)
-    qcon = QuadraticConstraint(A, b, g, dg, nnzg, nnzh)
-    push!(qcons, qcon)
-  end
-end
-
-"""
-    parser_MOI(moimodel, index_map, nvar)
+    parser_MOI(moimodel, index_map)
 
 Parse linear constraints of a `MOI.ModelLike`.
 """
-function parser_MOI(moimodel, index_map, nvar)
+function parser_MOI(moimodel, index_map)
 
   # Variables associated to linear constraints
   nlin = 0
@@ -457,16 +263,9 @@ function parser_MOI(moimodel, index_map, nvar)
   lin_lcon = Float64[]
   lin_ucon = Float64[]
 
-  # Variables associated to quadratic constraints
-  nquad = 0
-  qcons = QuadraticConstraint[]
-  quad_lcon = Float64[]
-  quad_ucon = Float64[]
-
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
-    # Ignore VectorNonlinearOracle here, we'll parse it separately
-    if F == MOI.VectorOfVariables && S <: MOI.VectorNonlinearOracle{Float64}
+    if (F, S) == (MOI.VectorOfVariables, ORACLE)
       continue
     end
     (F == VNF) && error(
@@ -474,107 +273,51 @@ function parser_MOI(moimodel, index_map, nvar)
     )
     F <: AF || F <: QF || F == SNF || F == VI || error("Function $F is not supported.")
     S <: LS || error("Set $S is not supported.")
+    if F == SNF
+      continue
+    end
 
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
     for cidx in conindices
-      fun = MOI.get(moimodel, MOI.ConstraintFunction(), cidx)
       if F == VI
+        fun = MOI.get(moimodel, MOI.ConstraintFunction(), cidx)
         index_map[cidx] = MOI.ConstraintIndex{F, S}(fun.value)
         continue
-      else
-        index_map[cidx] = MOI.ConstraintIndex{F, S}(nlin)
       end
+      index_map[cidx] = MOI.ConstraintIndex{F, S}(nlin)
+      if !(F <: AF)
+        continue
+      end
+      fun = MOI.get(moimodel, MOI.ConstraintFunction(), cidx)
       set = MOI.get(moimodel, MOI.ConstraintSet(), cidx)
-      if typeof(fun) <: SAF
+      if F == SAF
         parser_SAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
         nlin += 1
-      end
-      if typeof(fun) <: VAF
+      else
         parser_VAF(fun, set, linrows, lincols, linvals, nlin, lin_lcon, lin_ucon, index_map)
         nlin += set.dimension
-      end
-      if typeof(fun) <: SQF
-        parser_SQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
-        nquad += 1
-      end
-      if typeof(fun) <: VQF
-        parser_VQF(fun, set, nvar, qcons, quad_lcon, quad_ucon, index_map)
-        nquad += set.dimension
       end
     end
   end
   coo = COO(linrows, lincols, linvals)
   lin_nnzj = length(linvals)
   lincon = LinearConstraints(coo, lin_nnzj)
-  quad_nnzj = 0
-  quad_nnzh = 0
-  for i = 1:nquad
-    quad_nnzj += qcons[i].nnzg
-    quad_nnzh += qcons[i].nnzh
-  end
-  quadcon = QuadraticConstraints(nquad, qcons, quad_nnzj, quad_nnzh)
-
-  return nlin, lincon, lin_lcon, lin_ucon, quadcon, quad_lcon, quad_ucon
+  return nlin, lincon, lin_lcon, lin_ucon
 end
 
-# Affine or quadratic, nothing to do
-_nlp_model(::MOI.Nonlinear.Model, ::MOI.ModelLike, ::Type, ::Type) = false
-
-function _nlp_model(dest::MOI.Nonlinear.Model, src::MOI.ModelLike, F::Type{SNF}, S::Type)
-  has_nonlinear = false
-  for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
-    MOI.Nonlinear.add_constraint(
-      dest,
-      MOI.get(src, MOI.ConstraintFunction(), ci),
-      MOI.get(src, MOI.ConstraintSet(), ci),
-    )
-    has_nonlinear = true
-  end
-  return has_nonlinear
-end
-
-function _nlp_model(model::MOI.ModelLike)::Union{Nothing, MOI.Nonlinear.Model}
-  nlp_model = MOI.Nonlinear.Model()
-  has_nonlinear = false
-  for attr in MOI.get(model, MOI.ListOfModelAttributesSet())
-    if attr isa MOI.UserDefinedFunction
-      has_nonlinear = true
-      args = MOI.get(model, attr)
-      MOI.Nonlinear.register_operator(nlp_model, attr.name, attr.arity, args...)
+function _nlp_block(src, backend, index_map)
+  types = MOI.get(src, MOI.ListOfConstraintTypesPresent())
+  operators =
+    filter(attr -> attr isa MOI.UserDefinedFunction, MOI.get(src, MOI.ListOfModelAttributesSet()))
+  has_objective = MOI.get(src, MOI.ObjectiveFunctionType()) <: SNF
+  legacy = MOI.get(src, MOI.NLPBlock())
+  has_oracles = (MOI.VectorOfVariables, ORACLE) in types
+  dest = MOI.Nonlinear.model(backend)
+  if !isnothing(legacy)
+    if has_oracles
+      error("VectorNonlinearOracle constraints cannot be combined with a legacy NLPBlock.")
     end
-  end
-  for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
-    has_nonlinear |= _nlp_model(nlp_model, model, F, S)
-  end
-  F = MOI.get(model, MOI.ObjectiveFunctionType())
-  if F <: SNF
-    MOI.Nonlinear.set_objective(nlp_model, MOI.get(model, MOI.ObjectiveFunction{F}()))
-    has_nonlinear = true
-  end
-  if !has_nonlinear
-    return nothing
-  end
-  return nlp_model
-end
-
-function _nlp_block(model::MOI.ModelLike)
-  # Old interface with `@NL...`
-  nlp_data = MOI.get(model, MOI.NLPBlock())
-  # New interface with `@constraint` and `@objective`
-  nlp_model = _nlp_model(model)
-  vars = MOI.get(model, MOI.ListOfVariableIndices())
-  if isnothing(nlp_data)
-    if isnothing(nlp_model)
-      evaluator =
-        MOI.Nonlinear.Evaluator(MOI.Nonlinear.Model(), MOI.Nonlinear.SparseReverseMode(), vars)
-      nlp_data = MOI.NLPBlockData(evaluator)
-    else
-      backend = MOI.Nonlinear.SparseReverseMode()
-      evaluator = MOI.Nonlinear.Evaluator(nlp_model, backend, vars)
-      nlp_data = MOI.NLPBlockData(evaluator)
-    end
-  else
-    if !isnothing(nlp_model)
+    if has_objective || !isempty(operators) || any(t -> first(t) == SNF, types)
       error(
         "Cannot optimize a model which contains the features from " *
         "both the legacy (macros beginning with `@NL`) and new " *
@@ -582,8 +325,57 @@ function _nlp_block(model::MOI.ModelLike)
         "the other.",
       )
     end
+    # The legacy NLPBlock path requires the built-in outer quadratic layer.
+    @assert dest isa MOI.Nonlinear.ModelWithQuad
+    if !any(t -> first(t) <: QF, types)
+      return legacy
+    end
+  elseif has_oracles && !MOI.supports_constraint(dest, MOI.VectorOfVariables, ORACLE)
+    dest = MOI.Nonlinear.ModelWithOracles(dest)
   end
-  return nlp_data
+  src_vars = MOI.get(src, MOI.ListOfVariableIndices())
+  vars = MOI.add_variables(dest, length(src_vars))
+  variable_map = Dict(zip(src_vars, vars))
+  for attr in operators
+    MOI.set(dest, attr, MOI.get(src, attr))
+  end
+  # Insert the quadratic rows first, including for backends that keep insertion order.
+  for (F, S) in types
+    if F <: QF
+      for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
+        f = MOI.Utilities.map_indices(variable_map, MOI.get(src, MOI.ConstraintFunction(), ci))
+        _add_quadratic_constraint(dest, f, MOI.get(src, MOI.ConstraintSet(), ci))
+      end
+    end
+  end
+  if !isnothing(legacy)
+    if legacy.has_objective
+      dest.objective_sink = MOI.Nonlinear._INNER
+    end
+    evaluator = _legacy_evaluator(dest, legacy, backend)
+    return MOI.NLPBlockData(_constraint_bounds(dest, legacy), evaluator, legacy.has_objective)
+  end
+  for (F, S) in types
+    if F == SNF || (F, S) == (MOI.VectorOfVariables, ORACLE)
+      for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
+        f = MOI.get(src, MOI.ConstraintFunction(), ci)
+        index_map[ci] = MOI.add_constraint(
+          dest,
+          MOI.Utilities.map_indices(variable_map, f),
+          MOI.get(src, MOI.ConstraintSet(), ci),
+        )
+      end
+    end
+  end
+  if has_objective
+    attr = MOI.ObjectiveFunction{SNF}()
+    MOI.set(dest, attr, MOI.Utilities.map_indices(variable_map, MOI.get(src, attr)))
+    # NLPModelMeta stores the sense. Its evaluator must return the original objective.
+    sense = MOI.get(src, MOI.ObjectiveSense())
+    MOI.set(dest, MOI.ObjectiveSense(), sense == MOI.MAX_SENSE ? MOI.MIN_SENSE : sense)
+  end
+  evaluator = MOI.Nonlinear.Evaluator(dest, backend, vars)
+  return MOI.NLPBlockData(_constraint_bounds(dest, nothing), evaluator, has_objective)
 end
 
 """
@@ -600,78 +392,40 @@ function parser_NL(nlp_data; hessian::Bool = true)
   nl_ucon = Float64[bounds.upper for bounds in nlp_data.constraint_bounds]
 
   eval = nlp_data.evaluator
-  has_hessian = hessian && :Hess in MOI.features_available(eval)
-  # Check features available in model
-  init_feat = [:Grad, :Jac]
+  features = MOI.features_available(eval)
+  has_hessian = hessian && :Hess in features
+  init_feat = Symbol[]
+  if nlp_data.has_objective
+    push!(init_feat, :Grad)
+  end
+  if nnln > 0
+    push!(init_feat, :Jac)
+  end
   if has_hessian
     push!(init_feat, :Hess)
   end
-  if :JacVec in MOI.features_available(eval)
+  if nnln > 0 && :JacVec in features
     push!(init_feat, :JacVec)
   end
-  if :HessVec in MOI.features_available(eval)
+  if hessian && :HessVec in features
     push!(init_feat, :HessVec)
   end
 
   MOI.initialize(eval, init_feat)
 
-  jac = MOI.jacobian_structure(eval)
+  jac = nnln > 0 ? MOI.jacobian_structure(eval) : Tuple{Int, Int}[]
   jac_rows, jac_cols = getindex.(jac, 1), getindex.(jac, 2)
   nnzj = length(jac)
 
   hess = has_hessian ? MOI.hessian_lagrangian_structure(eval) : Tuple{Int, Int}[]
-  hess_rows = has_hessian ? getindex.(hess, 1) : Int[]
-  hess_cols = has_hessian ? getindex.(hess, 2) : Int[]
+  # MOI allows either triangle. NLPModels requires the lower triangle.
+  hess_rows = [max(i, j) for (i, j) in hess]
+  hess_cols = [min(i, j) for (i, j) in hess]
   nnzh = length(hess)
   nlcon =
     NonLinearStructure(nnln, nl_lcon, nl_ucon, jac_rows, jac_cols, nnzj, hess_rows, hess_cols, nnzh)
 
   return nlcon
-end
-
-"""
-    oracles = parser_oracles(moimodel)
-
-Parse nonlinear oracles of a `MOI.ModelLike`.
-"""
-function parser_oracles(moimodel)
-  hessian_oracles_supported = true
-  oracles = Tuple{MOI.VectorOfVariables, _VectorNonlinearOracleCache}[]
-  lcon = Float64[]
-  ucon = Float64[]
-
-  # We know this pair exists from ListOfConstraintTypesPresent
-  for ci in MOI.get(
-    moimodel,
-    MOI.ListOfConstraintIndices{MOI.VectorOfVariables, MOI.VectorNonlinearOracle{Float64}}(),
-  )
-    f = MOI.get(moimodel, MOI.ConstraintFunction(), ci)  # ::MOI.VectorOfVariables
-    set = MOI.get(moimodel, MOI.ConstraintSet(), ci)       # ::MOI.VectorNonlinearOracle{Float64}
-
-    cache = _VectorNonlinearOracleCache(set)
-    push!(oracles, (f, cache))
-
-    # Bounds: MOI.VectorNonlinearOracle stores them internally (l, u)
-    append!(lcon, set.l)
-    append!(ucon, set.u)
-
-    # Support for the Hessian
-    hessian_oracles_supported = hessian_oracles_supported && !isnothing(set.eval_hessian_lagrangian)
-  end
-
-  # Number of scalar constraints represented by all oracles
-  ncon = length(lcon)
-
-  # Number of nonzeros for the Jacobian and Hessian
-  nnzj = 0
-  nnzh = 0
-  for (_, cache) in oracles
-    nnzj += length(cache.set.jacobian_structure)
-    # there may or may not be Hessian info
-    nnzh += length(cache.set.hessian_lagrangian_structure)
-  end
-
-  return Oracles(oracles, ncon, lcon, ucon, nnzj, nnzh, hessian_oracles_supported)
 end
 
 """
