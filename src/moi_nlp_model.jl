@@ -17,7 +17,8 @@ end
 
 Construct a `MathOptNLPModel` from a `JuMP` model. The `backend` selects the
 model and evaluator for scalar nonlinear objectives and for quadratic and nonlinear constraints.
-A legacy `MOI.NLPBlock` supplies its own evaluator.
+A legacy `MOI.NLPBlock` supplies its own evaluator and requires a backend whose
+model has `MOI.Nonlinear.ModelWithQuad` as its outer layer.
 
 `hessian` should be set to `false` for multivariate user-defined functions registered without hessian.
 """

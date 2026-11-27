@@ -66,6 +66,11 @@ end
   @test MOI.get(opt, attr) === backend
 end
 
+struct LegacyBackend{M} <: MOI.Nonlinear.AbstractAutomaticDifferentiation
+  model::M
+end
+MOI.Nonlinear.model(backend::LegacyBackend) = backend.model
+
 @testset "Direct construction and legacy NLP blocks" begin
   src = JuMP.Model()
   x = JuMP.@variable(src)
@@ -79,6 +84,12 @@ end
   nlp = NLPModelsJuMP.MathOptNLPModel(src; backend)
   @test length(backend.models) == 1
   @test NLPModels.grad(nlp, [2.0]) == [12.0]
+  unlayered = LegacyBackend(MOI.Nonlinear.Model())
+  @test_throws AssertionError NLPModelsJuMP.MathOptNLPModel(src; backend = unlayered)
+  JuMP.@constraint(src, x^2 >= 1)
+  @test_throws AssertionError NLPModelsJuMP.MathOptNLPModel(src; backend = unlayered)
+  layered = LegacyBackend(MOI.Nonlinear.model(MOI.Nonlinear.SparseReverseMode()))
+  @test NLPModelsJuMP.MathOptNLPModel(src; backend = layered).eval.model === layered.model
   JuMP.@constraint(src, exp(x) >= 1)
   @test_throws "both the legacy" NLPModelsJuMP.MathOptNLPModel(src; backend)
 end
@@ -214,7 +225,9 @@ end
   JuMP.@constraint(src, [2x^2 + 3] in MOI.Nonpositives(1))
   JuMP.@constraint(src, [x^2 - 4] in MOI.Zeros(1))
   MOI.set(JuMP.backend(src), MOI.NLPBlock(), MOI.NLPBlockData([], LegacyObjective(), false))
-  nlp = NLPModelsJuMP.MathOptNLPModel(JuMP.backend(src))
+  backend = CustomAD()
+  nlp = NLPModelsJuMP.MathOptNLPModel(JuMP.backend(src); backend)
+  @test only(backend.models) === nlp.eval.model.inner
   # MOI can return the two constraint types in either order.
   eq = only(findall(==(4.0), nlp.meta.lcon))
   le = 3 - eq

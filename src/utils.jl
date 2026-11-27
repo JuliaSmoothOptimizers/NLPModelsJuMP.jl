@@ -286,51 +286,6 @@ function _add_quadratic_constraint(model, f::VQF, set)
   return
 end
 
-# A legacy objective with no constraints need not implement any Jacobian callbacks.
-# EvaluatorWithQuad still calls them on the inner evaluator when it combines rows.
-struct _ObjectiveOnlyEvaluator{E} <: MOI.AbstractNLPEvaluator
-  inner::E
-end
-
-MOI.features_available(d::_ObjectiveOnlyEvaluator) =
-  union(MOI.features_available(d.inner), [:Jac, :JacVec])
-function MOI.initialize(d::_ObjectiveOnlyEvaluator, features)
-  return MOI.initialize(d.inner, setdiff(features, [:Jac, :JacVec]))
-end
-MOI.eval_objective(d::_ObjectiveOnlyEvaluator, x) = MOI.eval_objective(d.inner, x)
-function MOI.eval_objective_gradient(d::_ObjectiveOnlyEvaluator, g, x)
-  return MOI.eval_objective_gradient(d.inner, g, x)
-end
-MOI.eval_constraint(::_ObjectiveOnlyEvaluator, g, x) = nothing
-MOI.jacobian_structure(::_ObjectiveOnlyEvaluator) = Tuple{Int, Int}[]
-MOI.eval_constraint_jacobian(::_ObjectiveOnlyEvaluator, J, x) = nothing
-MOI.eval_constraint_jacobian_product(::_ObjectiveOnlyEvaluator, y, x, v) = nothing
-MOI.eval_constraint_jacobian_transpose_product(::_ObjectiveOnlyEvaluator, y, x, v) = fill!(y, 0)
-function MOI.hessian_lagrangian_structure(d::_ObjectiveOnlyEvaluator)
-  return MOI.hessian_lagrangian_structure(d.inner)
-end
-function MOI.eval_hessian_lagrangian(d::_ObjectiveOnlyEvaluator, H, x, σ, μ)
-  return MOI.eval_hessian_lagrangian(d.inner, H, x, σ, μ)
-end
-function MOI.eval_hessian_lagrangian_product(d::_ObjectiveOnlyEvaluator, Hv, x, v, σ, μ)
-  return MOI.eval_hessian_lagrangian_product(d.inner, Hv, x, v, σ, μ)
-end
-
-function _quadratic_and_legacy_block(model, legacy)
-  if !legacy.has_objective && isempty(legacy.constraint_bounds)
-    return MOI.NLPBlockData(MOI.Nonlinear.Evaluator(model, MOI.Nonlinear.SparseReverseMode()))
-  end
-  if legacy.has_objective
-    model.objective_sink = MOI.Nonlinear._INNER
-  end
-  inner =
-    isempty(legacy.constraint_bounds) ? _ObjectiveOnlyEvaluator(legacy.evaluator) : legacy.evaluator
-  evaluator = MOI.Nonlinear.EvaluatorWithQuad(model, inner)
-  bounds = MOI.Utilities.constraint_bounds(model)
-  pairs = vcat(MOI.NLPBoundsPair.(bounds.lower, bounds.upper), legacy.constraint_bounds)
-  return MOI.NLPBlockData(pairs, evaluator, legacy.has_objective)
-end
-
 """
     parser_MOI(moimodel, index_map)
 
@@ -392,9 +347,8 @@ function _nlp_block(src, backend)
     filter(attr -> attr isa MOI.UserDefinedFunction, MOI.get(src, MOI.ListOfModelAttributesSet()))
   has_objective = MOI.get(src, MOI.ObjectiveFunctionType()) <: SNF
   legacy = MOI.get(src, MOI.NLPBlock())
-  if isnothing(legacy)
-    dest = MOI.Nonlinear.model(backend)
-  else
+  dest = MOI.Nonlinear.model(backend)
+  if !isnothing(legacy)
     if has_objective || !isempty(operators) || any(t -> first(t) == SNF, types)
       error(
         "Cannot optimize a model which contains the features from " *
@@ -403,10 +357,11 @@ function _nlp_block(src, backend)
         "the other.",
       )
     end
+    # The legacy NLPBlock path requires the built-in outer quadratic layer.
+    @assert dest isa MOI.Nonlinear.ModelWithQuad
     if !any(t -> first(t) <: QF, types)
       return legacy
     end
-    dest = MOI.Nonlinear.ModelWithQuad(MOI.Nonlinear.Model())
   end
   src_vars = MOI.get(src, MOI.ListOfVariableIndices())
   vars = MOI.add_variables(dest, length(src_vars))
@@ -424,7 +379,11 @@ function _nlp_block(src, backend)
     end
   end
   if !isnothing(legacy)
-    return _quadratic_and_legacy_block(dest, legacy)
+    if legacy.has_objective
+      dest.objective_sink = MOI.Nonlinear._INNER
+    end
+    evaluator = _legacy_evaluator(dest, legacy, backend)
+    return MOI.NLPBlockData(_constraint_bounds(dest, legacy), evaluator, legacy.has_objective)
   end
   for (F, S) in types
     if F == SNF
@@ -446,8 +405,7 @@ function _nlp_block(src, backend)
     MOI.set(dest, MOI.ObjectiveSense(), sense == MOI.MAX_SENSE ? MOI.MIN_SENSE : sense)
   end
   evaluator = MOI.Nonlinear.Evaluator(dest, backend, vars)
-  bounds = MOI.Utilities.constraint_bounds(dest)
-  return MOI.NLPBlockData(MOI.NLPBoundsPair.(bounds.lower, bounds.upper), evaluator, has_objective)
+  return MOI.NLPBlockData(_constraint_bounds(dest, nothing), evaluator, has_objective)
 end
 
 """
