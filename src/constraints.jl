@@ -10,17 +10,8 @@ function NLPModels.cons_lin!(nlp::_MathOptModel, x::AbstractVector, c::AbstractV
 end
 
 function _cons_nln!(nlp, x, c)
-  offset = nlp.nlcon.nnln
-  if offset > 0
-    MOI.eval_constraint(_constraint_evaluator(nlp), view(c, 1:offset), x)
-  end
-  for (f, s) in nlp.oracles.oracles
-    for i in eachindex(s.x)
-      s.x[i] = x[f.variables[i].value]
-    end
-    rows = (offset + 1):(offset + s.set.output_dimension)
-    s.set.eval_f(view(c, rows), s.x)
-    offset += s.set.output_dimension
+  if nlp.nlcon.nnln > 0
+    MOI.eval_constraint(_constraint_evaluator(nlp), c, x)
   end
   return c
 end
@@ -54,18 +45,8 @@ function NLPModels.jac_nln_structure!(
   rows::AbstractVector{<:Integer},
   cols::AbstractVector{<:Integer},
 )
-  offset = nlp.nlcon.nnzj
-  view(rows, 1:offset) .= nlp.nlcon.jac_rows
-  view(cols, 1:offset) .= nlp.nlcon.jac_cols
-  row_offset = nlp.nlcon.nnln
-  for (f, s) in nlp.oracles.oracles
-    for (r, c) in s.set.jacobian_structure
-      offset += 1
-      rows[offset] = row_offset + r
-      cols[offset] = f.variables[c].value
-    end
-    row_offset += s.set.output_dimension
-  end
+  rows .= nlp.nlcon.jac_rows
+  cols .= nlp.nlcon.jac_cols
   return rows, cols
 end
 
@@ -89,17 +70,8 @@ function NLPModels.jac_lin_coord!(nlp::_MathOptModel, x::AbstractVector, vals::A
 end
 
 function _jac_nln_coord!(nlp, x, vals)
-  offset = nlp.nlcon.nnzj
   if nlp.nlcon.nnln > 0
-    MOI.eval_constraint_jacobian(_constraint_evaluator(nlp), view(vals, 1:offset), x)
-  end
-  for (f, s) in nlp.oracles.oracles
-    for i in eachindex(s.x)
-      s.x[i] = x[f.variables[i].value]
-    end
-    nnzj = length(s.set.jacobian_structure)
-    s.set.eval_jacobian(view(vals, (offset + 1):(offset + nnzj)), s.x)
-    offset += nnzj
+    MOI.eval_constraint_jacobian(_constraint_evaluator(nlp), vals, x)
   end
   return vals
 end
@@ -129,20 +101,8 @@ function NLPModels.jprod_lin!(
 end
 
 function _jprod_nln!(nlp, x, v, Jv)
-  offset = nlp.nlcon.nnln
-  if offset > 0
-    MOI.eval_constraint_jacobian_product(_constraint_evaluator(nlp), view(Jv, 1:offset), x, v)
-  end
-  for (f, s) in nlp.oracles.oracles
-    for i in eachindex(s.x)
-      s.x[i] = x[f.variables[i].value]
-    end
-    s.set.eval_jacobian(s.nzJ, s.x)
-    view(Jv, (offset + 1):(offset + s.set.output_dimension)) .= 0
-    for (k, (r, c)) in enumerate(s.set.jacobian_structure)
-      Jv[offset + r] += s.nzJ[k] * v[f.variables[c].value]
-    end
-    offset += s.set.output_dimension
+  if nlp.nlcon.nnln > 0
+    MOI.eval_constraint_jacobian_product(_constraint_evaluator(nlp), Jv, x, v)
   end
   return Jv
 end
@@ -183,26 +143,10 @@ function NLPModels.jtprod_lin!(
 end
 
 function _jtprod_nln!(nlp, x, v, Jtv)
-  offset = nlp.nlcon.nnln
-  if offset > 0
-    MOI.eval_constraint_jacobian_transpose_product(
-      _constraint_evaluator(nlp),
-      Jtv,
-      x,
-      view(v, 1:offset),
-    )
+  if nlp.nlcon.nnln > 0
+    MOI.eval_constraint_jacobian_transpose_product(_constraint_evaluator(nlp), Jtv, x, v)
   else
     fill!(Jtv, 0)
-  end
-  for (f, s) in nlp.oracles.oracles
-    for i in eachindex(s.x)
-      s.x[i] = x[f.variables[i].value]
-    end
-    s.set.eval_jacobian(s.nzJ, s.x)
-    for (k, (r, c)) in enumerate(s.set.jacobian_structure)
-      Jtv[f.variables[c].value] += s.nzJ[k] * v[offset + r]
-    end
-    offset += s.set.output_dimension
   end
   return Jtv
 end

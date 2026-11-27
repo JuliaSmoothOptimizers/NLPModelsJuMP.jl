@@ -1,3 +1,5 @@
+using JuMP
+
 function hs100(args...; kwargs...)
   nlp = Model()
   x0 = [1, 2, 0, 4, 0, 1, 1]
@@ -29,8 +31,7 @@ function hs100_oracle(args...; kwargs...)
   x0 = [1, 2, 0, 4, 0, 1, 1]
   @variable(model, x[i = 1:7], start = x0[i])
 
-  # 1st constraint: keep as NLconstraint
-  @NLconstraint(model, 127 - 2 * x[1]^2 - 3 * x[2]^4 - x[3] - 4 * x[4]^2 - 5 * x[5] ≥ 0)
+  @constraint(model, 127 - 2 * x[1]^2 - 3 * x[2]^4 - x[3] - 4 * x[4]^2 - 5 * x[5] ≥ 0)
 
   # 2nd constraint as oracle:
   # Original: 282 - 7x1 - 3x2 - 10x3^2 - x4 + x5 ≥ 0
@@ -94,7 +95,7 @@ function hs100_oracle(args...; kwargs...)
   @constraint(model, -4 * x[1]^2 - x[2]^2 + 3 * x[1] * x[2] - 2 * x[3]^2 - 5 * x[6] + 11 * x[7] ≥ 0)
 
   # Objective: same as original
-  @NLobjective(
+  @objective(
     model,
     Min,
     (x[1] - 10)^2 +

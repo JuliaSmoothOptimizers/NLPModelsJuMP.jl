@@ -122,24 +122,25 @@ end
   for legacy in (false, true), least_squares in (false, true)
     src = JuMP.Model()
     x, y = JuMP.@variable(src, [1:2])
-    if legacy
-      JuMP.@NLconstraint(src, sin(x) <= 0)
-    else
-      JuMP.@constraint(src, sin(x) <= 0)
-    end
     JuMP.@constraint(src, x + y == 5)
     JuMP.@constraint(src, [x * y + 3, x^2 - 4] in MOI.Nonnegatives(2))
-    oracle = MOI.VectorNonlinearOracle(;
-      dimension = 1,
-      l = [-1.0],
-      u = [1.0],
-      eval_f = (ret, u) -> (ret[1] = u[1]^2),
-      jacobian_structure = [(1, 1)],
-      eval_jacobian = (ret, u) -> (ret[1] = 2u[1]),
-      hessian_lagrangian_structure = [(1, 1)],
-      eval_hessian_lagrangian = (ret, u, μ) -> (ret[1] = 2μ[1]),
-    )
-    JuMP.@constraint(src, [y] in oracle)
+    if legacy
+      JuMP.@NLconstraint(src, -1 <= y^2 <= 1)
+      JuMP.@NLconstraint(src, sin(x) <= 0)
+    else
+      oracle = MOI.VectorNonlinearOracle(;
+        dimension = 1,
+        l = [-1.0],
+        u = [1.0],
+        eval_f = (ret, u) -> (ret[1] = u[1]^2),
+        jacobian_structure = [(1, 1)],
+        eval_jacobian = (ret, u) -> (ret[1] = 2u[1]),
+        hessian_lagrangian_structure = [(1, 1)],
+        eval_hessian_lagrangian = (ret, u, μ) -> (ret[1] = 2μ[1]),
+      )
+      JuMP.@constraint(src, [y] in oracle)
+      JuMP.@constraint(src, sin(x) <= 0)
+    end
     if least_squares
       F = legacy ? JuMP.@NLexpression(src, x^2) : x
       nlp = NLPModelsJuMP.MathOptNLSModel(src, [F])
@@ -150,17 +151,17 @@ end
       else
         JuMP.@objective(src, Min, x^3)
       end
-      nlp = NLPModelsJuMP.MathOptNLPModel(src; backend = CustomAD())
+      nlp = NLPModelsJuMP.MathOptNLPModel(src)
       @test length(nlp.eval.model) == 2
       objective_hessian = 12.0
     end
     u, v = [2.0, 3.0], [4.0, -1.0]
-    c = [5.0, 6.0, 4.0, sin(2.0), 9.0]
-    J = [1.0 1.0; 3.0 2.0; 4.0 0.0; cos(2.0) 0.0; 0.0 6.0]
+    c = [5.0, 6.0, 4.0, 9.0, sin(2.0)]
+    J = [1.0 1.0; 3.0 2.0; 4.0 0.0; 0.0 6.0; cos(2.0) 0.0]
     μ = [1.0, 2.0, 3.0, 4.0, 5.0]
-    H = [objective_hessian + 6 - 4sin(2.0) 2.0; 2.0 10.0]
-    @test nlp.meta.lcon == [5.0, -3.0, 4.0, -Inf, -1.0]
-    @test nlp.meta.ucon == [5.0, Inf, Inf, 0.0, 1.0]
+    H = [objective_hessian + 6 - 5sin(2.0) 2.0; 2.0 8.0]
+    @test nlp.meta.lcon == [5.0, -3.0, 4.0, -1.0, -Inf]
+    @test nlp.meta.ucon == [5.0, Inf, Inf, 1.0, 0.0]
     @test NLPModels.cons(nlp, u) ≈ c
     @test NLPModels.cons_lin(nlp, u) ≈ c[1:1]
     @test NLPModels.cons_nln(nlp, u) ≈ c[2:end]
@@ -183,9 +184,48 @@ end
     if !least_squares
       @test Matrix(NLPModels.jth_hess(nlp, u, 2)) ≈ [0.0 1.0; 1.0 0.0]
       @test NLPModels.jth_hprod(nlp, u, v, 2) ≈ reverse(v)
-      @test NLPModels.ghjvprod(nlp, u, u, v) ≈ [0.0, 10.0, 16.0, -8sin(2.0), -6.0]
+      @test Matrix(NLPModels.jth_hess(nlp, u, 4)) ≈ [0.0 0.0; 0.0 2.0]
+      @test NLPModels.ghjvprod(nlp, u, u, v) ≈ [0.0, 10.0, 16.0, -6.0, -8sin(2.0)]
     end
   end
+end
+
+@testset "Vector oracle with first derivatives only" begin
+  src = JuMP.Model()
+  unused = JuMP.@variable(src)
+  x, y = JuMP.@variable(src, [1:2])
+  JuMP.delete(src, unused)
+  oracle = MOI.VectorNonlinearOracle(;
+    dimension = 2,
+    l = [-Inf, 0.0],
+    u = [3.0, Inf],
+    eval_f = (ret, u) -> (ret .= [u[1] * u[2], u[1]^2]),
+    jacobian_structure = [(1, 1), (1, 2), (2, 1)],
+    eval_jacobian = (ret, u) -> (ret .= [u[2], u[1], 2u[1]]),
+  )
+  c = JuMP.@constraint(src, [y, x] in oracle)
+  opt = NLPModelsJuMP.Optimizer()
+  @test MOI.supports_constraint(opt, MOI.VectorOfVariables, typeof(oracle))
+  MOI.set(opt, MOI.AutomaticDifferentiationBackend(), CustomAD())
+  MOI.set(opt, MOI.RawOptimizerAttribute("solver"), identity)
+  index_map = MOI.copy_to(opt, JuMP.backend(src))
+  @test MOI.is_valid(opt.nlp.eval.model, index_map[JuMP.index(c)])
+  u, v = [2.0, 3.0], [1.0, -2.0]
+  J = [3.0 2.0; 0.0 6.0]
+  for nlp in (opt.nlp, NLPModelsJuMP.MathOptNLSModel(src, [x]))
+    @test nlp.meta.lcon == oracle.l
+    @test nlp.meta.ucon == oracle.u
+    @test NLPModels.cons(nlp, u) == [6.0, 9.0]
+    @test NLPModels.jac(nlp, u) == J
+    @test NLPModels.jprod(nlp, u, v) == J * v
+    @test NLPModels.jtprod(nlp, u, v) == J' * v
+    @test !nlp.meta.hess_available
+    @test !nlp.meta.hprod_available
+  end
+
+  JuMP.@NLconstraint(src, sin(x) <= 0)
+  @test_throws "legacy NLPBlock" NLPModelsJuMP.MathOptNLPModel(src)
+  @test_throws "legacy NLPBlock" NLPModelsJuMP.MathOptNLSModel(src, [x])
 end
 
 struct LegacyObjective <: MOI.AbstractNLPEvaluator end

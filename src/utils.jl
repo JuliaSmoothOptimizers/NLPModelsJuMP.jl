@@ -25,21 +25,7 @@ const VNF = MOI.VectorNonlinearFunction
 const NF = Union{SNF, VNF}
 
 # VectorNonlinearOracle
-const ORACLE = MOI.VectorNonlinearOracle{Float64}  # VectorNonlinearOracle{Float64}(input_dimension, output_dimension, l, u, eval_f, jacobian_structure, eval_jacobian, hessian_lagrangian_structure, eval_hessian_lagrangian)
-
-# Cache of VectorNonlinearOracle
-mutable struct _VectorNonlinearOracleCache
-  set::MOI.VectorNonlinearOracle{Float64}
-  x::Vector{Float64}
-  nzJ::Vector{Float64}
-  nzH::Vector{Float64}
-
-  function _VectorNonlinearOracleCache(set::MOI.VectorNonlinearOracle{Float64})
-    nnzj = length(set.jacobian_structure)
-    nnzh = length(set.hessian_lagrangian_structure)
-    return new(set, zeros(set.input_dimension), zeros(nnzj), zeros(nnzh))
-  end
-end
+const ORACLE = MOI.VectorNonlinearOracle{Float64}
 
 # AffLinSets and VecLinSets
 const ALS = Union{
@@ -112,30 +98,6 @@ mutable struct Objective
   gradient::SparseVector{Float64}
   hessian::COO
   nnzh::Int
-end
-
-"""
-    Oracles
-
-Structure containing nonlinear oracles data:
-- oracles: vector of tuples (MOI.VectorOfVariables, _VectorNonlinearOracleCache)
-- ncon: number of scalar constraints represented by all oracles
-- lcon: lower bounds of oracle constraints
-- ucon: upper bounds of oracle constraints
-- nnzj: number of non-zero entries in the Jacobian of all oracles
-- nnzh: number of non-zero entries in the Hessian of all oracles
-- nzJ: buffer to store the nonzeros of the Jacobian for all oracles (needed for the functions jprod and jtprod)
-- nzH: buffer to store the nonzeros of the Hessian for all oracles (needed for the function hprod)
-- hessian_oracles_supported: support of the Hessian for all oracles
-"""
-mutable struct Oracles
-  oracles::Vector{Tuple{MOI.VectorOfVariables, _VectorNonlinearOracleCache}}
-  ncon::Int
-  lcon::Vector{Float64}
-  ucon::Vector{Float64}
-  nnzj::Int
-  nnzh::Int
-  hessian_oracles_supported::Bool
 end
 
 """
@@ -303,8 +265,7 @@ function parser_MOI(moimodel, index_map)
 
   contypes = MOI.get(moimodel, MOI.ListOfConstraintTypesPresent())
   for (F, S) in contypes
-    # Ignore VectorNonlinearOracle here, we'll parse it separately
-    if F == MOI.VectorOfVariables && S <: MOI.VectorNonlinearOracle{Float64}
+    if (F, S) == (MOI.VectorOfVariables, ORACLE)
       continue
     end
     (F == VNF) && error(
@@ -312,6 +273,9 @@ function parser_MOI(moimodel, index_map)
     )
     F <: AF || F <: QF || F == SNF || F == VI || error("Function $F is not supported.")
     S <: LS || error("Set $S is not supported.")
+    if F == SNF
+      continue
+    end
 
     conindices = MOI.get(moimodel, MOI.ListOfConstraintIndices{F, S}())
     for cidx in conindices
@@ -341,14 +305,18 @@ function parser_MOI(moimodel, index_map)
   return nlin, lincon, lin_lcon, lin_ucon
 end
 
-function _nlp_block(src, backend)
+function _nlp_block(src, backend, index_map)
   types = MOI.get(src, MOI.ListOfConstraintTypesPresent())
   operators =
     filter(attr -> attr isa MOI.UserDefinedFunction, MOI.get(src, MOI.ListOfModelAttributesSet()))
   has_objective = MOI.get(src, MOI.ObjectiveFunctionType()) <: SNF
   legacy = MOI.get(src, MOI.NLPBlock())
+  has_oracles = (MOI.VectorOfVariables, ORACLE) in types
   dest = MOI.Nonlinear.model(backend)
   if !isnothing(legacy)
+    if has_oracles
+      error("VectorNonlinearOracle constraints cannot be combined with a legacy NLPBlock.")
+    end
     if has_objective || !isempty(operators) || any(t -> first(t) == SNF, types)
       error(
         "Cannot optimize a model which contains the features from " *
@@ -362,10 +330,12 @@ function _nlp_block(src, backend)
     if !any(t -> first(t) <: QF, types)
       return legacy
     end
+  elseif has_oracles && !MOI.supports_constraint(dest, MOI.VectorOfVariables, ORACLE)
+    dest = MOI.Nonlinear.ModelWithOracles(dest)
   end
   src_vars = MOI.get(src, MOI.ListOfVariableIndices())
   vars = MOI.add_variables(dest, length(src_vars))
-  index_map = Dict(zip(src_vars, vars))
+  variable_map = Dict(zip(src_vars, vars))
   for attr in operators
     MOI.set(dest, attr, MOI.get(src, attr))
   end
@@ -373,7 +343,7 @@ function _nlp_block(src, backend)
   for (F, S) in types
     if F <: QF
       for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
-        f = MOI.Utilities.map_indices(index_map, MOI.get(src, MOI.ConstraintFunction(), ci))
+        f = MOI.Utilities.map_indices(variable_map, MOI.get(src, MOI.ConstraintFunction(), ci))
         _add_quadratic_constraint(dest, f, MOI.get(src, MOI.ConstraintSet(), ci))
       end
     end
@@ -386,12 +356,12 @@ function _nlp_block(src, backend)
     return MOI.NLPBlockData(_constraint_bounds(dest, legacy), evaluator, legacy.has_objective)
   end
   for (F, S) in types
-    if F == SNF
+    if F == SNF || (F, S) == (MOI.VectorOfVariables, ORACLE)
       for ci in MOI.get(src, MOI.ListOfConstraintIndices{F, S}())
         f = MOI.get(src, MOI.ConstraintFunction(), ci)
-        MOI.add_constraint(
+        index_map[ci] = MOI.add_constraint(
           dest,
-          MOI.Utilities.map_indices(index_map, f),
+          MOI.Utilities.map_indices(variable_map, f),
           MOI.get(src, MOI.ConstraintSet(), ci),
         )
       end
@@ -399,7 +369,7 @@ function _nlp_block(src, backend)
   end
   if has_objective
     attr = MOI.ObjectiveFunction{SNF}()
-    MOI.set(dest, attr, MOI.Utilities.map_indices(index_map, MOI.get(src, attr)))
+    MOI.set(dest, attr, MOI.Utilities.map_indices(variable_map, MOI.get(src, attr)))
     # NLPModelMeta stores the sense. Its evaluator must return the original objective.
     sense = MOI.get(src, MOI.ObjectiveSense())
     MOI.set(dest, MOI.ObjectiveSense(), sense == MOI.MAX_SENSE ? MOI.MIN_SENSE : sense)
@@ -456,51 +426,6 @@ function parser_NL(nlp_data; hessian::Bool = true)
     NonLinearStructure(nnln, nl_lcon, nl_ucon, jac_rows, jac_cols, nnzj, hess_rows, hess_cols, nnzh)
 
   return nlcon
-end
-
-"""
-    oracles = parser_oracles(moimodel)
-
-Parse nonlinear oracles of a `MOI.ModelLike`.
-"""
-function parser_oracles(moimodel)
-  hessian_oracles_supported = true
-  oracles = Tuple{MOI.VectorOfVariables, _VectorNonlinearOracleCache}[]
-  lcon = Float64[]
-  ucon = Float64[]
-
-  # We know this pair exists from ListOfConstraintTypesPresent
-  for ci in MOI.get(
-    moimodel,
-    MOI.ListOfConstraintIndices{MOI.VectorOfVariables, MOI.VectorNonlinearOracle{Float64}}(),
-  )
-    f = MOI.get(moimodel, MOI.ConstraintFunction(), ci)  # ::MOI.VectorOfVariables
-    set = MOI.get(moimodel, MOI.ConstraintSet(), ci)       # ::MOI.VectorNonlinearOracle{Float64}
-
-    cache = _VectorNonlinearOracleCache(set)
-    push!(oracles, (f, cache))
-
-    # Bounds: MOI.VectorNonlinearOracle stores them internally (l, u)
-    append!(lcon, set.l)
-    append!(ucon, set.u)
-
-    # Support for the Hessian
-    hessian_oracles_supported = hessian_oracles_supported && !isnothing(set.eval_hessian_lagrangian)
-  end
-
-  # Number of scalar constraints represented by all oracles
-  ncon = length(lcon)
-
-  # Number of nonzeros for the Jacobian and Hessian
-  nnzj = 0
-  nnzh = 0
-  for (_, cache) in oracles
-    nnzj += length(cache.set.jacobian_structure)
-    # there may or may not be Hessian info
-    nnzh += length(cache.set.hessian_lagrangian_structure)
-  end
-
-  return Oracles(oracles, ncon, lcon, ucon, nnzj, nnzh, hessian_oracles_supported)
 end
 
 """

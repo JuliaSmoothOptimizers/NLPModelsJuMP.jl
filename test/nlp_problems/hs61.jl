@@ -1,3 +1,5 @@
+using JuMP
+
 "HS61 model"
 function hs61(args...; kwargs...)
   nlp = Model()
@@ -16,7 +18,7 @@ function hs61_oracle(args...; kwargs...)
   model = Model()
   @variable(model, x[i = 1:3], start = 0)
 
-  @NLobjective(model, Min, 4 * x[1]^2 + 2 * x[2]^2 + 2 * x[3]^2 - 33 * x[1] + 16 * x[2] - 24 * x[3])
+  @objective(model, Min, 4 * x[1]^2 + 2 * x[2]^2 + 2 * x[3]^2 - 33 * x[1] + 16 * x[2] - 24 * x[3])
 
   # First equality: 3*x1 - 2*x2^2 - 7 == 0
   # Canonical form for MathOptNLPModel:
